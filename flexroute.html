@@ -2163,7 +2163,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.02bb</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.02cb</span></div>
   </div>
   <div class="hbtns"><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; Edit</button></div>
 </div>
@@ -3437,11 +3437,11 @@ function parseFlexOCR(rawText) {
     var m = addr.match(re2);
     if (!m) return addr;
     var core = m[1].trim();
-    // Honorific guard: "Dr" or "St" before uppercase proper noun = name prefix, not street type.
-    // "1022 Dr Martin Luther King Jr..." → "Dr" is "Doctor", not "Drive" abbreviation.
-    if (/\b(Dr|St)\s*$/i.test(core)) {
+    // Honorific guard: "Dr/St" before uppercase proper noun = name prefix, not street type.
+    // Also: "County Road 1050 E" → "Road" is part of compound name, "1050 E" is road number.
+    if (/\b(Dr|St|County\s+Road)\s*$/i.test(core)) {
       var _rem = addr.slice(m[1].length).trim();
-      if (/^[A-Z]/.test(_rem)) return addr;
+      if (/^[A-Z0-9]/i.test(_rem)) return addr;
     }
     return core;
   }
@@ -4113,10 +4113,10 @@ function truncateAfterStreetTypeG(addr, keepCity) {
   var m = addr.match(re);
   if (!m) return addr;
   var core = m[1].trim();
-  // Honorific guard: "Dr/St" before uppercase proper noun = name prefix, not street type.
-  if (/\b(Dr|St)\s*$/i.test(core)) {
+  // Honorific guard: "Dr/St" + "County Road" before further content = name, not street type.
+  if (/\b(Dr|St|County\s+Road)\s*$/i.test(core)) {
     var _rem2 = addr.slice(m[1].length).trim();
-    if (/^[A-Z]/.test(_rem2)) return addr;
+    if (/^[A-Z0-9]/i.test(_rem2)) return addr;
   }
   if (!keepCity) return core;
   var suffix = addr.slice(m[1].length);
