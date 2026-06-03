@@ -1,0 +1,48 @@
+{
+  "id": "/flexroute",
+  "name": "FlexRoute – Route Optimizer",
+  "short_name": "FlexRoute",
+  "description": "Scan your delivery itinerary and get the shortest route in seconds. Free, no login required.",
+  "start_url": "/flexroute",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08080F",
+  "theme_color": "#D97000",
+  "lang": "en",
+  "categories": ["navigation", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/og-image.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "label": "FlexRoute route optimization"
+    }
+  ]
+}
