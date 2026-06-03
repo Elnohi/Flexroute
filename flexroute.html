@@ -2163,7 +2163,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.02</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.02bb</span></div>
   </div>
   <div class="hbtns"><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; Edit</button></div>
 </div>
@@ -2172,7 +2172,7 @@ function vResult() {
   ${sv ? (S.savingsOpen
     ? `<div id="savingsBanner">${vSavings(sv)}<button onclick="S.savingsOpen=false;render()" style="display:block;width:100%;margin-top:6px;background:transparent;border:none;color:var(--t3);font-size:12px;cursor:pointer;padding:4px">&#8963; collapse</button></div>`
     : `<div id="savingsBanner" onclick="S.savingsOpen=true;render()" style="background:var(--surf);border:1.5px solid var(--ok);border-radius:var(--r);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer">
-        <span style="font-size:14px;font-weight:700;color:var(--ok)">&#10003; Saved ${sv.savedKm}&#8239;${S.unit} &amp; ~${sv.savedMin}&#8239;min</span>
+        <span style="font-size:14px;font-weight:700;color:var(--ok)">&#10003; Saved ${sv.savedKm}&#8239;${distUnit()} &amp; ~${sv.savedMin}&#8239;min</span>
         <span style="font-size:11px;color:var(--t3);background:var(--surf2);padding:3px 8px;border-radius:5px">details &#8964;</span>
       </div>`)
     : ''}
@@ -2835,11 +2835,17 @@ async function optimize() {
       geocode(addr, biasLat, biasLon),
       new Promise(res => setTimeout(() => res(null), 12000))
     ]);
-    coordMap[x.key] = result;
-    if (result && x.key === '__home__' && !biasLat) {
-      biasLat = result.lat; biasLon = result.lon; // bootstrap bias from home
-    } else if (result && x.key === '__start__' && !biasLat) {
-      biasLat = result.lat; biasLon = result.lon; // bootstrap bias from depot
+    // For home and start, reject results outside the user's country
+    // (prevents e.g. "3 Fermoy Rd" geocoding to Fermoy, Ireland)
+    var _validResult = result;
+    if (result && (x.key === '__home__' || x.key === '__start__')) {
+      if (!_inCountry(result.lat, result.lon, S.userState)) _validResult = null;
+    }
+    coordMap[x.key] = _validResult;
+    if (_validResult && x.key === '__home__' && !biasLat) {
+      biasLat = _validResult.lat; biasLon = _validResult.lon; // bootstrap bias from home
+    } else if (_validResult && x.key === '__start__' && !biasLat) {
+      biasLat = _validResult.lat; biasLon = _validResult.lon; // bootstrap bias from depot
     } else if (result && x.key !== '__home__' && x.key !== '__start__') {
       biasLat = biasLat ? (biasLat * biasCount + result.lat) / (biasCount + 1) : result.lat;
       biasLon = biasLon ? (biasLon * biasCount + result.lon) / (biasCount + 1) : result.lon;
