@@ -1,12 +1,6 @@
 [build]
   functions = "netlify/functions"
 
-[[redirects]]
-  from = "https://www.flexrouteapp.com/*"
-  to = "https://flexrouteapp.com/:splat"
-  status = 301
-  force = true
-
 [[headers]]
   for = "/*"
   [headers.values]
