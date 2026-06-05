@@ -1,10 +1,10 @@
 [build]
   functions = "netlify/functions"
 
-# Fix: Netlify ignores dot-folders. Serve .well-known from well-known/ instead.
+# Serve assetlinks.json via function — bypasses Netlify's dot-folder issue
 [[redirects]]
-  from = "/.well-known/*"
-  to = "/well-known/:splat"
+  from = "/.well-known/assetlinks.json"
+  to = "/.netlify/functions/assetlinks"
   status = 200
   force = true
 
@@ -31,10 +31,3 @@
   for = "/.netlify/functions/*"
   [headers.values]
     Access-Control-Allow-Origin = "https://flexrouteapp.com"
-
-[[headers]]
-  for = "/well-known/assetlinks.json"
-  [headers.values]
-    Content-Type = "application/json"
-    Access-Control-Allow-Origin = "*"
-    Cache-Control = "no-cache"
