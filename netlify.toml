@@ -1,7 +1,6 @@
 [build]
   functions = "netlify/functions"
 
-# Serve assetlinks.json via function — bypasses Netlify's dot-folder issue
 [[redirects]]
   from = "/.well-known/assetlinks.json"
   to = "/.netlify/functions/assetlinks"
@@ -30,4 +29,4 @@
 [[headers]]
   for = "/.netlify/functions/*"
   [headers.values]
-    Access-Control-Allow-Origin = "https://flexrouteapp.com"
+    Access-Control-Allow-Origin = "*"
