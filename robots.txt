@@ -1,5 +1,5 @@
 User-agent: *
 Allow: /
-Disallow: /.well-known/
+Disallow:
 
 Sitemap: https://flexrouteapp.com/sitemap.xml
