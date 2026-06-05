@@ -1,6 +1,13 @@
 [build]
   functions = "netlify/functions"
 
+# Critical: serve assetlinks.json directly, no redirects allowed
+[[redirects]]
+  from = "/.well-known/assetlinks.json"
+  to = "/.well-known/assetlinks.json"
+  status = 200
+  force = true
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -14,7 +21,6 @@
   [headers.values]
     Cache-Control = "no-cache, must-revalidate"
 
-# Critical: sw.js must never be cached by the browser so SW updates reach users immediately
 [[headers]]
   for = "/sw.js"
   [headers.values]
@@ -31,3 +37,4 @@
   [headers.values]
     Content-Type = "application/json"
     Access-Control-Allow-Origin = "*"
+    Cache-Control = "no-cache"
