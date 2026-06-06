@@ -573,6 +573,117 @@ if ('serviceWorker' in navigator) {
 </style>
 </head>
 <body>
+
+<!-- ═══════ ONBOARDING OVERLAY ═══════ -->
+<style>
+#fr-onboard{position:fixed;inset:0;z-index:99999;background:rgba(8,8,15,.92);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px;font-family:'DM Sans',sans-serif}
+#fr-onboard.show{display:flex;animation:fr-fade .25s ease-out}
+@keyframes fr-fade{from{opacity:0}to{opacity:1}}
+#fr-onboard .fr-card{background:#FFFFFF;border-radius:18px;max-width:440px;width:100%;padding:28px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative;max-height:90vh;overflow-y:auto}
+#fr-onboard .fr-skip{position:absolute;top:14px;right:16px;background:none;border:none;color:#888880;font-size:14px;cursor:pointer;padding:6px 10px;font-family:inherit}
+#fr-onboard .fr-skip:hover{color:#111110}
+#fr-onboard h2{font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:800;color:#111110;margin:0 0 4px;letter-spacing:.5px}
+#fr-onboard .fr-sub{color:#444440;font-size:14px;margin-bottom:22px;line-height:1.5}
+#fr-onboard .fr-step{display:flex;gap:14px;align-items:flex-start;margin-bottom:18px;padding:14px;background:#F5F5F0;border-radius:12px;border-left:3px solid #D97000}
+#fr-onboard .fr-num{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:#D97000;color:#FFFFFF;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;font-family:'Barlow Condensed',sans-serif}
+#fr-onboard .fr-step-content{flex:1}
+#fr-onboard .fr-step-title{font-weight:600;color:#111110;font-size:15px;margin-bottom:4px}
+#fr-onboard .fr-step-desc{color:#444440;font-size:13px;line-height:1.5}
+#fr-onboard .fr-tip{background:#FFF5E6;border:1px solid #FFD699;border-radius:10px;padding:12px 14px;margin-bottom:22px;font-size:13px;color:#7A4500;line-height:1.5}
+#fr-onboard .fr-tip strong{color:#5C3300}
+#fr-onboard .fr-cta{display:flex;gap:10px;flex-direction:column}
+#fr-onboard .fr-btn{padding:14px 20px;border:none;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s}
+#fr-onboard .fr-btn-primary{background:#D97000;color:#FFFFFF}
+#fr-onboard .fr-btn-primary:active{background:#B85F00;transform:scale(.98)}
+#fr-onboard .fr-check{display:flex;align-items:center;gap:8px;justify-content:center;color:#888880;font-size:13px;margin-top:14px;cursor:pointer;user-select:none}
+#fr-onboard .fr-check input{width:16px;height:16px;cursor:pointer;accent-color:#D97000}
+</style>
+
+<div id="fr-onboard" role="dialog" aria-labelledby="fr-onboard-title">
+  <div class="fr-card">
+    <button class="fr-skip" id="fr-skip" aria-label="Skip">Skip ✕</button>
+    <h2 id="fr-onboard-title">Welcome to FlexRoute 👋</h2>
+    <div class="fr-sub">Get the shortest route for your Amazon Flex shift in 3 quick steps.</div>
+
+    <div class="fr-step">
+      <div class="fr-num">1</div>
+      <div class="fr-step-content">
+        <div class="fr-step-title">📸 Screenshot your itinerary</div>
+        <div class="fr-step-desc">Open the Amazon Flex app and take a screenshot of your stop list (the address list view).</div>
+      </div>
+    </div>
+
+    <div class="fr-step">
+      <div class="fr-num">2</div>
+      <div class="fr-step-content">
+        <div class="fr-step-title">📤 Upload it to FlexRoute</div>
+        <div class="fr-step-desc">Tap the upload button below. FlexRoute reads the addresses automatically — no typing needed.</div>
+      </div>
+    </div>
+
+    <div class="fr-step">
+      <div class="fr-num">3</div>
+      <div class="fr-step-content">
+        <div class="fr-step-title">🚀 Get your optimized route</div>
+        <div class="fr-step-desc">Tap “Optimize Route” to get the shortest path. Then open it in Google Maps or Waze with one tap.</div>
+      </div>
+    </div>
+
+    <div class="fr-tip">
+      <strong>💡 Tip:</strong> Set your home/start address in Settings (⚙️) for the most accurate routes. Your data never leaves your device.
+    </div>
+
+    <div class="fr-cta">
+      <button class="fr-btn fr-btn-primary" id="fr-start">Got it — let's go</button>
+      <label class="fr-check"><input type="checkbox" id="fr-dont-show"> Don't show this again</label>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  try {
+    var ONBOARD_KEY = 'fr_onboard_v1_seen';
+    var seen = localStorage.getItem(ONBOARD_KEY);
+    if (!seen) {
+      var overlay = document.getElementById('fr-onboard');
+      overlay.classList.add('show');
+      document.body.style.overflow = 'hidden';
+
+      function dismiss(){
+        overlay.classList.remove('show');
+        document.body.style.overflow = '';
+        var dontShow = document.getElementById('fr-dont-show').checked;
+        // Always mark as seen (session-based); persistent if "Don't show again" is checked
+        if (dontShow) {
+          localStorage.setItem(ONBOARD_KEY, 'never');
+        } else {
+          sessionStorage.setItem(ONBOARD_KEY, 'session');
+        }
+        // GA event
+        if (typeof gtag === 'function') {
+          gtag('event', 'onboarding_dismissed', { persistent: dontShow });
+        }
+      }
+      document.getElementById('fr-start').addEventListener('click', dismiss);
+      document.getElementById('fr-skip').addEventListener('click', dismiss);
+
+      // GA event for shown
+      if (typeof gtag === 'function') {
+        gtag('event', 'onboarding_shown');
+      }
+    } else if (seen === 'never') {
+      // Never show again, do nothing
+    } else if (sessionStorage.getItem(ONBOARD_KEY)) {
+      // Already dismissed this session
+    }
+  } catch(e) {
+    // localStorage blocked — silently skip onboarding
+  }
+})();
+</script>
+<!-- ═══════ END ONBOARDING ═══════ -->
+
 <div class="offline-bar" id="offlineBar">&#9889; No connection — route still works, geocoding needs internet</div>
 <script>
 window.addEventListener('online',  function(){ document.getElementById('offlineBar').classList.remove('show'); });
@@ -671,8 +782,7 @@ function stateToCountry(state) {
     GB:'gb', UK:'gb',
     DE:'de', ES:'es', IT:'it', FR:'fr',
     AU:'au', JP:'jp', IND:'in', MX:'mx', BR:'br',
-    NL:'nl', BE:'be', SE:'se', PL:'pl', SG:'sg',
-    SA:'sa', AE:'ae', KR:'kr', AR:'ar', CO:'co', ZA:'za'
+    NL:'nl', BE:'be', SE:'se', PL:'pl', SG:'sg'
   };
   if (map[state]) return map[state];
   // All US state codes not in map → 'us'
@@ -2164,7 +2274,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.02j</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.02bb</span></div>
   </div>
   <div class="hbtns"><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; Edit</button></div>
 </div>
@@ -2967,7 +3077,7 @@ async function optimize() {
           var _isUS = S.userState && stateToCountry(S.userState) === 'us';
           if (_isUS) {
             try {
-              var _censusQ = encodeURIComponent(_os.address + (S.userState ? ', ' + S.userState : ''));
+              var _censusQ = encodeURIComponent(_os.address);
               var _cUrl = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress'
                 + '?address=' + _censusQ
                 + '&benchmark=Public_AR_Current&format=json';
@@ -2986,39 +3096,6 @@ async function optimize() {
               }
             } catch(e) {}
           }
-
-          // Strategy 6: OCR space-merge recovery
-          // OCR sometimes splits one word into two: "CAVAL CADE CT" → try "CAVALCADE CT"
-          // Try merging each adjacent pair of short words in the street name and re-geocoding.
-          if (!_os.coords) {
-            try {
-              var _baseAddr6 = (_stripped || _os.address).replace(/,.*$/, '').trim();
-              var _hm6 = _baseAddr6.match(/^(\d+\S*)\s+(.+)$/);
-              var _typeRe6 = /^(CT|DR|RD|AVE|BLVD|ST|LN|WAY|PL|CRT|CRES|COURT|DRIVE|ROAD|AVENUE|LANE|PLACE|CIRCLE|LOOP|TRAIL|TRL|PKWY|HWY)$/i;
-              if (_hm6) {
-                var _h6 = _hm6[1];
-                var _parts6 = _hm6[2].split(/\s+/);
-                var _city6 = _os.address.includes(',') ? _os.address.slice(_os.address.indexOf(',')) : '';
-                for (var _s6 = 0; _s6 < _parts6.length - 1; _s6++) {
-                  var _wa = _parts6[_s6], _wb = _parts6[_s6 + 1];
-                  if (_wa.length <= 8 && _wb.length <= 7 && !_typeRe6.test(_wa) && !_typeRe6.test(_wb)) {
-                    var _mp = _parts6.slice();
-                    _mp.splice(_s6, 2, _wa + _wb);
-                    var _ma = (_h6 + ' ' + _mp.join(' ') + _city6).trim();
-                    if (S.userState && !new RegExp(S.userState + '\\s*$').test(_ma)) {
-                      _ma += ', ' + S.userState;
-                    }
-                    var _r6 = await geocode(_ma, biasLat, biasLon);
-                    if (_r6 && haversineKm(_r6.lat, _r6.lon, _mLat, _mLon) <= _cut) {
-                      console.log('[FlexRoute] OCR merge rescued:', _os.address, '→', _ma);
-                      _os.coords = _r6; break;
-                    }
-                  }
-                }
-              }
-            } catch(e) {}
-          }
-          if (_os.coords) continue;
 
           // All strategies failed — mark for fix screen
           console.warn('[FlexRoute] Could not rescue:', _os.address, '— showing in fix screen');
@@ -3466,27 +3543,16 @@ function parseFlexOCR(rawText) {
       + '|cove|cv|bay|broadway|plaza|row|vale|rise|green|walk|nook|keep'
       + '|hill|hills|wood|woods|pass|point|pt|hollow|ford|crossing|run|loop';
     var dir  = '(?:\\s+(?:east|west|north|south|[ensw](?:\\.|\\b)))?';
-    var re2  = new RegExp('^(.+\\b(?:' + types + ')\\b' + dir + ')', 'i');
+    var unit = '(?:\\s*(?:,\\s*)?(?:unit|apt|apartment|suite|ste|#|fl(?:oor)?)\\s*#?\\s*[\\w-]+)?'; // route number: State Road 46, Hwy 30
+    var re2  = new RegExp('^(.+\\b(?:' + types + ')\\b' + dir + unit + ')', 'i');
     var m = addr.match(re2);
     if (!m) return addr;
     var core = m[1].trim();
-    // Universal remainder guard:
-    // If something follows the matched street type, decide whether to keep or strip it.
-    // Keep  → "Boulevard Haussmann", "Avenue des Champs", "County Road 1050 E", "Ave North"
-    // Strip → "Street Unit 806", "Ave Apt 4B", "Road Suite 900", "Avenue 205" (duplicate#)
-    var _rem = addr.slice(m[1].length).trim();
-    if (_rem) {
-      // Unit designators and bare duplicate house numbers → strip them (return truncated core)
-      var _isUnit = /^(?:apt|apartment|unit|suite|ste|#|\d)/i.test(_rem);
-      if (/\bCounty\s+Road\s*$/i.test(core)) {
-        // County Road X E — road number always kept
-        return addr;
-      } else if (!_isUnit) {
-        // Proper name / article / direction after street type → keep full address
-        // e.g. "Haussmann", "des Champs", "North", "Martin Luther King Jr"
-        return addr;
-      }
-      // _isUnit = true → fall through, return truncated core below
+    // Honorific guard: "Dr" or "St" before uppercase proper noun = name prefix, not street type.
+    // "1022 Dr Martin Luther King Jr..." → "Dr" is "Doctor", not "Drive" abbreviation.
+    if (/\b(Dr|St)\s*$/i.test(core)) {
+      var _rem = addr.slice(m[1].length).trim();
+      if (/^[A-Z]/.test(_rem)) return addr;
     }
     return core;
   }
@@ -3542,9 +3608,7 @@ function parseFlexOCR(rawText) {
       // Polish/Czech: ul. Wojska 10, al. Jerozolimskie 44
       /^(ul|al|pl|os|rondo)\.\s+\w/i.test(orig) ||
       // UK: Flat/Apt/Unit at start: "Flat 3, 42 Victoria Road"
-      /^(flat|apartment|ground floor|first floor|basement)\s+\d/i.test(orig) ||
-      // Japanese/Asian block format: "2-14-3 Shinjuku", "1-1 Marunouchi"
-      /^\d+-\d+(?:-\d+)?\s+[A-Za-z]/i.test(orig)
+      /^(flat|apartment|ground floor|first floor|basement)\s+\d/i.test(orig)
     );
     if (!intlOk && !/^\d/.test(clean)) return false;
     if (intlOk) return true;  // International street — bypass STREET_KW check
@@ -3642,18 +3706,8 @@ function parseFlexOCR(rawText) {
           && !isNoise(nextLn2);
 
         if (!addrLine && isStreet(ln)) {
-          // Auto-correct international formats:
-          // German/Spanish: "Calle Mayor 24" → "24 Calle Mayor"
-          //                 "Kurfurstendamm 12" → "12 Kurfurstendamm"
-          // Japanese block: "2-14-3 Shinjuku" → kept as-is (already digit-first)
-          var _lnCorr = ln;
-          var _numLast = ln.trim().match(/^([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F\s\-\.]{3,})\s+(\d+[a-z]?)$/i);
-          if (_numLast && ln.trim().length > 8) {
-            _lnCorr = _numLast[2] + ' ' + _numLast[1].trim();
-            console.log('[FlexRoute] Intl format corrected:', ln.trim(), '→', _lnCorr);
-          }
           addrLine = truncateAfterStreetType(
-            cleanLine(_lnCorr)
+            cleanLine(ln)
               .replace(/\s+for\s*\.+$/i, '')
               .replace(/\.{2,}$/, '')
               .trim()
@@ -3763,9 +3817,6 @@ function expandAbbr(q) {
   // European: "Str." → "Straße", "Str " → "Straße "
   q = q.replace(/\bStr\.\s/g, 'Straße ');
   q = q.replace(/\bstr\.\s/gi, 'Straße ');
-  // Spanish/Portuguese: "Av." → "Avenida"
-  q = q.replace(/\bAv\.?\s+(?=[A-Z])/g, 'Avenida ');
-  q = q.replace(/\bCalle\b/gi, 'Calle');
   // Polish: "ul." → "ulica"
   q = q.replace(/^ul\.\s/i, 'ulica ');
   q = q.replace(/^al\.\s/i, 'aleja ');
@@ -4142,7 +4193,7 @@ function round1(n) { return Math.round(n * 10) / 10; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── Geocoding cache (localStorage, 30-day TTL) ────────────────────────────
-const _GEO_CACHE_KEY = 'fr_geo_v3';
+const _GEO_CACHE_KEY = 'fr_geo_v2';
 function _geoLoad() { try { return JSON.parse(localStorage.getItem(_GEO_CACHE_KEY)||'{}'); } catch { return {}; } }
 function _geoGet(addr, bLat, bLon) {
   try {
@@ -4173,16 +4224,10 @@ function truncateAfterStreetTypeG(addr, keepCity) {
   var m = addr.match(re);
   if (!m) return addr;
   var core = m[1].trim();
-  // Honorific guard: "Dr/St" before proper noun. Exception: APT/UNIT treated as unit.
-  // "County Road" always keeps remainder.
-  if (/\b(Dr|St|County\s+Road)\s*$/i.test(core)) {
+  // Honorific guard: "Dr/St" before uppercase proper noun = name prefix, not street type.
+  if (/\b(Dr|St)\s*$/i.test(core)) {
     var _rem2 = addr.slice(m[1].length).trim();
-    if (/\bCounty\s+Road\s*$/i.test(core)) {
-      if (/^[A-Z0-9]/i.test(_rem2)) return addr;
-    } else {
-      var _isUnit2 = /^(?:apt|apartment|unit|suite|ste|#)/i.test(_rem2);
-      if (/^[A-Z]/i.test(_rem2) && !_isUnit2) return addr;
-    }
+    if (/^[A-Z]/.test(_rem2)) return addr;
   }
   if (!keepCity) return core;
   var suffix = addr.slice(m[1].length);
