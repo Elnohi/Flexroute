@@ -2266,7 +2266,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.06c</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.06d</span></div>
   </div>
   <div class="hbtns"><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; Edit</button></div>
 </div>
@@ -3066,10 +3066,23 @@ async function optimize() {
           // All strategies failed — mark for fix screen
           // Strategy 5 (US only): Census Bureau Geocoder — covers new US addresses
           // not yet in OpenStreetMap. Free, no key, official US address database.
-          var _isUS = S.userState && stateToCountry(S.userState) === 'us';
+          // Detect "US-ness" via inferred context (home/warehouse/region dropdown),
+          // not just the dropdown — many users set home with state but skip the dropdown.
+          var _inferredCtx = inferRegionContext();
+          var _ctxState = _inferredCtx.state || S.userState || '';
+          var _ctxCountry = _inferredCtx.country || (S.userState ? stateToCountry(S.userState) : '');
+          var _isUS = Boolean(
+                      (_ctxCountry && (_ctxCountry === 'USA' || _ctxCountry === 'us'))
+                   || (_ctxState && /^(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)$/.test(_ctxState))
+                  );
           if (_isUS) {
             try {
-              var _censusQ = encodeURIComponent(_os.address + (S.userState ? ', ' + S.userState : ''));
+              // Add state to the query if address doesn't already have one
+              var _addrForCensus = _os.address;
+              if (_ctxState && !/,\s*[A-Z]{2}\b/.test(_addrForCensus)) {
+                _addrForCensus = _addrForCensus + ', ' + _ctxState;
+              }
+              var _censusQ = encodeURIComponent(_addrForCensus);
               var _cUrl = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress'
                 + '?address=' + _censusQ
                 + '&benchmark=Public_AR_Current&format=json';
@@ -3081,12 +3094,15 @@ async function optimize() {
                   var _cc = _cm[0].coordinates;
                   var _r5 = { lat: _cc.y, lon: _cc.x };
                   if (haversineKm(_r5.lat, _r5.lon, _mLat, _mLon) <= _cut) {
-                    console.log('[FlexRoute] Rescued via Census Bureau:', _os.address);
+                    console.log('[FlexRoute] Rescued via Census Bureau:', _os.address, '(query: ' + _addrForCensus + ')');
+                    if (typeof trackEvent === 'function') {
+                      trackEvent('geocode_rescued_census', { triggered_by: _inferredCtx.state ? 'inferred_state' : 'dropdown' });
+                    }
                     _os.coords = _r5; continue;
                   }
                 }
               }
-            } catch(e) {}
+            } catch(e) { console.warn('[FlexRoute] Census Bureau call failed:', e); }
           }
 
           // Strategy 6: OCR space-merge recovery
