@@ -2266,7 +2266,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.05a</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.06c</span></div>
   </div>
   <div class="hbtns"><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; Edit</button></div>
 </div>
@@ -3129,6 +3129,87 @@ async function optimize() {
         }
       }
 
+      // ─── Rescue failed stops using context from successful stops ─────────
+      // For stops that returned null (not just wrong coords), extract state
+      // (broad — safe for multi-city routes) and city (specific — only used
+      // when route is geographically tight) from already-geocoded peers.
+      //
+      // IMPORTANT: city is only auto-appended if the route is single-city,
+      // because a multi-city route like Whitby/Pickering/Oshawa would otherwise
+      // force a failed Pickering stop into Whitby. State is always safe to
+      // append since multi-city routes still share the same state/province.
+      const _failedStops = S.stops.filter(function(s){ return !s.coords && s.geoFailed; });
+      if (_failedStops.length > 0) {
+        // Extract state + city from successful stops' resolved displayNames
+        var _stateHits = {};
+        var _cityHits  = {};
+        var _STATE_RE2 = /\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC|ON|BC|AB|QC|MB|SK|NS|NB|NL|PE|YT|NT|NU)\b/i;
+        _og.forEach(function(s){
+          var src = (s.coords && s.coords.displayName) || s.address || '';
+          var sm = src.match(_STATE_RE2);
+          if (sm) { var st = sm[1].toUpperCase(); _stateHits[st] = (_stateHits[st]||0)+1; }
+          var cm = src.match(/,\s*([A-Za-z][A-Za-z\s\-]{2,30})(?:,|$)/);
+          if (cm) {
+            var ct = cm[1].trim();
+            if (ct.length > 2 && !_STATE_RE2.test(ct)) _cityHits[ct] = (_cityHits[ct]||0)+1;
+          }
+        });
+        var _topState = Object.keys(_stateHits).sort(function(a,b){ return _stateHits[b]-_stateHits[a]; })[0];
+
+        // Multi-city detection: only treat city as "dominant" if it covers >70% of successful stops
+        // For routes spanning Whitby/Pickering/Oshawa, no single city dominates → don't auto-append city.
+        var _cityKeys = Object.keys(_cityHits);
+        var _ogCount  = _og.length;
+        var _topCity2 = '';
+        if (_cityKeys.length > 0) {
+          var _sortedCities = _cityKeys.sort(function(a,b){ return _cityHits[b]-_cityHits[a]; });
+          var _topCityName  = _sortedCities[0];
+          var _topCityShare = _cityHits[_topCityName] / _ogCount;
+          if (_topCityShare >= 0.7) {
+            _topCity2 = _topCityName; // route is single-city dominant → safe to use
+          } else {
+            console.log('[FlexRoute] Multi-city route detected (' + _sortedCities.slice(0,4).join(', ') + ') — using state only');
+          }
+        }
+
+        if (_topState || _topCity2) {
+          console.log('[FlexRoute] Rescuing', _failedStops.length, 'failed stop(s) with peer context:',
+                      { state: _topState, city: _topCity2 || '(multi-city — skipped)', centroid: [_mLat.toFixed(3), _mLon.toFixed(3)] });
+          for (var _fi = 0; _fi < _failedStops.length; _fi++) {
+            var _fs = _failedStops[_fi];
+            var _aug = _fs.address;
+            var _hasStateInAddr = _STATE_RE2.test(_aug);
+            var _hasCityInAddr  = /,\s*[A-Za-z]{3,}/.test(_fs.address);
+
+            // Strategy A: address has a city but no state → append state (safe for multi-city)
+            if (_hasCityInAddr && _topState && !_hasStateInAddr) {
+              _aug = _fs.address + ', ' + _topState;
+            }
+            // Strategy B: address has NO city → only safe when route is single-city dominant
+            else if (!_hasCityInAddr && _topCity2) {
+              _aug = _fs.address + ', ' + _topCity2 + (_topState ? ', ' + _topState : '');
+            }
+            // No safe augmentation possible → skip rather than guess wrong
+            if (_aug === _fs.address) continue;
+
+            try {
+              var _rs = await geocode(_aug, _mLat, _mLon);
+              if (_rs && haversineKm(_rs.lat, _rs.lon, _mLat, _mLon) <= _cut) {
+                console.log('[FlexRoute] Rescued failed stop via peer context:', _fs.address, '→', _aug);
+                _fs.coords = _rs;
+                _fs.geoFailed = false;
+                S.geoFailed = S.geoFailed.filter(function(a){ return a !== _fs.address; });
+                if (typeof trackEvent === 'function') {
+                  trackEvent('geocode_rescued_peer_context', {
+                    strategy: _hasCityInAddr ? 'peer_state_only' : 'peer_city_and_state'
+                  });
+                }
+              }
+            } catch(_e) {}
+          }
+        }
+      }
+
       // Validate home & start coords against cluster (silent drop if wrong country)
       if (S.homeCoords) {
         var _hd = haversineKm(S.homeCoords.lat, S.homeCoords.lon, _mLat, _mLon);
@@ -3876,6 +3957,45 @@ function expandAbbr(q) {
   return q;
 }
 
+// ─── Region context inference ─────────────────────────────────────────────────
+// Extracts state/country signals from user-set fields (home address, warehouse
+// address, region selector) so partial stop addresses can be disambiguated.
+// e.g. user in Michigan with stops "5577 SAINT ANDREW CIR, CLARKSTON" gets
+// ", MI" appended → Photon finds Clarkston, Michigan instead of failing.
+function inferRegionContext() {
+  var result = { state: '', country: '' };
+  // US/CA state abbreviations (2-letter, common ones)
+  var STATE_RE = /\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC|ON|BC|AB|QC|MB|SK|NS|NB|NL|PE|YT|NT|NU)\b/i;
+  // Country names commonly written in addresses
+  var COUNTRY_RE = /\b(USA|United States|Canada|United Kingdom|UK|Germany|France|Spain|Italy|Mexico|Brazil|Japan|India|Saudi Arabia|UAE|Australia)\b/i;
+  // Check home and warehouse for state/country signals
+  var sources = [S.home, S.startAddr].filter(Boolean);
+  for (var i = 0; i < sources.length; i++) {
+    var src = sources[i];
+    if (!result.state) {
+      var sm = src.match(STATE_RE);
+      if (sm) result.state = sm[1].toUpperCase();
+    }
+    if (!result.country) {
+      var cm = src.match(COUNTRY_RE);
+      if (cm) result.country = cm[1];
+    }
+    if (result.state && result.country) break;
+  }
+  // Fall back to region selector (S.userState) — stored as 2-letter code
+  if (!result.state && S.userState && /^[A-Z]{2}$/i.test(S.userState)) {
+    result.state = S.userState.toUpperCase();
+  }
+  // Map state → country when only state is known
+  if (result.state && !result.country) {
+    var US_STATES = /^(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)$/;
+    var CA_PROV  = /^(ON|BC|AB|QC|MB|SK|NS|NB|NL|PE|YT|NT|NU)$/;
+    if (US_STATES.test(result.state)) result.country = 'USA';
+    else if (CA_PROV.test(result.state)) result.country = 'Canada';
+  }
+  return result;
+}
+
 async function geocode(address, biasLat, biasLon) {
   if (!address?.trim()) return null;
   // Cache check first
@@ -3899,6 +4019,26 @@ async function geocode(address, biasLat, biasLon) {
     address = address + ', ' + S._inferredCity;
     console.log('[FlexRoute] City appended from route context:', address);
   }
+
+  // ─── State/Region/Country inference from home, warehouse, region selector ───
+  // Solves "Clarkston" ambiguity (MI vs GA vs WA vs UT) and similar by
+  // appending state/country context extracted from user-set fields.
+  var _inferred = inferRegionContext();
+  if (_inferred.state || _inferred.country) {
+    // Only append if the address doesn't already have a state/country signal
+    var _hasState   = /,\s*[A-Z]{2}\b/.test(address) || (_inferred.state && new RegExp('\\b' + _inferred.state + '\\b', 'i').test(address));
+    var _hasCountry = _inferred.country && new RegExp('\\b' + _inferred.country + '\\b', 'i').test(address);
+    if (!_hasState && _inferred.state) {
+      address = address + ', ' + _inferred.state;
+      console.log('[FlexRoute] State appended from context:', _inferred.state, '→', address);
+    }
+    if (!_hasCountry && _inferred.country && !_inferred.state) {
+      // Only append country if no state was added (state implies country)
+      address = address + ', ' + _inferred.country;
+      console.log('[FlexRoute] Country appended from context:', _inferred.country, '→', address);
+    }
+  }
+
 
   // Strategy: fetch multiple candidates and pick the one closest to cluster centroid
   
