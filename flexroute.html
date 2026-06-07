@@ -193,6 +193,28 @@ input:focus{border-color:var(--brd2);background:var(--surf3)}
 /* ── Result rows ── */
 .ri-active{outline:2px solid var(--acc)!important;background:var(--acc-d)!important}
 .ri{display:flex;align-items:flex-start;gap:14px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);padding:16px 15px}
+
+/* Route zoom levels — applied to body when on route view */
+body.rzoom-1 .rlist .ri{padding:18px 17px;gap:16px}
+body.rzoom-1 .rlist .ri-addr{font-size:20px;line-height:1.5;font-weight:600}
+body.rzoom-1 .rlist .rn{width:42px;height:42px;font-size:18px}
+body.rzoom-1 .rlist .ri-l{min-width:48px}
+body.rzoom-1 .rlist .rpkg{min-width:42px;padding:4px 7px}
+body.rzoom-1 .rlist .rpkg-v{font-size:18px}
+body.rzoom-2 .rlist .ri{padding:22px 19px;gap:18px}
+body.rzoom-2 .rlist .ri-addr{font-size:24px;line-height:1.4;font-weight:700;color:#fff}
+body.rzoom-2 .rlist .rn{width:50px;height:50px;font-size:22px;font-weight:900}
+body.rzoom-2 .rlist .ri-l{min-width:56px}
+body.rzoom-2 .rlist .rpkg{min-width:48px;padding:5px 9px}
+body.rzoom-2 .rlist .rpkg-v{font-size:22px}
+body.rzoom-2 .rlist .ri{border-width:2px}
+/* Higher contrast borders in zoom mode for visual separation */
+body.rzoom-1 .rlist .ri,body.rzoom-2 .rlist .ri{border-color:var(--t3)}
+
+/* Zoom toggle button */
+.zoom-btn{background:var(--surf);border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;height:44px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;font-family:var(--sans);display:flex;align-items:center;gap:4px;line-height:1}
+.zoom-btn:active{background:var(--surf2)}
+.zoom-btn.active{border-color:var(--acc);color:var(--acc)}
 .ri.rl{border-color:var(--ok);background:var(--ok-d)}
 .ri.rh{border-color:var(--ok);background:var(--ok-d)}
 .ri-l{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;min-width:40px}
@@ -383,20 +405,20 @@ input:focus{border-color:var(--brd2)}
 .ld-pfill{height:100%;background:var(--acc);border-radius:1px;transition:width .3s}
 
 /* Result rows */
-.ri{display:flex;align-items:flex-start;gap:10px;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:10px 11px}
+.ri{display:flex;align-items:flex-start;gap:12px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);padding:14px 13px}
 .ri.rl{border-color:var(--ok);background:var(--ok-d)}
 .ri.rh{border-color:var(--ok);background:var(--ok-d)}
-.ri-l{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;min-width:36px}
-.rn{width:30px;height:30px;border-radius:50%;background:var(--acc);color:#000;font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center}
-.rpkg{display:flex;flex-direction:column;align-items:center;background:var(--surf);border:1.5px solid var(--acc);border-radius:5px;padding:2px 5px;min-width:30px}
-.rpkg-l{font-size:8px;color:var(--t3);line-height:1}
-.rpkg-v{font-size:14px;font-weight:800;color:var(--acc);line-height:1.2}
-.ri-addr{flex:1;font-size:14px;font-family:var(--mono);color:var(--t2);line-height:1.4;word-break:break-word;padding-top:4px}
-.ri-tag{font-size:9px;font-weight:700;letter-spacing:2px;color:var(--ok);border:1px solid var(--ok);padding:2px 5px;border-radius:4px;flex-shrink:0;margin-top:6px}
-.rlist{display:flex;flex-direction:column;gap:7px}
+.ri-l{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;min-width:42px}
+.rn{width:38px;height:38px;border-radius:50%;background:var(--acc);color:#000;font-size:17px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.rpkg{display:flex;flex-direction:column;align-items:center;background:var(--surf);border:1.5px solid var(--acc);border-radius:5px;padding:2px 5px;min-width:34px}
+.rpkg-l{font-size:9px;color:var(--t3);line-height:1}
+.rpkg-v{font-size:15px;font-weight:800;color:var(--acc);line-height:1.2}
+.ri-addr{flex:1;font-size:16px;font-family:var(--body);color:var(--t1);line-height:1.45;word-break:break-word;padding-top:6px;font-weight:500}
+.ri-tag{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--ok);border:1px solid var(--ok);padding:2px 5px;border-radius:4px;flex-shrink:0;margin-top:6px}
+.rlist{display:flex;flex-direction:column;gap:8px}
 .rmeta{display:flex;justify-content:space-between;align-items:center;margin-top:13px;margin-bottom:3px}
-.rcnt{font-size:12px;color:var(--t3)}
-.rcp{font-size:12px;color:var(--acc);background:transparent;border:1px solid var(--brd);border-radius:5px;padding:4px 10px;cursor:pointer;font-family:var(--sans)}
+.rcnt{font-size:13px;color:var(--t2)}
+.rcp{font-size:13px;color:var(--acc);background:transparent;border:1px solid var(--brd);border-radius:5px;padding:5px 11px;cursor:pointer;font-family:var(--sans)}
 .lgd{display:flex;gap:14px;margin-top:10px;padding:9px 11px;background:var(--surf);border-radius:var(--rs);border:1px solid var(--brd);flex-wrap:wrap}
 .li{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--t2)}
 .cb{background:var(--acc);color:#000;font-size:10px;font-weight:800;padding:1px 6px;border-radius:10px;margin-left:5px}
@@ -724,6 +746,8 @@ const S = {
   lang: localStorage.getItem('fr_lang') || (['fr','de','es'].indexOf((navigator.language||'en').substring(0,2).toLowerCase()) >= 0 ? (navigator.language||'en').substring(0,2).toLowerCase() : 'en'),
   tweakMode:  false,
   savingsOpen: false,
+  // Text zoom level for route view: 0=normal, 1=large, 2=xlarge (persisted)
+  routeZoom: parseInt(localStorage.getItem('fr_route_zoom') || '0', 10) || 0,
   companion:  false,
   cIdx:       0,
   cDone:      [],
@@ -1015,14 +1039,14 @@ function activateMoveRow(row) {
     var up = document.createElement('button');
     up.innerHTML = '&#8593;';
     up.style.cssText = 'width:30px;height:30px;background:var(--acc);color:#000;border:none;border-radius:5px;cursor:pointer;font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center';
-    up.addEventListener('click', function(e){ e.stopPropagation(); var t=S.optimized[idx]; S.optimized[idx]=S.optimized[idx-1]; S.optimized[idx-1]=t; render(); });
+    up.addEventListener('click', function(e){ e.stopPropagation(); var t=S.optimized[idx]; S.optimized[idx]=S.optimized[idx-1]; S.optimized[idx-1]=t; S.tweakMode=true; saveSession(); render(); });
     ctrl.appendChild(up);
   }
   if (idx < n - 1) {
     var dn = document.createElement('button');
     dn.innerHTML = '&#8595;';
     dn.style.cssText = 'width:30px;height:30px;background:var(--acc);color:#000;border:none;border-radius:5px;cursor:pointer;font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center';
-    dn.addEventListener('click', function(e){ e.stopPropagation(); var t=S.optimized[idx]; S.optimized[idx]=S.optimized[idx+1]; S.optimized[idx+1]=t; render(); });
+    dn.addEventListener('click', function(e){ e.stopPropagation(); var t=S.optimized[idx]; S.optimized[idx]=S.optimized[idx+1]; S.optimized[idx+1]=t; S.tweakMode=true; saveSession(); render(); });
     ctrl.appendChild(dn);
   }
   row.style.position = 'relative';
@@ -1171,6 +1195,8 @@ function bind() {
         var sidx=parseInt(skipBtn.getAttribute('data-skip'));
         var sremoved=S.optimized.splice(sidx,1)[0];
         S.geoFailed=S.geoFailed.filter(function(a){return a!==sremoved.address;});
+        // Mark route as stale — needs re-optimization since stop count changed
+        if (S.optimized.length > 0) { S.tweakMode = true; }
         saveSession(); render();
       }
     });
@@ -1298,9 +1324,22 @@ function bind() {
       case 'cpBtn':
       case 'cpyBtn':       copyRoute(); break;
       case 'shareBtn':     shareRoute(); break;
-                    S.tweakMode=false;
-        S.stops=S.optimized.map(function(s){return Object.assign({},s);});
-        S.optimized=[]; S.savings=null; saveSession(); optimize(); break;
+      case 'reoptBtn':
+        S.tweakMode=false;
+        // From route view, the visible order is in S.optimized; copy back as the new input order.
+        // From edit view, S.stops is already the source of truth — no copy needed.
+        if (S.phase === 'result' && S.optimized && S.optimized.length > 0) {
+          S.stops=S.optimized.map(function(s){return Object.assign({},s);});
+        }
+        S.optimized=[]; S.savings=null; saveSession(); optimize();
+        if (typeof trackEvent === 'function') trackEvent('route_reoptimized', { trigger: 'manual_edit' });
+        break;
+      case 'zoomBtn':
+        S.routeZoom = (S.routeZoom + 1) % 3;
+        localStorage.setItem('fr_route_zoom', String(S.routeZoom));
+        if (typeof trackEvent === 'function') trackEvent('route_zoom_changed', { level: S.routeZoom });
+        render();
+        break;
       case 'clearStartBtn': S.startAddr=''; localStorage.removeItem('fr_sa'); localStorage.removeItem('fr_start'); toast('Starting address cleared'); render(); break;
       case 'clearHomeBtn':  S.home=''; localStorage.removeItem('fr_hm'); toast('Home address cleared'); render(); break;
       case 'retryOptBtn': S.errMsg=''; optimize(); break;
@@ -1799,6 +1838,11 @@ function render() {
   app.innerHTML = (v[S.phase] || vInput)();
   bind();
   if (S.phase === 'result') bindGestures();
+  // Apply route view zoom class only on result phase
+  document.body.classList.remove('rzoom-1', 'rzoom-2');
+  if (S.phase === 'result' && S.routeZoom > 0) {
+    document.body.classList.add('rzoom-' + S.routeZoom);
+  }
   // Restore state/province selector after DOM rebuild (static HTML loses selected value)
   var _sel = document.getElementById('stateSelectMain');
   if (_sel) _sel.value = S.userState || '';
@@ -1919,6 +1963,14 @@ function vInput() {
   </div>
 </div>
 <div class="scr" style="padding-top:4px">
+
+  ${(S.tweakMode && S.optimized && S.optimized.length > 0 && S.stops.length > 0) ? `<div style="background:linear-gradient(135deg, #FF9900 0%, #D97000 100%);border-radius:var(--r);padding:14px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(217,112,0,.3)">
+    <div style="flex:1">
+      <div style="font-size:15px;font-weight:800;color:#000;margin-bottom:2px">&#9888; Route is out of date</div>
+      <div style="font-size:12px;color:#000;opacity:.85">You edited stops since last optimization</div>
+    </div>
+    <button id="reoptBtn" style="background:#000;color:#FF9900;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);white-space:nowrap">&#9889; Re-optimize</button>
+  </div>` : ''}
 
   ${!S.iosDismissed && (isIOSSafari() || isAndroidChrome()) ? `
   <div class="ios-toast" id="iosDismissBtn" role="button" tabindex="0" onclick="(function(){var el=document.getElementById('iosDismissBtn');if(el)el.style.display='none';localStorage.setItem('fr_ios_dismissed','1');})()">
@@ -2266,11 +2318,19 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.06e</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.07a</span></div>
   </div>
-  <div class="hbtns"><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; Edit</button></div>
+  <div class="hbtns" style="gap:8px"><button class="zoom-btn ${S.routeZoom > 0 ? 'active' : ''}" id="zoomBtn" title="Toggle text size — tap to cycle: normal → large → extra large">${S.routeZoom === 0 ? 'A' : S.routeZoom === 1 ? 'A+' : 'A++'}</button><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; Edit</button></div>
 </div>
 <div class="scr" style="padding-top:6px">
+
+  ${S.tweakMode ? `<div style="background:linear-gradient(135deg, #FF9900 0%, #D97000 100%);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(217,112,0,.3)">
+    <div style="flex:1">
+      <div style="font-size:15px;font-weight:800;color:#000;margin-bottom:2px">&#9888; Route is out of date</div>
+      <div style="font-size:12px;color:#000;opacity:.85">You edited stops since last optimization</div>
+    </div>
+    <button id="reoptBtn" style="background:#000;color:#FF9900;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);white-space:nowrap">&#9889; Re-optimize</button>
+  </div>` : ''}
 
   ${sv ? (S.savingsOpen
     ? `<div id="savingsBanner">${vSavings(sv)}<button onclick="S.savingsOpen=false;render()" style="display:block;width:100%;margin-top:6px;background:transparent;border:none;color:var(--t3);font-size:12px;cursor:pointer;padding:4px">&#8963; collapse</button></div>`
@@ -2636,6 +2696,8 @@ function addStop(text, flexNum, skipRender, pkgCount) {
 
   S.manVal = ''; S.errMsg = '';
   if (!skipRender) {
+    // If there's an existing optimized route, mark it stale
+    if (S.optimized && S.optimized.length > 0) S.tweakMode = true;
     saveSession();
     render();
     if (flexNum == null) {
@@ -2644,12 +2706,21 @@ function addStop(text, flexNum, skipRender, pkgCount) {
   }
   return true;
 }
-function rmStop(id) { S.stops = S.stops.filter(s => s.id !== id); if (S.lastId === id) S.lastId = null; render(); }
+function rmStop(id) {
+  S.stops = S.stops.filter(s => s.id !== id);
+  if (S.lastId === id) S.lastId = null;
+  // If there's an existing optimized route, mark it stale so user sees re-optimize prompt
+  if (S.optimized && S.optimized.length > 0) S.tweakMode = true;
+  saveSession(); render();
+}
 function togLast(id) { S.lastId = S.lastId === id ? null : id; render(); }
 function mvStop(id, dir) {
   const i = S.stops.findIndex(s => s.id === id); if (i < 0) return;
   const j = i + dir; if (j < 0 || j >= S.stops.length) return;
-  [S.stops[i], S.stops[j]] = [S.stops[j], S.stops[i]]; render();
+  [S.stops[i], S.stops[j]] = [S.stops[j], S.stops[i]];
+  // Reordering only affects route if we had one already
+  if (S.optimized && S.optimized.length > 0) S.tweakMode = true;
+  saveSession(); render();
 }
 function clrAll() {
   if (!confirm('Clear all stops?')) return;
