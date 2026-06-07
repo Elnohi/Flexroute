@@ -2266,7 +2266,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.06d</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">OPTIMIZED ROUTE<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.06e</span></div>
   </div>
   <div class="hbtns"><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; Edit</button></div>
 </div>
@@ -3137,6 +3137,52 @@ async function optimize() {
             } catch(e) {}
           }
           if (_os.coords) continue;
+
+          // ─── Strategy 7: Street suffix strip ──────────────────────────────
+          // OCR sometimes reads the wrong suffix (Dr vs St vs Rd) because
+          // they're visually similar in some fonts. The street name itself is
+          // usually unique enough — geocoders often resolve correctly without
+          // a suffix at all.
+          // Example: "5577 SAINT ANDREW DR, CLARKSTON" (wrong: actually CIR)
+          //  → strip "DR" → "5577 SAINT ANDREW, CLARKSTON" → geocoder finds it
+          try {
+            var _baseAddr7 = _os.address;
+            var _suffixRe7 = /\s+(ST|RD|AVE|DR|BLVD|LN|WAY|PL|CT|CIR|CRT|CRES|COURT|DRIVE|ROAD|AVENUE|LANE|PLACE|CIRCLE|LOOP|TRAIL|TRL|PKWY|HWY|HIGHWAY|STREET|PARKWAY)\b\.?(?=\s*,|\s*$)/i;
+            if (_suffixRe7.test(_baseAddr7)) {
+              var _stripped7 = _baseAddr7.replace(_suffixRe7, '');
+              var _r7 = await geocode(_stripped7, _mLat, _mLon);
+              if (_r7 && haversineKm(_r7.lat, _r7.lon, _mLat, _mLon) <= _cut) {
+                console.log('[FlexRoute] Rescued via suffix strip:', _os.address, '→', _stripped7);
+                if (typeof trackEvent === 'function') {
+                  trackEvent('geocode_rescued_suffix_strip', {});
+                }
+                _os.coords = _r7; continue;
+              }
+            }
+          } catch(e) {}
+
+          // ─── Strategy 8: Admin/township word strip ────────────────────────
+          // City names sometimes include administrative suffixes like "TWP"
+          // (Township), "CITY OF", "VILLAGE OF", "TOWN OF", "BORO" that confuse
+          // geocoders. Strip them and retry.
+          // Example: "1234 Main St, Waterford TWP" → "1234 Main St, Waterford"
+          try {
+            var _baseAddr8 = _os.address;
+            var _adminRe8 = /\s*\b(TWP|TOWNSHIP|CITY OF|VILLAGE OF|TOWN OF|BOROUGH OF|BORO OF|BOROUGH|BORO)\b\.?/gi;
+            if (_adminRe8.test(_baseAddr8)) {
+              var _stripped8 = _baseAddr8.replace(_adminRe8, '').replace(/\s{2,}/g, ' ').replace(/,\s*,/g, ',').trim();
+              if (_stripped8 !== _baseAddr8) {
+                var _r8 = await geocode(_stripped8, _mLat, _mLon);
+                if (_r8 && haversineKm(_r8.lat, _r8.lon, _mLat, _mLon) <= _cut) {
+                  console.log('[FlexRoute] Rescued via admin-word strip:', _os.address, '→', _stripped8);
+                  if (typeof trackEvent === 'function') {
+                    trackEvent('geocode_rescued_admin_strip', {});
+                  }
+                  _os.coords = _r8; continue;
+                }
+              }
+            }
+          } catch(e) {}
 
           // All strategies failed — mark for fix screen
           console.warn('[FlexRoute] Could not rescue:', _os.address, '— showing in fix screen');
