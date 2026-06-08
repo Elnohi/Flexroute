@@ -2422,7 +2422,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.07e</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.07f</span></div>
   </div>
   <div class="hbtns" style="gap:8px"><button class="zoom-btn ${S.routeZoom > 0 ? 'active' : ''}" id="zoomBtn" title="${t('zoom_title')||'Increase text size'}" aria-label="${t('zoom_title')||'Increase text size'}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg><span style="margin-left:4px;font-size:13px;font-weight:700;line-height:1">${S.routeZoom === 0 ? '' : S.routeZoom === 1 ? '+' : '++'}</span></button><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; ${t('edit_btn')||'Edit'}</button></div>
 </div>
@@ -3057,6 +3057,52 @@ async function extractFromFile(file) {
   });
 }
 
+// ─── Census Bureau geocoder helper ────────────────────────────────────────────
+// Called when Photon + Nominatim BOTH fail for a US address. The US Census
+// Bureau maintains the official US address database and often has rural/new
+// subdivision addresses that OpenStreetMap lacks (e.g. Camby IN subdivisions).
+//
+// Returns: { lat, lon } on success, or null if the address can't be found.
+// Validates the result against optional cluster bias coords + max-distance
+// to reject coincidental matches (e.g. "131 Main St" matching the wrong state).
+//
+// SAFE TO CALL: pure async function, no side effects, free API, no key required.
+async function tryCensusBureau(address, ctxState, biasLat, biasLon, maxKm) {
+  if (!address) return null;
+  try {
+    // Add state to the query if address doesn't already include one
+    var addrForCensus = address;
+    if (ctxState && !/,\s*[A-Z]{2}\b/.test(addrForCensus)) {
+      addrForCensus = addrForCensus + ', ' + ctxState;
+    }
+    var censusQ = encodeURIComponent(addrForCensus);
+    var cUrl = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress'
+      + '?address=' + censusQ
+      + '&benchmark=Public_AR_Current&format=json';
+    // 8s timeout — Census Bureau can be slow on rare addresses
+    var cr = await Promise.race([
+      fetch(cUrl),
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('CENSUS_TIMEOUT')); }, 8000); })
+    ]);
+    if (!cr.ok) return null;
+    var cd = await cr.json();
+    var cm = cd && cd.result && cd.result.addressMatches;
+    if (!cm || cm.length === 0) return null;
+    var cc = cm[0].coordinates;
+    var coords = { lat: cc.y, lon: cc.x };
+    // Optional distance validation against cluster centroid
+    if (typeof biasLat === 'number' && typeof biasLon === 'number' && typeof maxKm === 'number') {
+      if (haversineKm(coords.lat, coords.lon, biasLat, biasLon) > maxKm) {
+        return null;
+      }
+    }
+    return coords;
+  } catch (e) {
+    console.warn('[FlexRoute] Census Bureau call failed:', e && e.message);
+    return null;
+  }
+}
+
 // ─── Main optimize flow ───────────────────────────────────────────────────────
 async function optimize() {
   // Save startAddr immediately — persists through all render() calls during optimization
@@ -3130,9 +3176,42 @@ async function optimize() {
       biasCount++;
     }
     if (!result && x.key !== '__home__' && x.key !== '__start__') {
-      if (!S.geoFailed.includes(x.address)) S.geoFailed.push(x.address);
-      var failedStop = S.stops.find(function(s){ return s.id === x.key; });
-      if (failedStop) failedStop.geoFailed = true;
+      // Photon + Nominatim both failed. Before marking as failed, try Census
+      // Bureau for US addresses — covers rural/new subdivisions missing from OSM.
+      // This fires DURING the main loop (not the outlier rescue pass) because
+      // those stops never reach the rescue cascade (they have no coords to be
+      // an outlier of). This was the Indiana Camby/Mooresville bug.
+      var _censusResult = null;
+      var _inferred = inferRegionContext();
+      var _state = _inferred.state || S.userState || '';
+      var _country = _inferred.country || (S.userState ? stateToCountry(S.userState) : '');
+      var _isUS = Boolean(
+        (_country && (_country === 'USA' || _country === 'us'))
+        || (_state && /^(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)$/.test(_state))
+      );
+      if (_isUS) {
+        // Use the running cluster bias to validate — if we have one. Allow
+        // generous 75km radius since the cluster may still be small at this
+        // point in the loop. The outlier pass later does tighter validation.
+        _censusResult = await tryCensusBureau(x.address, _state, biasLat, biasLon, biasLat ? 75 : null);
+        if (_censusResult) {
+          console.log('[FlexRoute] Census Bureau rescued mid-loop:', x.address);
+          if (typeof trackEvent === 'function') {
+            trackEvent('geocode_rescued_census', { triggered_by: 'main_loop_' + (_inferred.state ? 'inferred' : 'dropdown') });
+          }
+          coordMap[x.key] = _censusResult;
+          // Update bias with the rescued coord too
+          biasLat = biasLat ? (biasLat * biasCount + _censusResult.lat) / (biasCount + 1) : _censusResult.lat;
+          biasLon = biasLon ? (biasLon * biasCount + _censusResult.lon) / (biasCount + 1) : _censusResult.lon;
+          biasCount++;
+        }
+      }
+      // Still failed after Census attempt → mark for fix screen
+      if (!_censusResult) {
+        if (!S.geoFailed.includes(x.address)) S.geoFailed.push(x.address);
+        var failedStop = S.stops.find(function(s){ return s.id === x.key; });
+        if (failedStop) failedStop.geoFailed = true;
+      }
     }
     done++;
     S.ldProg = Math.round(done / toGeocode.length * 100);
