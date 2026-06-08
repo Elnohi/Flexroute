@@ -24,7 +24,15 @@
 
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 const CENSUS_URL    = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress';
-const TIMEOUT_MS    = 10000;
+// Per-provider timeouts:
+//   Nominatim: 3s. When it works, it answers in <300ms. When it rate-limits
+//     us (429), it returns immediately. The only slow case is genuine network
+//     latency, where 3s is plenty. Was 10s — that was wasting ~7s per failed
+//     call during rapid scan bursts (37 stops = many failures = >2 min wasted).
+//   Census Bureau: 8s. This one occasionally takes 4-6s for rare/rural
+//     addresses but is the workhorse for rescue, so we let it breathe.
+const TIMEOUT_NOMINATIM = 3000;
+const TIMEOUT_CENSUS    = 8000;
 // Nominatim usage policy requires identifying User-Agent with contact info.
 // https://operations.osmfoundation.org/policies/nominatim/
 const USER_AGENT    = 'FlexRoute/1.0 (https://flexrouteapp.com; sami@flexrouteapp.com)';
@@ -83,7 +91,9 @@ exports.handler = async function(event) {
 
   // Call upstream with timeout
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  // Pick timeout based on provider (Nominatim short, Census longer)
+  const timeoutMs = provider === 'census' ? TIMEOUT_CENSUS : TIMEOUT_NOMINATIM;
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   let resp;
   try {
     resp = await fetch(url, { headers, signal: ctrl.signal });
