@@ -2422,7 +2422,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.07f</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.07h</span></div>
   </div>
   <div class="hbtns" style="gap:8px"><button class="zoom-btn ${S.routeZoom > 0 ? 'active' : ''}" id="zoomBtn" title="${t('zoom_title')||'Increase text size'}" aria-label="${t('zoom_title')||'Increase text size'}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg><span style="margin-left:4px;font-size:13px;font-weight:700;line-height:1">${S.routeZoom === 0 ? '' : S.routeZoom === 1 ? '+' : '++'}</span></button><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; ${t('edit_btn')||'Edit'}</button></div>
 </div>
@@ -3070,35 +3070,44 @@ async function extractFromFile(file) {
 async function tryCensusBureau(address, ctxState, biasLat, biasLon, maxKm) {
   if (!address) return null;
   try {
-    // Add state to the query if address doesn't already include one
-    var addrForCensus = address;
-    if (ctxState && !/,\s*[A-Z]{2}\b/.test(addrForCensus)) {
-      addrForCensus = addrForCensus + ', ' + ctxState;
-    }
-    var censusQ = encodeURIComponent(addrForCensus);
-    var cUrl = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress'
-      + '?address=' + censusQ
-      + '&benchmark=Public_AR_Current&format=json';
-    // 8s timeout — Census Bureau can be slow on rare addresses
+    console.log('[Census] Trying:', address, '(state=' + (ctxState || '?') + ')');
+    // Call via Netlify proxy — direct browser→Census Bureau hits CORS/rate-limit
     var cr = await Promise.race([
-      fetch(cUrl),
-      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('CENSUS_TIMEOUT')); }, 8000); })
+      fetch('/.netlify/functions/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider: 'census',
+          query: address,
+          state: ctxState || undefined
+        })
+      }),
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('CENSUS_TIMEOUT')); }, 10000); })
     ]);
-    if (!cr.ok) return null;
+    if (!cr.ok) {
+      console.warn('[Census] Proxy returned HTTP', cr.status);
+      return null;
+    }
     var cd = await cr.json();
-    var cm = cd && cd.result && cd.result.addressMatches;
-    if (!cm || cm.length === 0) return null;
-    var cc = cm[0].coordinates;
-    var coords = { lat: cc.y, lon: cc.x };
+    var results = (cd && cd.results) || [];
+    if (results.length === 0) {
+      console.log('[Census] No match for:', address);
+      return null;
+    }
+    var coords = { lat: results[0].lat, lon: results[0].lon };
+    console.log('[Census] Found:', address, '→', coords.lat.toFixed(4), coords.lon.toFixed(4));
     // Optional distance validation against cluster centroid
     if (typeof biasLat === 'number' && typeof biasLon === 'number' && typeof maxKm === 'number') {
-      if (haversineKm(coords.lat, coords.lon, biasLat, biasLon) > maxKm) {
+      var distKm = haversineKm(coords.lat, coords.lon, biasLat, biasLon);
+      if (distKm > maxKm) {
+        console.warn('[Census] Rejected (too far from cluster):', address,
+          '— ' + distKm.toFixed(0) + 'km away, max ' + maxKm + 'km');
         return null;
       }
     }
     return coords;
   } catch (e) {
-    console.warn('[FlexRoute] Census Bureau call failed:', e && e.message);
+    console.warn('[Census] Call failed:', e && e.message, 'for', address);
     return null;
   }
 }
@@ -3189,6 +3198,7 @@ async function optimize() {
         (_country && (_country === 'USA' || _country === 'us'))
         || (_state && /^(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)$/.test(_state))
       );
+      console.log('[GeocodeFail]', x.address, '— state=' + _state, 'country=' + _country, '_isUS=' + _isUS);
       if (_isUS) {
         // Use the running cluster bias to validate — if we have one. Allow
         // generous 75km radius since the cluster may still be small at this
@@ -3293,22 +3303,29 @@ async function optimize() {
           // Strategy 4: Nominatim with bounding box centred on delivery area
           try {
             var _bb = 0.5;
-            var _nUrl = 'https://nominatim.openstreetmap.org/search?q='
-              + encodeURIComponent(_stripped || _os.address)
-              + '&format=json&limit=5'
-              + '&viewbox=' + (_mLon-_bb).toFixed(4) + ',' + (_mLat+_bb).toFixed(4)
-              + ',' + (_mLon+_bb).toFixed(4) + ',' + (_mLat-_bb).toFixed(4)
-              + '&bounded=1'; // CRITICAL: bounded=1 restricts to bounding box only
-            var _nr = await fetch(_nUrl);
+            var _viewboxStr = (_mLon-_bb).toFixed(4) + ',' + (_mLat+_bb).toFixed(4)
+                            + ',' + (_mLon+_bb).toFixed(4) + ',' + (_mLat-_bb).toFixed(4);
+            // Via Netlify proxy (browser→Nominatim direct gets CORS-blocked on 429)
+            var _nr = await fetch('/.netlify/functions/geocode', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                provider: 'nominatim',
+                query: _stripped || _os.address,
+                viewbox: _viewboxStr
+                // Note: 'bounded=1' constraint not directly supported by proxy yet,
+                // but viewbox biasing produces similar results in practice for rescue.
+              })
+            });
             if (_nr.ok) {
-              var _nd = await _nr.json();
-              if (_nd && _nd.length > 0) {
+              var _nd = (await _nr.json()).results || [];
+              if (_nd.length > 0) {
                 var _best = _nd.reduce(function(b, c) {
-                  var bd = haversineKm(parseFloat(b.lat), parseFloat(b.lon), _mLat, _mLon);
-                  var cd = haversineKm(parseFloat(c.lat), parseFloat(c.lon), _mLat, _mLon);
+                  var bd = haversineKm(b.lat, b.lon, _mLat, _mLon);
+                  var cd = haversineKm(c.lat, c.lon, _mLat, _mLon);
                   return cd < bd ? c : b;
                 });
-                var _r4 = { lat: parseFloat(_best.lat), lon: parseFloat(_best.lon), _approximate: true };
+                var _r4 = { lat: _best.lat, lon: _best.lon, _approximate: true };
                 if (haversineKm(_r4.lat, _r4.lon, _mLat, _mLon) <= _cut) {
                   console.log('[FlexRoute] Rescued via Nominatim bounded:', _os.address);
                   _os.coords = _r4; continue;
@@ -3330,33 +3347,15 @@ async function optimize() {
                    || (_ctxState && /^(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)$/.test(_ctxState))
                   );
           if (_isUS) {
-            try {
-              // Add state to the query if address doesn't already have one
-              var _addrForCensus = _os.address;
-              if (_ctxState && !/,\s*[A-Z]{2}\b/.test(_addrForCensus)) {
-                _addrForCensus = _addrForCensus + ', ' + _ctxState;
+            // Use the same helper as the main-loop path — goes through Netlify proxy
+            var _r5 = await tryCensusBureau(_os.address, _ctxState, _mLat, _mLon, _cut);
+            if (_r5) {
+              console.log('[FlexRoute] Rescued via Census Bureau (outlier pass):', _os.address);
+              if (typeof trackEvent === 'function') {
+                trackEvent('geocode_rescued_census', { triggered_by: _inferredCtx.state ? 'inferred_state' : 'dropdown' });
               }
-              var _censusQ = encodeURIComponent(_addrForCensus);
-              var _cUrl = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress'
-                + '?address=' + _censusQ
-                + '&benchmark=Public_AR_Current&format=json';
-              var _cr = await fetch(_cUrl);
-              if (_cr.ok) {
-                var _cd = await _cr.json();
-                var _cm = _cd && _cd.result && _cd.result.addressMatches;
-                if (_cm && _cm.length > 0) {
-                  var _cc = _cm[0].coordinates;
-                  var _r5 = { lat: _cc.y, lon: _cc.x };
-                  if (haversineKm(_r5.lat, _r5.lon, _mLat, _mLon) <= _cut) {
-                    console.log('[FlexRoute] Rescued via Census Bureau:', _os.address, '(query: ' + _addrForCensus + ')');
-                    if (typeof trackEvent === 'function') {
-                      trackEvent('geocode_rescued_census', { triggered_by: _inferredCtx.state ? 'inferred_state' : 'dropdown' });
-                    }
-                    _os.coords = _r5; continue;
-                  }
-                }
-              }
-            } catch(e) { console.warn('[FlexRoute] Census Bureau call failed:', e); }
+              _os.coords = _r5; continue;
+            }
           }
 
           // Strategy 6: OCR space-merge recovery
@@ -4449,17 +4448,29 @@ async function fetchCandidates(q, limit) {
     var nominatimP = (async () => {
       try {
         var _nCC = S.userState ? stateToCountry(S.userState) : '';
-        var nUrl = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q)
-          + '&format=json&limit=' + Math.min(limit,5) + '&accept-language=en'
-          + (_nCC ? '&countrycodes=' + _nCC : '');
+        // Build viewbox params for the proxy
+        var _viewbox = '';
         if (biasLat && biasLon) {
           var bb = 1.2;
-          nUrl += '&viewbox='+(biasLon-bb).toFixed(4)+','+(biasLat+bb).toFixed(4)+','+(biasLon+bb).toFixed(4)+','+(biasLat-bb).toFixed(4);
+          _viewbox = (biasLon-bb).toFixed(4) + ',' + (biasLat+bb).toFixed(4) + ',' + (biasLon+bb).toFixed(4) + ',' + (biasLat-bb).toFixed(4);
         }
-        var nr = await fetch(nUrl, { signal: _ac(5000).signal });
+        // Call our Netlify proxy instead of Nominatim directly. Browser → Nominatim
+        // gets rate-limited (HTTP 429 without CORS headers, appears as "CORS error").
+        // Server-side proxy has separate IP + identifying User-Agent.
+        var nr = await fetch('/.netlify/functions/geocode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            provider: 'nominatim',
+            query: q,
+            countrycodes: _nCC || undefined,
+            viewbox: _viewbox || undefined
+          }),
+          signal: _ac(8000).signal
+        });
         if (!nr.ok) return [];
         var nd = await nr.json();
-        return (nd || []).map(f => ({ lon: parseFloat(f.lon), lat: parseFloat(f.lat) }));
+        return (nd.results || []).map(f => ({ lon: f.lon, lat: f.lat }));
       } catch { return []; }
     })();
     var photonHits = await photonP;
