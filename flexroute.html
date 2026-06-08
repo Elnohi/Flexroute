@@ -2422,7 +2422,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.07d</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.07e</span></div>
   </div>
   <div class="hbtns" style="gap:8px"><button class="zoom-btn ${S.routeZoom > 0 ? 'active' : ''}" id="zoomBtn" title="${t('zoom_title')||'Increase text size'}" aria-label="${t('zoom_title')||'Increase text size'}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg><span style="margin-left:4px;font-size:13px;font-weight:700;line-height:1">${S.routeZoom === 0 ? '' : S.routeZoom === 1 ? '+' : '++'}</span></button><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; ${t('edit_btn')||'Edit'}</button></div>
 </div>
@@ -3753,39 +3753,98 @@ async function getTesseract() {
   return tesseractWorker;
 }
 
-async function geminiExtract(b64, mediaType) {
-  // Convert base64 to blob for Tesseract
-  const byteChars = atob(b64);
-  const bytes = new Uint8Array(byteChars.length);
-  for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
-  const blob = new Blob([bytes], { type: mediaType });
-  const url = URL.createObjectURL(blob);
-
+// ─── Google Cloud Vision OCR (primary engine) ──────────────────────────────
+// Calls our Netlify function which proxies to Google's Vision API. The function
+// holds the API key server-side so it never reaches the browser.
+//
+// Returns the raw extracted text, or throws on failure (caller falls back to
+// Tesseract). We DON'T throw on parse-zero-stops here — Google might succeed
+// but the user's screenshot might genuinely have no stops yet (empty itinerary).
+async function googleVisionOCR(b64) {
+  // 25s safety timeout — matches function's internal timeout
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 26000);
+  let resp;
   try {
-    const worker = await getTesseract();
-    const { data: { text } } = await worker.recognize(url);
-    URL.revokeObjectURL(url);
-    // Store raw text for debug
-    S._lastOCR = text;
-    const parsed = parseFlexOCR(text);
-    const allLines = text.split('\n').filter(l => l.trim());
-    console.log('[FlexRoute OCR] raw lines:', allLines.length, 'parsed stops:', parsed.length);
-    // Log full text in chunks of 50 lines so nothing is truncated
-    for (var ci = 0; ci < allLines.length; ci += 50) {
-      console.log('[OCR lines ' + ci + '-' + (ci+49) + ']\n' + allLines.slice(ci, ci+50).join('\n'));
-    }
-    return parsed;
-  } catch (err) {
-    URL.revokeObjectURL(url);
-    tesseractWorker = null;
-    if (err.message === 'CDN_BLOCKED') {
-      throw new Error('CDN_BLOCKED');
-    }
-    if (err.message && err.message.includes('timeout')) {
-      throw new Error('Image reading timed out. Check your internet connection and try again.');
-    }
-    throw new Error('OCR failed: ' + err.message);
+    resp = await fetch('/.netlify/functions/ocr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: b64 }),
+      signal: ctrl.signal
+    });
+  } finally {
+    clearTimeout(timer);
   }
+  if (!resp.ok) {
+    let errBody = {};
+    try { errBody = await resp.json(); } catch(_) {}
+    const code = errBody.code || ('HTTP_' + resp.status);
+    throw new Error('GOOGLE_VISION_FAILED:' + code);
+  }
+  const data = await resp.json();
+  if (typeof data.text !== 'string') throw new Error('GOOGLE_VISION_FAILED:NO_TEXT');
+  return data.text;
+}
+
+// ─── OCR pipeline (primary: Google Vision, fallback: Tesseract.js) ─────────
+// Tries Google first (better accuracy, solves the "ESTATENLN" space-loss
+// problem). If Google fails for any reason (network, quota, API down,
+// user-disabled), falls back to Tesseract.js which runs entirely in the
+// browser. The fallback is transparent to the user.
+async function geminiExtract(b64, mediaType) {
+  // Allow users to opt out of cloud OCR (stored as 'fr_local_ocr' in localStorage)
+  const useLocalOnly = localStorage.getItem('fr_local_ocr') === '1';
+  let text = null;
+  let engine = 'tesseract';  // for telemetry
+
+  if (!useLocalOnly) {
+    try {
+      text = await googleVisionOCR(b64);
+      engine = 'google_vision';
+      console.log('[FlexRoute OCR] engine: Google Cloud Vision');
+      if (typeof trackEvent === 'function') trackEvent('ocr_engine_used', { engine: 'google_vision' });
+    } catch (e) {
+      // Log the specific failure mode for diagnostics, then fall through to Tesseract
+      console.warn('[FlexRoute OCR] Google Vision failed:', e && e.message, '— falling back to Tesseract');
+      if (typeof trackEvent === 'function') trackEvent('ocr_fallback_to_tesseract', { reason: (e && e.message || 'unknown').substring(0, 60) });
+    }
+  }
+
+  if (text === null) {
+    // Tesseract path (fallback OR user opted local-only)
+    const byteChars = atob(b64);
+    const bytes = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mediaType });
+    const url = URL.createObjectURL(blob);
+    try {
+      const worker = await getTesseract();
+      const result = await worker.recognize(url);
+      text = result.data.text;
+      URL.revokeObjectURL(url);
+      console.log('[FlexRoute OCR] engine: Tesseract.js' + (useLocalOnly ? ' (user preference)' : ' (fallback)'));
+      if (typeof trackEvent === 'function' && useLocalOnly) trackEvent('ocr_engine_used', { engine: 'tesseract_local' });
+    } catch (err) {
+      URL.revokeObjectURL(url);
+      tesseractWorker = null;
+      if (err.message === 'CDN_BLOCKED') throw new Error('CDN_BLOCKED');
+      if (err.message && err.message.includes('timeout')) {
+        throw new Error('Image reading timed out. Check your internet connection and try again.');
+      }
+      throw new Error('OCR failed: ' + err.message);
+    }
+  }
+
+  // Store raw text for debug ("Show raw OCR text" feature)
+  S._lastOCR = text;
+  const parsed = parseFlexOCR(text);
+  const allLines = text.split('\n').filter(l => l.trim());
+  console.log('[FlexRoute OCR] raw lines:', allLines.length, 'parsed stops:', parsed.length, 'engine:', engine);
+  // Log full text in chunks of 50 lines so nothing is truncated
+  for (var ci = 0; ci < allLines.length; ci += 50) {
+    console.log('[OCR lines ' + ci + '-' + (ci+49) + ']\n' + allLines.slice(ci, ci+50).join('\n'));
+  }
+  return parsed;
 }
 
 // Parse Amazon Flex itinerary text extracted by Tesseract

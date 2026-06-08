@@ -1,6 +1,6 @@
 // FlexRoute Service Worker — offline support
 // v2: network-first for HTML so deploys reach users immediately
-const CACHE = 'flexroute-v2';   // ← bumped from v1; forces cache wipe on update
+const CACHE = 'flexroute-v3';   // bumped: v07e adds Netlify function routing   // ← bumped from v1; forces cache wipe on update
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
@@ -26,6 +26,20 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
+
+  // Always network-only for Netlify functions — never cache, never offline-fallback
+  // (POST requests to /.netlify/functions/* shouldn't be served stale)
+  if (url.pathname.startsWith('/.netlify/functions/')) {
+    e.respondWith(
+      fetch(e.request).catch(() =>
+        new Response(JSON.stringify({ error: 'offline', code: 'OFFLINE' }), {
+          status: 503,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      )
+    );
+    return;
+  }
 
   // Always network-only for external APIs — never cache these
   const isAPI = [
