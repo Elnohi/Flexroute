@@ -1240,7 +1240,26 @@ function bind() {
           _fgeoAddr = _fgeoAddr + ', ' + S._inferredCity;
         }
         (async function(){
-          var _cc = await geocode(_fgeoAddr, biasLat, biasLon);
+          // Use the cluster centroid saved by the last optimize() run for bias.
+          // biasLat/biasLon from optimize() are local and not accessible here.
+          var _fBiasLat = S._biasLat || null;
+          var _fBiasLon = S._biasLon || null;
+          var _cc = await geocode(_fgeoAddr, _fBiasLat, _fBiasLon);
+          // Census Bureau fallback — catches US addresses missing from OSM/Photon.
+          // This mirrors the mid-loop rescue in optimize(), but runs from the fix screen.
+          if (!_cc) {
+            var _fCtx = inferRegionContext();
+            var _fState = _fCtx.state || S.userState || '';
+            var _fCountry = _fCtx.country || (_fState ? stateToCountry(_fState) : '');
+            var _fIsUS = Boolean(
+              (_fCountry && (_fCountry === 'us' || _fCountry === 'USA'))
+              || (_fState && /^(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)$/.test(_fState))
+            );
+            if (_fIsUS) {
+              if (_fstatus) _fstatus.innerHTML = '<span style="color:var(--t3)">Trying Census Bureau...</span>';
+              _cc = await tryCensusBureau(_fgeoAddr, _fState, _fBiasLat, _fBiasLon, _fBiasLat ? 100 : null);
+            }
+          }
           if (_cc) {
             var _fstop = S.stops.find(function(s){ return s.id === fixApplyId; });
             if (_fstop) {
@@ -1258,7 +1277,7 @@ function bind() {
               }
             }
           } else {
-            if (_fstatus) _fstatus.innerHTML = '<span style="color:var(--err)">&#10005; Still not found — try adding city name</span>';
+            if (_fstatus) _fstatus.innerHTML = '<span style="color:var(--err)">&#10005; Still not found — try adding city name or state</span>';
           }
         })();
         return;
@@ -2422,7 +2441,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.07h</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.09b</span></div>
   </div>
   <div class="hbtns" style="gap:8px"><button class="zoom-btn ${S.routeZoom > 0 ? 'active' : ''}" id="zoomBtn" title="${t('zoom_title')||'Increase text size'}" aria-label="${t('zoom_title')||'Increase text size'}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg><span style="margin-left:4px;font-size:13px;font-weight:700;line-height:1">${S.routeZoom === 0 ? '' : S.routeZoom === 1 ? '+' : '++'}</span></button><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; ${t('edit_btn')||'Edit'}</button></div>
 </div>
@@ -3134,13 +3153,19 @@ async function optimize() {
   });
 
   // Step 1 — Geocode all addresses including start and home
+  // Seed coordMap from stops that already have valid coords (e.g. from the fix screen).
+  // This prevents re-geocoding corrected stops from scratch, which can re-introduce
+  // failures if Nominatim rate-limits or the bias centroid shifts on the second run.
+  const coordMap = {};
+  S.stops.forEach(s => { if (s.coords && !s.geoFailed) coordMap[s.id] = s.coords; });
+
   const toGeocode = [
     { key: '__home__',  address: S.home },
     { key: '__start__', address: S.startAddr },
-    ...S.stops.map(s => ({ key: s.id, address: s.address }))
+    ...S.stops
+      .filter(s => !coordMap[s.id])   // skip stops we already have coords for
+      .map(s => ({ key: s.id, address: s.address }))
   ].filter(x => x.address);
-
-  const coordMap = {};
   let done = 0;
   let biasLat = null, biasLon = null, biasCount = 0;
   // Country bounding boxes — reject home/start geocode if outside expected region
@@ -3229,6 +3254,9 @@ async function optimize() {
     if (i < toGeocode.length - 1) await sleep(400);
   }
 
+  // Store cluster centroid on S so fix screen handler can use it (it runs outside optimize() scope).
+  S._biasLat = biasLat; S._biasLon = biasLon;
+
   // *** THE CRITICAL SECTION — was missing from broken version ***
   S.homeCoords = coordMap['__home__'] || null;
   let startCoords = S.gpsCoords ? { lon: S.gpsCoords.lon, lat: S.gpsCoords.lat } : null;
@@ -3236,6 +3264,8 @@ async function optimize() {
     startCoords = coordMap['__start__'] || await geocode(S.startAddr, biasLat, biasLon);
     localStorage.setItem('fr_sa', S.startAddr);
   }
+  // coordMap[s.id] is set from pre-seeded existing coords OR the geocoding loop above.
+  // Pre-seeded stops were skipped in toGeocode, so their key is already in coordMap.
   S.stops.forEach(s => { s.coords = coordMap[s.id] || null; });
 
   // Post-geocode outlier rescue pass
