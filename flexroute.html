@@ -795,13 +795,11 @@ function stateToCountry(state) {
     // USA — all return 'us' (handled by else below)
     // International
     GB:'gb', UK:'gb',
-    DE:'de', ES:'es', IT:'it', FR:'fr',
+    DEU:'de', ES:'es', IT:'it', FR:'fr',
+    // DE removed — clashes with Delaware (US state); Germany now uses 'DEU'
     AU:'au', JP:'jp', IND:'in', MX:'mx', BR:'br',
     NL:'nl', BE:'be', SE:'se', PL:'pl', SG:'sg',
-    SA:'sa', AE:'ae', KR:'kr', ZA:'za'
-    // AR and CO removed — they clash with US states Arkansas and Colorado.
-    // Argentina and Colombia are not in the region selector; the 'us' fallback
-    // below correctly handles AR (Arkansas) and CO (Colorado).
+    SA:'sa', AE:'ae', KR:'kr', AR:'ar', CO:'co', ZA:'za'
   };
   if (map[state]) return map[state];
   // All US state codes not in map → 'us'
@@ -2160,7 +2158,7 @@ function vInput() {
       <optgroup label="United States"><option value="AL">AL — Alabama</option><option value="AK">AK — Alaska</option><option value="AZ">AZ — Arizona</option><option value="AR">AR — Arkansas</option><option value="CA">CA — California</option><option value="CO">CO — Colorado</option><option value="CT">CT — Connecticut</option><option value="DE">DE — Delaware</option><option value="FL">FL — Florida</option><option value="GA">GA — Georgia</option><option value="HI">HI — Hawaii</option><option value="ID">ID — Idaho</option><option value="IL">IL — Illinois</option><option value="IN">IN — Indiana</option><option value="IA">IA — Iowa</option><option value="KS">KS — Kansas</option><option value="KY">KY — Kentucky</option><option value="LA">LA — Louisiana</option><option value="ME">ME — Maine</option><option value="MD">MD — Maryland</option><option value="MA">MA — Massachusetts</option><option value="MI">MI — Michigan</option><option value="MN">MN — Minnesota</option><option value="MO">MO — Missouri</option><option value="MT">MT — Montana</option><option value="NE">NE — Nebraska</option><option value="NV">NV — Nevada</option><option value="NH">NH — New Hampshire</option><option value="NJ">NJ — New Jersey</option><option value="NM">NM — New Mexico</option><option value="NY">NY — New York</option><option value="NC">NC — North Carolina</option><option value="ND">ND — North Dakota</option><option value="OH">OH — Ohio</option><option value="OK">OK — Oklahoma</option><option value="OR">OR — Oregon</option><option value="PA">PA — Pennsylvania</option><option value="RI">RI — Rhode Island</option><option value="SC">SC — South Carolina</option><option value="SD">SD — South Dakota</option><option value="TN">TN — Tennessee</option><option value="TX">TX — Texas</option><option value="UT">UT — Utah</option><option value="VT">VT — Vermont</option><option value="VA">VA — Virginia</option><option value="WA">WA — Washington</option><option value="WV">WV — West Virginia</option><option value="WI">WI — Wisconsin</option><option value="WY">WY — Wyoming</option></optgroup>
       <optgroup label="Europe &amp; Rest of World">
         <option value="GB">🇬🇧 United Kingdom</option>
-        <option value="DE">🇩🇪 Germany</option>
+        <option value="DEU">🇩🇪 Germany</option>
         <option value="FR">🇫🇷 France</option>
         <option value="ES">🇪🇸 Spain</option>
         <option value="IT">🇮🇹 Italy</option>
@@ -2444,7 +2442,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.09e</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.09g</span></div>
   </div>
   <div class="hbtns" style="gap:8px"><button class="zoom-btn ${S.routeZoom > 0 ? 'active' : ''}" id="zoomBtn" title="${t('zoom_title')||'Increase text size'}" aria-label="${t('zoom_title')||'Increase text size'}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg><span style="margin-left:4px;font-size:13px;font-weight:700;line-height:1">${S.routeZoom === 0 ? '' : S.routeZoom === 1 ? '+' : '++'}</span></button><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; ${t('edit_btn')||'Edit'}</button></div>
 </div>
@@ -3754,25 +3752,19 @@ async function optimizeWithGemini() {
   // Failed stops handled in vFix screen — not appended to result
 
   // Sanity check: if avg km/stop is implausibly large, at least one stop has
-  // wrong coordinates (e.g. "N CALCOT CT, CAMBY" → Calcot UK).
-  // Instead of suppressing the savings card entirely, recompute it on the
-  // plausible local cluster only (stops within 80km of the median point).
-  // The driver still sees their real savings — we just exclude the rogue stop.
+  // wrong coordinates. Recompute savings on the local cluster only (stops within
+  // 80km of the median), so driver still sees real savings excluding the bad stop.
   const _hvMaxOK = Math.max(geocodedStops.length * 80, 150);
   var _savOrigKm = origKm, _savOptKm = optKm;
   if (optKm > _hvMaxOK) {
-    console.warn('[FlexRoute] Haversine route implausible: ' + optKm.toFixed(0) + 'km for ' +
-      geocodedStops.length + ' stops — recomputing savings on local cluster only');
-    // Find median lat/lon of all geocoded stops
+    console.warn('[FlexRoute] Haversine implausible: ' + optKm.toFixed(0) + 'km — recomputing on local cluster');
     var _sLats = geocodedStops.map(function(s){ return s.coords.lat; }).slice().sort(function(a,b){return a-b;});
     var _sLons = geocodedStops.map(function(s){ return s.coords.lon; }).slice().sort(function(a,b){return a-b;});
     var _mLat2 = _sLats[Math.floor(_sLats.length / 2)];
     var _mLon2 = _sLons[Math.floor(_sLons.length / 2)];
-    // Keep only stops within 80km of median — excludes wrong-country outliers
     var _localIdx = geocodedStops.map(function(s, i){ return i; })
       .filter(function(i){ return haversineKm(geocodedStops[i].coords.lat, geocodedStops[i].coords.lon, _mLat2, _mLon2) <= 80; });
     if (_localIdx.length >= 2) {
-      // Recompute distances using only local stops, in original vs optimized order
       function _localDist(idxArr) {
         var d = 0;
         for (var _li = 0; _li < idxArr.length - 1; _li++) {
@@ -3781,9 +3773,7 @@ async function optimizeWithGemini() {
         }
         return d;
       }
-      // Original order = geocodedStops index order filtered to local
       var _localOrigOrder = origIdx.filter(function(i){ return _localIdx.indexOf(i) >= 0; });
-      // Optimized order = route order filtered to local
       var _localOptOrder  = route.filter(function(i){ return _localIdx.indexOf(i) >= 0; });
       _savOrigKm = round1(_localDist(_localOrigOrder));
       _savOptKm  = round1(_localDist(_localOptOrder));
@@ -4195,7 +4185,9 @@ function parseFlexOCR(rawText) {
     }
     // Fallback: 3+ digit house number, not a time/fraction, reasonable length.
     // Catches truncated addresses where street type is cut off ("3050 pharmacy...").
-    if (/^\d{3,}/.test(clean) && !/^\d{1,4}[:\-\/]\d/.test(clean) && clean.length > 8) return true;
+    // Exclude "015, CH.018" tracking code fragments (digit then immediate comma).
+    if (/^\d{3,}/.test(clean) && !/^\d{1,4}[:\-\/]\d/.test(clean) && clean.length > 8
+        && !/^\d{2,4},/.test(clean)) return true;
     // Fuzzy abbreviation heuristic — catches OCR misreads of street types:
     // "25 Elmeroy Crt" → OCR reads "Cit"/"Cnt"/"Ort" (1 char wrong) → all missed above
     // If: starts with house number + has 2+ words + ends with short word (2-5 chars)
@@ -4232,6 +4224,11 @@ function parseFlexOCR(rawText) {
     if (/^locations\s+\d/i.test(l)) return true;  // 'Locations 2' dropdown
     if (/them in your|in your itinerary|you.ll see them/i.test(l)) return true; // Amazon bottom message
     if (/^(after you|assigned more|more stops)/i.test(l)) return true; // Amazon bottom message
+    // Amazon Flex package/route tracking codes — never addresses:
+    // "#FR.015, CH.018", "#B.L36.OV", "#K-22.3E", "#K-7", "#B.L36"
+    if (/^#\s*[A-Za-z]{1,3}[.\-]\w{1,}/i.test(line.trim())) return true;
+    // Tracking ID fragments when # is dropped by OCR: "015, CH.018"
+    if (/^\d{2,4},\s*[A-Z]{2,3}[.\-]\d{3}/i.test(line.trim())) return true;
     return /^(deliver|package|itinerary|current|next stop|map|summary|list|search|tracking|locations|after you|you.ll|location)/i.test(line)
       || /^\d+\s*v$/.test(line)   // "2 v" locations dropdown
       || line.length < 3;
