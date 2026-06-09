@@ -105,8 +105,12 @@ exports.handler = async function(event) {
   clearTimeout(timer);
 
   if (!resp.ok) {
+    // Pass 429 back as 429 (not 502) so the Netlify dashboard can distinguish
+    // rate-limit hits from genuine upstream failures, and so callers can
+    // differentiate "try again later" from "geocoder is down".
+    const outStatus = resp.status === 429 ? 429 : 502;
     return {
-      statusCode: 502,
+      statusCode: outStatus,
       headers: cors,
       body: JSON.stringify({
         error: 'Geocoder error',
