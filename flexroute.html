@@ -54,8 +54,8 @@
 html{overflow-x:hidden;max-width:100vw}
 body{height:100%;background:var(--bg);color:var(--t1);font-family:var(--body);overscroll-behavior:none;overflow-x:hidden;max-width:100vw}
 body{padding-bottom:env(safe-area-inset-bottom)}
-#app{max-width:480px;width:100%;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;overflow-x:hidden}
-.scr{flex:1;display:flex;flex-direction:column;padding:0 16px 32px;overflow-y:auto}
+#app{max-width:480px;width:100%;margin:0 auto;height:100vh;max-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.scr{flex:1;display:flex;flex-direction:column;padding:0 16px 32px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 
 /* ── Header ── */
 .hdr{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1.5px solid var(--brd);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
@@ -284,8 +284,8 @@ ang="en">
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;background:var(--bg);color:var(--t1);font-family:var(--sans);overscroll-behavior:none}
 body{padding-bottom:env(safe-area-inset-bottom)}
-#app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
-.scr{flex:1;display:flex;flex-direction:column;padding:0 16px 28px;overflow-y:auto}
+#app{max-width:480px;margin:0 auto;height:100vh;max-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.scr{flex:1;display:flex;flex-direction:column;padding:0 16px 28px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 
 /* Header */
 .hdr{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--brd);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
@@ -1977,7 +1977,7 @@ function vSetup() {
   return `
 <div class="hdr">
   <div class="hbrand">
-    <img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute">
+    <img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
   </div>
   <div class="hbtns">
     <button class="ib" id="skipSetupBtn" title="Close">&#10005;</button>
@@ -2075,7 +2075,7 @@ function vInput() {
   return `
 <div class="hdr">
   <div class="hbrand">
-    <img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute">
+    <img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
   </div>
   <div class="hbtns" style="gap:8px">
     ${langPill()}
@@ -2385,7 +2385,7 @@ function vFix() {
   return `
 <div class="hdr">
   <div class="hbrand">
-    <img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute">
+    <img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
   </div>
   <div class="hbtns">
     ${langPill()}${unitPill()}
@@ -2442,7 +2442,7 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.09g</span></div>
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.09h</span></div>
   </div>
   <div class="hbtns" style="gap:8px"><button class="zoom-btn ${S.routeZoom > 0 ? 'active' : ''}" id="zoomBtn" title="${t('zoom_title')||'Increase text size'}" aria-label="${t('zoom_title')||'Increase text size'}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg><span style="margin-left:4px;font-size:13px;font-weight:700;line-height:1">${S.routeZoom === 0 ? '' : S.routeZoom === 1 ? '+' : '++'}</span></button><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; ${t('edit_btn')||'Edit'}</button></div>
 </div>
@@ -2853,11 +2853,9 @@ function clrAll() {
   clearSession(); render();
 }
 // Map Photon reverse-geocode response → selector value (e.g. 'Michigan' → 'MI')
-// Also handles countrycode fallback for international regions.
 function stateFromPhoton(p) {
   if (!p) return '';
   var STATE_NAME_MAP = {
-    // US states
     'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
     'Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA',
     'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA',
@@ -2870,46 +2868,35 @@ function stateFromPhoton(p) {
     'South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT',
     'Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI',
     'Wyoming':'WY','District of Columbia':'DC',
-    // Canadian provinces
     'Ontario':'ON','British Columbia':'BC','Alberta':'AB','Quebec':'QC',
     'Manitoba':'MB','Saskatchewan':'SK','Nova Scotia':'NS','New Brunswick':'NB',
     'Newfoundland and Labrador':'NL','Prince Edward Island':'PE',
     'Northwest Territories':'NT','Yukon':'YT','Nunavut':'NU',
-    // Countries → selector value
     'United Kingdom':'GB','Germany':'DE','France':'FR','Spain':'ES','Italy':'IT',
     'Netherlands':'NL','Belgium':'BE','Sweden':'SE','Poland':'PL',
     'Australia':'AU','Japan':'JP','India':'IND','Mexico':'MX','Brazil':'BR',
     'Singapore':'SG',
   };
-  // Try state name first (most precise for US/CA)
-  if (p.state && STATE_NAME_MAP[p.state]) return STATE_NAME_MAP[p.state];
-  // Try country name for international
-  if (p.country && STATE_NAME_MAP[p.country]) return STATE_NAME_MAP[p.country];
-  // Fallback: countrycode → selector value for countries without state breakdown
   var CC_MAP = {
     'gb':'GB','de':'DE','fr':'FR','es':'ES','it':'IT','nl':'NL','be':'BE',
-    'se':'SE','pl':'PL','au':'AU','jp':'JP','in':'IND','mx':'MX','br':'BR',
-    'sg':'SG'
+    'se':'SE','pl':'PL','au':'AU','jp':'JP','in':'IND','mx':'MX','br':'BR','sg':'SG'
   };
-  if (p.countrycode && CC_MAP[p.countrycode.toLowerCase()]) {
-    return CC_MAP[p.countrycode.toLowerCase()];
-  }
+  if (p.state && STATE_NAME_MAP[p.state]) return STATE_NAME_MAP[p.state];
+  if (p.country && STATE_NAME_MAP[p.country]) return STATE_NAME_MAP[p.country];
+  if (p.countrycode && CC_MAP[p.countrycode.toLowerCase()]) return CC_MAP[p.countrycode.toLowerCase()];
   return '';
 }
 
-// Apply auto-detected region: set S.userState, persist, update imperial flag,
-// update the selector DOM, and show a dismissible confirmation toast.
+// Apply auto-detected region — never overwrites a manually set region
 function applyAutoRegion(code, label) {
-  if (!code || S.userState) return;  // never overwrite a manually set region
+  if (!code || S.userState) return;
   S.userState = code;
   localStorage.setItem('fr_state', code);
-  // Mirror the manual-select behaviour: set imperial for US states
   var US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID',
     'IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE',
     'NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN',
     'TX','UT','VT','VA','WA','WV','WI','WY','DC'];
   if (US_STATES.indexOf(code) >= 0) S.useImperial = true;
-  // Update selector if still visible
   var sel = document.getElementById('stateSelectMain');
   if (sel) sel.value = code;
   render();
@@ -2936,12 +2923,9 @@ async function getGPS() {
           S.gpsAddr = [p.housenumber, p.street, p.city].filter(Boolean).join(' ');
           S.startAddr = S.gpsAddr;
           localStorage.setItem('fr_start', S.startAddr);
-          // Auto-set region from GPS reverse-geocode if driver hasn't set one yet
+          // Auto-set region from GPS if not already set
           var _gpsSC = stateFromPhoton(p);
-          if (_gpsSC) {
-            var _gpsLabel = p.state || p.country || _gpsSC;
-            applyAutoRegion(_gpsSC, _gpsLabel);
-          }
+          if (_gpsSC) { var _gpsLabel = p.state || p.country || _gpsSC; applyAutoRegion(_gpsSC, _gpsLabel); }
         } else {
           S.gpsAddr = lat.toFixed(5) + ', ' + lon.toFixed(5);
           S.startAddr = S.gpsAddr;
@@ -3328,8 +3312,7 @@ async function optimize() {
   // Store cluster centroid on S so fix screen handler can use it (it runs outside optimize() scope).
   S._biasLat = biasLat; S._biasLon = biasLon;
 
-  // Auto-detect region from cluster centroid if driver hasn't set one.
-  // Fires silently after every optimize() run — no GPS permission needed.
+  // Auto-detect region from cluster centroid if driver hasn't set one
   if (!S.userState && biasLat && biasLon) {
     (async function() {
       try {
@@ -3337,10 +3320,7 @@ async function optimize() {
         var _rd = await _rr.json();
         var _rp = _rd.features && _rd.features[0] && _rd.features[0].properties;
         var _rc = stateFromPhoton(_rp);
-        if (_rc) {
-          var _rl = (_rp && (_rp.state || _rp.country)) || _rc;
-          applyAutoRegion(_rc, _rl);
-        }
+        if (_rc) { var _rl = (_rp && (_rp.state || _rp.country)) || _rc; applyAutoRegion(_rc, _rl); }
       } catch(e) { /* silent — region stays unset */ }
     })();
   }
