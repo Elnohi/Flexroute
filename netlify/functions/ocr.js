@@ -6,11 +6,17 @@
 //    grab it from DevTools and rack up charges or burn through the free tier.
 //  - This function holds the key server-side and forwards requests.
 //
+// Origin gate: this endpoint is billed per call (Google Vision), so it also
+// rejects requests that don't come from flexrouteapp.com — see
+// _originCheck.js for why this exists alongside verify.js.
+//
 // Contract:
 //   POST /.netlify/functions/ocr
 //   Body: { image: "<base64 image, no data: prefix>" }
 //   Response: { text: "<extracted text>" } on success
 //             { error: "...", code: "..." } on failure (HTTP 4xx/5xx)
+
+const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
 const GOOGLE_VISION_URL = 'https://vision.googleapis.com/v1/images:annotate';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;  // 10 MB — Google's limit is 20MB, we cap lower
@@ -34,6 +40,14 @@ exports.handler = async function(event) {
 
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers: cors, body: JSON.stringify({ error: 'Method not allowed', code: 'METHOD' }) };
+  }
+
+  // Reject requests not coming from flexrouteapp.com BEFORE doing any costed
+  // work (Vision API calls are billed per request). A cloned frontend with
+  // verify.js stripped out would still hit this check here.
+  if (!isAuthorizedOrigin(event)) {
+    logRejected('ocr', event);
+    return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden', code: 'BAD_ORIGIN' }) };
   }
 
   const apiKey = process.env.GOOGLE_VISION_API_KEY;

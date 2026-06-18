@@ -10,6 +10,10 @@
 //       limit bucket from the user's home IP)
 //     - We can centralize identifying User-Agent (Nominatim requires this)
 //
+// Origin gate: a clone hot-linking this endpoint would burn our shared
+// Nominatim/Census rate-limit bucket for every real user — see
+// _originCheck.js for why this exists alongside verify.js.
+//
 // Contract:
 //   POST /.netlify/functions/geocode
 //   Body: {
@@ -21,6 +25,8 @@
 //   }
 //   Response (200): { results: [{ lat, lon, display_name }] }   // 0+ results
 //   Response (4xx/5xx): { error, code }
+
+const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 const CENSUS_URL    = 'https://geocoding.geo.census.gov/geocoder/locations/onelineaddress';
@@ -49,6 +55,14 @@ exports.handler = async function(event) {
   }
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers: cors, body: JSON.stringify({ error: 'Method not allowed', code: 'METHOD' }) };
+  }
+
+  // Reject requests not coming from flexrouteapp.com BEFORE calling Nominatim
+  // or Census (shared rate-limit bucket, paid-in-effort to keep healthy).
+  // A cloned frontend with verify.js stripped out would still hit this check.
+  if (!isAuthorizedOrigin(event)) {
+    logRejected('geocode', event);
+    return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden', code: 'BAD_ORIGIN' }) };
   }
 
   let body;
