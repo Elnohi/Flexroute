@@ -4429,9 +4429,40 @@ function parseFlexOCR(rawText) {
           .replace(/,?\s*(them in your itinerary|in your itinerary|after you).*/i, '')
           .trim();
         var fullAddr = city ? (addrLine + ', ' + city) : addrLine;
-        var key = addrLine.toLowerCase().replace(/\s+/g,' ').substring(0, 22);
-        var _existingResult = results.find(function(r){
-          return r.address.toLowerCase().replace(/\s+/g,' ').indexOf(key) >= 0;
+        // Dedup key: normalize the FULL address (not a truncated prefix).
+        // Why not truncate to ~22 chars like before? Because two different
+        // units on the same long street name (e.g. "77 Shuter St Unit 1603"
+        // vs "77 Shuter Street Suite 999") share an identical prefix well
+        // under 22 characters — truncating merges genuinely different
+        // deliveries into one stop and silently drops/sums package counts
+        // for the wrong address.
+        //
+        // What we actually need to catch: the SAME physical line read
+        // slightly differently across two overlapping screenshots (e.g. one
+        // crop cuts off "Unit 1603", the other captures it in full). That's
+        // a "one is a prefix of the other" relationship on the FULL string,
+        // not a fixed character count — so compare the complete normalized
+        // address, and only treat a prefix-match as the same stop when the
+        // shorter one isn't simply missing a unit/suite/apartment number
+        // (which would mean it's actually a different sub-address).
+        var normAddr = fullAddr.toLowerCase().replace(/\s+/g, ' ').trim();
+        var hasUnitInfo = /\b(unit|apt|apartment|suite|ste|#)\.?\s*\d/i.test(fullAddr);
+        var _existingResult = results.find(function(r) {
+          var rNorm = r.address.toLowerCase().replace(/\s+/g, ' ').trim();
+          if (rNorm === normAddr) return true; // exact match, always same stop
+          // Prefix relationship (one is a truncated OCR read of the other) —
+          // only treat as the same stop if NEITHER side carries unit/suite
+          // info the other lacks. If either has a unit number the other
+          // doesn't, they're different sub-addresses, not OCR variance.
+          var shorter = normAddr.length <= rNorm.length ? normAddr : rNorm;
+          var longer  = normAddr.length <= rNorm.length ? rNorm : normAddr;
+          if (longer.indexOf(shorter) !== 0) return false; // not a prefix relationship
+          var rHasUnit = /\b(unit|apt|apartment|suite|ste|#)\.?\s*\d/i.test(r.address);
+          if (hasUnitInfo !== rHasUnit) return false; // one has unit info, other doesn't → different sub-address
+          // Require the prefix to be reasonably long relative to the shorter
+          // string so two short, unrelated lines don't accidentally collide
+          // (e.g. avoids matching on just a house number + first letter).
+          return shorter.length >= 12;
         });
         if (_existingResult) {
           // Same address found:
@@ -4933,19 +4964,97 @@ async function osrmRoute(coords) {
 }
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
+// Google Maps chunk boundaries — chosen by GEOGRAPHIC GAP, not fixed count.
+//
+// Why: a fixed "every 5 stops" cut can slice straight through a tight
+// geographic cluster, landing one cluster member in chunk N and its
+// neighbors in chunk N+1. Each chunk is then shown to the driver as its
+// own little route, and a cluster that got split looks like a worse detour
+// than the full route actually is (the chunk has no way to show the driver
+// it's just a slice). Breaking chunks where the route ALREADY has a big
+// jump (a real geographic gap FlexRoute's own optimizer produced, e.g. a
+// detour out to a far stop) means each chunk reads as one coherent area.
+//
+// MAX_CHUNK keeps us within Google's documented waypoint limits. The dir
+// URL format supports up to 3 intermediate waypoints on mobile browsers and
+// 9 otherwise — drivers are on phones, so 3 is the binding constraint (the
+// previous value of 5 here was already over that limit on mobile; this
+// fixes a real latent bug, not just the chunk-boundary-placement issue).
+// MIN_CHUNK avoids ever producing a near-empty trailing chunk.
+const GMAPS_MAX_CHUNK = 3;
+const GMAPS_MIN_CHUNK = 2;
+
+// Computes chunk boundaries once per S.optimized array. Returns an array of
+// [startIdx, endIdx) pairs covering all stops in S.optimized.
+function _gMapsChunkBounds() {
+  const stops = S.optimized;
+  const n = stops.length;
+  if (n === 0) return [];
+  if (n <= GMAPS_MAX_CHUNK) return [[0, n]];
+
+  // Distance from each stop to the next (km), where coords are known.
+  // Stops with missing coords (geoFailed) get a gap of 0 so they never
+  // force an artificial break — we only want to break on REAL distance.
+  const gaps = [];
+  for (let i = 0; i < n - 1; i++) {
+    const a = stops[i].coords, b = stops[i + 1].coords;
+    gaps.push((a && b) ? haversineKm(a.lat, a.lon, b.lat, b.lon) : 0);
+  }
+  // Typical gap size across the WHOLE route — used as a baseline so we only
+  // break early on a gap that's a genuine outlier (e.g. a detour to a far
+  // stop), not just "the biggest of several similar small gaps in this
+  // particular window" (that was the bug in the first version of this
+  // function — it broke at every local maximum and produced too many tiny
+  // chunks). A median is more robust to a few huge outlier gaps skewing
+  // things than a mean would be.
+  const sortedGaps = gaps.slice().sort((a, b) => a - b);
+  const medianGap = sortedGaps.length
+    ? sortedGaps[Math.floor(sortedGaps.length / 2)]
+    : 0;
+  // A gap has to be at least this many times the median to count as a real
+  // "natural break" worth cutting early for. Otherwise we fall back to the
+  // old fixed-size cut, which is a perfectly fine default when the route
+  // doesn't have any standout jumps in this window.
+  const OUTLIER_FACTOR = 2.5;
+  const outlierThreshold = Math.max(medianGap * OUTLIER_FACTOR, 1.5); // km floor
+
+  const bounds = [];
+  let start = 0;
+  while (start < n) {
+    const maxEnd = Math.min(start + GMAPS_MAX_CHUNK, n);
+    const minEnd = Math.min(start + GMAPS_MIN_CHUNK, n);
+    if (maxEnd >= n) { bounds.push([start, n]); break; }
+
+    // Find the single biggest gap in this window. Only break there if it
+    // clears the outlier threshold — otherwise just take the full-size
+    // chunk (old fixed behavior), so we don't fragment a route that's
+    // genuinely one continuous cluster with no standout jump.
+    let bestIdx = -1, bestGap = -1;
+    for (let i = minEnd - 1; i < maxEnd; i++) {
+      if (gaps[i] > bestGap) { bestGap = gaps[i]; bestIdx = i; }
+    }
+    const end = (bestGap >= outlierThreshold) ? bestIdx + 1 : maxEnd;
+    bounds.push([start, end]);
+    start = end;
+  }
+  return bounds;
+}
+
 function gMapsURL(chunkIndex) {
-  const CHUNK = 5;
   const allStops = S.optimized.map(s => s.address);
+  const bounds = _gMapsChunkBounds();
   const idx = chunkIndex || 0;
-  const chunk = allStops.slice(idx * CHUNK, (idx + 1) * CHUNK);
+  if (idx >= bounds.length) return '#';
+  const [from, to] = bounds[idx];
+  const chunk = allStops.slice(from, to);
   if (!chunk.length) return '#';
-  const chunkStart = idx === 0 ? (S.startAddr || '') : allStops[idx * CHUNK - 1];
-  const isLast = (idx + 1) * CHUNK >= allStops.length;
+  const chunkStart = idx === 0 ? (S.startAddr || '') : allStops[from - 1];
+  const isLast = idx === bounds.length - 1;
   const chunkEnd = isLast ? S.home : '';
   const pts = [chunkStart, ...chunk, chunkEnd].filter(Boolean);
   return 'https://www.google.com/maps/dir/' + pts.map(p => encodeURIComponent(p)).join('/');
 }
-function totalChunks() { return Math.ceil(S.optimized.length / 5); }
+function totalChunks() { return _gMapsChunkBounds().length; }
 function round1(n) { return Math.round(n * 10) / 10; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
