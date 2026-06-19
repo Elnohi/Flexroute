@@ -752,6 +752,18 @@ const S = {
   cIdx:       0,
   cDone:      [],
   cShiftStart: null,
+  // Which nav app the driver last tapped during Shift Mode ('waze'|'maps'|null).
+  // Used to auto-relaunch the SAME app for the next stop after "Delivered"
+  // is tapped, instead of making the driver look at the screen and tap
+  // Waze/Maps again every single stop. Persisted across sessions so a
+  // driver who always uses Waze doesn't have to re-establish that choice
+  // every shift.
+  cNavApp:    localStorage.getItem('fr_nav_app') || null,
+  // Whether "Delivered" auto-relaunches nav for the next stop. Defaults ON
+  // since that's the point of this feature, but some drivers may prefer to
+  // glance at the next address before navigating (e.g. while still building
+  // trust in OCR accuracy) — easy to flip off from the Shift Mode header.
+  cAutoNav:   localStorage.getItem('fr_auto_nav') !== '0',
   iosDismissed: localStorage.getItem('fr_ios_dismissed') === '1',
   gpsCoords:  null,   // kept for future use
   gpsAddr:    '',
@@ -874,7 +886,8 @@ function saveSession() {
       stops: S.stops, optimized: S.optimized, savings: S.savings,
       lastId: S.lastId, startAddr: S.startAddr, uid: S.uid,
       geoFailed: S.geoFailed,
-      companion: S.companion, cIdx: S.cIdx, cDone: S.cDone, cShiftStart: S.cShiftStart
+      companion: S.companion, cIdx: S.cIdx, cDone: S.cDone, cShiftStart: S.cShiftStart,
+      cNavApp: S.cNavApp, cAutoNav: S.cAutoNav
     }));
   } catch(e) {}
 }
@@ -998,7 +1011,11 @@ window.addEventListener('load', () => {
         if (p.startAddr) S.startAddr = p.startAddr;
         S.uid = p.uid || 0;
         S.geoFailed = p.geoFailed || [];
-        if (p.companion) { S.companion=p.companion; S.cIdx=p.cIdx||0; S.cDone=p.cDone||[]; S.cShiftStart=p.cShiftStart||null; }
+        if (p.companion) {
+          S.companion=p.companion; S.cIdx=p.cIdx||0; S.cDone=p.cDone||[]; S.cShiftStart=p.cShiftStart||null;
+          if (p.cNavApp) S.cNavApp = p.cNavApp;
+          if (typeof p.cAutoNav === 'boolean') S.cAutoNav = p.cAutoNav;
+        }
         S.phase = (p.optimized && p.optimized.length > 0) ? 'result' : 'input';
         render();
         setTimeout(() => {
@@ -2590,6 +2607,11 @@ function vCompanion() {
     '<div class="comp-hdr">' +
       '<button id="compBkBtn" style="background:transparent;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:4px 10px">&#8592;</button>' +
       '<div style="font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--t2)">SHIFT MODE</div>' +
+      '<button id="compAutoNavBtn" title="Auto-open nav for next stop after Delivered" ' +
+        'style="background:transparent;border:1px solid var(--brd2);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;color:' +
+        (S.cAutoNav ? 'var(--acc);border-color:var(--acc)' : 'var(--t3)') + '">' +
+        (S.cAutoNav ? '&#9655; AUTO-NAV ON' : 'AUTO-NAV OFF') +
+      '</button>' +
       '<div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--acc)">' + done + '/' + total + '</div>' +
     '</div>' +
     '<div class="comp-prog"><div class="comp-prog-fill" style="width:' + pct + '%"></div></div>' +
@@ -2665,12 +2687,39 @@ function markDelivered() {
   var stops = S.optimized.filter(function(s){ return !s.geoFailed; });
   if (S.cIdx >= stops.length) return;
   if (S.cDone.indexOf(S.cIdx) < 0) S.cDone.push(S.cIdx);
-  if (S.cIdx < stops.length - 1) { S.cIdx++; }
+  var wasLast = S.cIdx >= stops.length - 1;
+  if (!wasLast) { S.cIdx++; }
   else {
     S.cIdx = stops.length;
     trackEvent('companion_completed', { stop_count: stops.length, elapsed_mins: Math.round((Date.now() - S.cShiftStart) / 60000) });
   }
   saveSession(); render();
+
+  // Auto-relaunch nav for the NEW current stop, using whichever app the
+  // driver last tapped (Waze or Maps). This is the whole point of this
+  // change: collapse "look at the new address, decide, tap Waze/Maps again"
+  // into a single action triggered by the "Delivered" tap itself, since
+  // that round-trip (FlexRoute -> nav app -> back to FlexRoute -> nav app
+  // again) is real, measurable time lost on every one of 14-30+ stops.
+  //
+  // Deliberately does NOT fire on the shift-complete screen (wasLast) —
+  // there's no "next stop" to navigate to; the Home button there is a
+  // separate, explicit tap, which is correct (driving home isn't an
+  // automatic action a driver should have sprung on them).
+  if (!wasLast && S.cNavApp && S.cAutoNav) {
+    var nextStop = stops[S.cIdx];
+    if (nextStop && nextStop.address) {
+      var url = S.cNavApp === 'waze'
+        ? 'https://waze.com/ul?q=' + encodeURIComponent(nextStop.address) + '&navigate=yes'
+        : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(nextStop.address);
+      // This is a direct, synchronous result of the user's own click on
+      // "Delivered" — most mobile browsers only allow window.open without
+      // a popup block when it's triggered this way, so calling it inline
+      // here (not after an async delay) matters.
+      window.open(url, '_blank');
+      trackEvent('maps_opened', { map_type: 'companion_autonav_' + S.cNavApp });
+    }
+  }
 }
 
 function bindCompanion() {
@@ -2682,10 +2731,24 @@ function bindCompanion() {
   // Completion Done button
   var doneC = document.getElementById('compFinishBtn');
   if (doneC) doneC.addEventListener('click', exitCompanion);
+  var autoNavBtn = document.getElementById('compAutoNavBtn');
+  if (autoNavBtn) autoNavBtn.addEventListener('click', function(){
+    S.cAutoNav = !S.cAutoNav;
+    try { localStorage.setItem('fr_auto_nav', S.cAutoNav ? '1' : '0'); } catch(e) {}
+    render();
+  });
   var wBtn = document.getElementById('compWazeBtn');
-  if (wBtn) wBtn.addEventListener('click', function(){ trackEvent('maps_opened', { map_type: 'companion_waze' }); });
+  if (wBtn) wBtn.addEventListener('click', function(){
+    S.cNavApp = 'waze';
+    try { localStorage.setItem('fr_nav_app', 'waze'); } catch(e) {}
+    trackEvent('maps_opened', { map_type: 'companion_waze' });
+  });
   var mBtn = document.getElementById('compMapsBtn');
-  if (mBtn) mBtn.addEventListener('click', function(){ trackEvent('maps_opened', { map_type: 'companion_maps' }); });
+  if (mBtn) mBtn.addEventListener('click', function(){
+    S.cNavApp = 'maps';
+    try { localStorage.setItem('fr_nav_app', 'maps'); } catch(e) {}
+    trackEvent('maps_opened', { map_type: 'companion_maps' });
+  });
 }
 
 function vSavings(sv) {
