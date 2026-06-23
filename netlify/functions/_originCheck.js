@@ -24,6 +24,11 @@
 const AUTHORIZED_ORIGINS = [
   'flexrouteapp.com',
   'www.flexrouteapp.com',
+  // TEMPORARY — testing the monetization build before flexrouteapp.com is
+  // pointed at this project. REMOVE this line before launch (once the
+  // domain is attached here, this is no longer needed and weakens the
+  // domain lock by accepting a second real public hostname).
+  'melodious-strudel-3bff01.netlify.app',
 ];
 
 // Allow localhost / 127.0.0.1 so local development isn't broken.
