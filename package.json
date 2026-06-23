@@ -1,7 +1,8 @@
 {
-  "name": "flexroute-functions",
+  "name": "flexroute",
   "private": true,
   "dependencies": {
-    "@netlify/blobs": "^10.7.9"
+    "@netlify/blobs": "^10.7.9",
+    "stripe": "^22.2.3"
   }
 }
