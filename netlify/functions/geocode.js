@@ -41,7 +41,7 @@ const TIMEOUT_NOMINATIM = 3000;
 const TIMEOUT_CENSUS    = 8000;
 // Nominatim usage policy requires identifying User-Agent with contact info.
 // https://operations.osmfoundation.org/policies/nominatim/
-const USER_AGENT    = 'FlexRoute/1.0 (https://flexrouteapp.com; sami@flexrouteapp.com)';
+const USER_AGENT    = 'FlexRoute/1.0 (https://flexrouteapp.com; flexrouteapp@gmail.com)';
 
 exports.handler = async function(event) {
   const cors = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
