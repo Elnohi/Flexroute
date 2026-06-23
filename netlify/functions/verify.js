@@ -11,25 +11,11 @@
 const AUTHORIZED_ORIGINS = [
   'flexrouteapp.com',
   'www.flexrouteapp.com',
-  // TEMPORARY — testing the monetization build before flexrouteapp.com is
-  // pointed at this project. REMOVE this line before launch.
-  'melodious-strudel-3bff01.netlify.app',
 ];
 
 exports.handler = async function(event, context) {
-  // CORS header needs to actually match whatever origin is calling this —
-  // it was previously hardcoded to flexrouteapp.com only, which meant even
-  // a request that PASSED the authorization check below would still get
-  // silently blocked by the browser's own CORS enforcement on any other
-  // origin (including this temporary testing one). Reflecting the request's
-  // own origin back (when present) fixes this without weakening anything —
-  // the actual authorization decision is still made by AUTHORIZED_ORIGINS
-  // below, this header only controls whether the BROWSER lets JS read the
-  // response, which is a separate concern from whether we consider the
-  // origin authorized.
-  const requestOrigin = event.headers['origin'] || 'https://flexrouteapp.com';
   const headers = {
-    'Access-Control-Allow-Origin': requestOrigin,
+    'Access-Control-Allow-Origin': 'https://flexrouteapp.com',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json',
