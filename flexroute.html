@@ -408,11 +408,8 @@ input:focus{border-color:var(--brd2)}
 .ri{display:flex;align-items:flex-start;gap:12px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);padding:14px 13px}
 .ri.rl{border-color:var(--ok);background:var(--ok-d)}
 .ri.rh{border-color:var(--ok);background:var(--ok-d)}
-.ri.ri-done{opacity:.7}
 .ri-l{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;min-width:42px}
 .rn{width:38px;height:38px;border-radius:50%;background:var(--acc);color:#000;font-size:17px;font-weight:800;display:flex;align-items:center;justify-content:center}
-.rn-toggle{appearance:none;-webkit-appearance:none;font-family:var(--sans);transition:background .15s,color .15s}
-.rn-toggle:active{transform:scale(0.92)}
 .rpkg{display:flex;flex-direction:column;align-items:center;background:var(--surf);border:1.5px solid var(--acc);border-radius:5px;padding:2px 5px;min-width:34px}
 .rpkg-l{font-size:9px;color:var(--t3);line-height:1}
 .rpkg-v{font-size:15px;font-weight:800;color:var(--acc);line-height:1.2}
@@ -743,23 +740,6 @@ const S = {
   ocrReady:   false,
   _lastOCR:   '',
   _showDebug: false,
-  // ── Monetization / entitlement state ────────────────────────────────────
-  // userEmail + sessionToken: set once the driver verifies a one-time code.
-  // Persisted in localStorage so re-verification is only needed if cleared
-  // or on a new device — see auth.js / verify-otp.js for the actual flow.
-  userEmail:    localStorage.getItem('fr_email') || null,
-  sessionToken: localStorage.getItem('fr_session_token') || null,
-  // entitlement: 'unknown' | 'trial_available' | 'trial_used' | 'paid' | 'legacy_free'
-  // Cached locally with a timestamp so we don't hit the entitlement-check
-  // function on every single render — only on app load / after checkout.
-  entitlement:      localStorage.getItem('fr_entitlement') || 'unknown',
-  entitlementCheckedAt: parseInt(localStorage.getItem('fr_entitlement_checked_at') || '0', 10),
-  // legacyFree: true if this device already had real route history BEFORE
-  // the paywall shipped — grandfathered free per the closed-testing plan.
-  // Decided once, locally, the first time the paywall code runs; never
-  // re-evaluated after that (so a legacy user doesn't lose status just
-  // because their history later gets cleared for unrelated reasons).
-  legacyFree:   localStorage.getItem('fr_legacy_free') === '1',
   _lastPhase: '',
   userState:  localStorage.getItem('fr_state') || '',
   useImperial: localStorage.getItem('fr_imperial') === '1',
@@ -772,26 +752,6 @@ const S = {
   cIdx:       0,
   cDone:      [],
   cShiftStart: null,
-  // Which nav app the driver last tapped during Shift Mode ('waze'|'maps'|null).
-  // Used to auto-relaunch the SAME app for the next stop after "Delivered"
-  // is tapped, instead of making the driver look at the screen and tap
-  // Waze/Maps again every single stop. Persisted across sessions so a
-  // driver who always uses Waze doesn't have to re-establish that choice
-  // every shift.
-  cNavApp:    localStorage.getItem('fr_nav_app') || null,
-  // Whether "Delivered" auto-relaunches nav for the next stop. Defaults ON
-  // since that's the point of this feature, but some drivers may prefer to
-  // glance at the next address before navigating (e.g. while still building
-  // trust in OCR accuracy) — easy to flip off from the Shift Mode header.
-  cAutoNav:   localStorage.getItem('fr_auto_nav') !== '0',
-  // Manually-checked-off rows on the STATIC result list (separate from
-  // Shift Mode's cDone). Added for drivers who optimize once, then do all
-  // navigation/delivery through the Amazon Flex app directly rather than
-  // using Shift Mode — they still want a way to visually track which stops
-  // on the static list they've already handled, without the overhead of
-  // entering Shift Mode at all. Indexed by stop id, not array position, so
-  // it survives re-renders and (within reason) re-optimizations.
-  rDone:      [],
   iosDismissed: localStorage.getItem('fr_ios_dismissed') === '1',
   gpsCoords:  null,   // kept for future use
   gpsAddr:    '',
@@ -914,8 +874,7 @@ function saveSession() {
       stops: S.stops, optimized: S.optimized, savings: S.savings,
       lastId: S.lastId, startAddr: S.startAddr, uid: S.uid,
       geoFailed: S.geoFailed,
-      companion: S.companion, cIdx: S.cIdx, cDone: S.cDone, cShiftStart: S.cShiftStart,
-      cNavApp: S.cNavApp, cAutoNav: S.cAutoNav, rDone: S.rDone
+      companion: S.companion, cIdx: S.cIdx, cDone: S.cDone, cShiftStart: S.cShiftStart
     }));
   } catch(e) {}
 }
@@ -1029,102 +988,6 @@ window.addEventListener('unhandledrejection', function(e) {
 });
 
 window.addEventListener('load', () => {
-  // ── Grandfathering check (runs once, before paywall logic) ─────────────
-  // Anyone who already has evidence of using FlexRoute pre-paywall gets
-  // permanently marked free, so closed-test drivers aren't suddenly hit
-  // with a trial wall mid-test. We check several independent, long-lived
-  // localStorage keys (not just the current session, which could have been
-  // cleared) so a returning user doesn't lose grandfathered status just
-  // because they cleared one piece of data. This only ever WRITES the flag
-  // once — if it's already set, never re-evaluate, so legacy status can't
-  // be revoked later by clearing history after the fact.
-  if (localStorage.getItem('fr_legacy_free') !== '1') {
-    var priorUsageSignals = [
-      'fr_session',       // a saved route session (cleared or not)
-      'fr_nav_app',        // chose a nav app in Shift Mode before
-      'fr_route_zoom',     // adjusted text zoom on the route view before
-      'fr_imperial',       // set a unit preference before
-      'fr_sa',             // saved a start address before
-      'fr_hm',              // saved a home address before
-    ];
-    var hasPriorUsage = priorUsageSignals.some(function(k) { return localStorage.getItem(k) != null; });
-    if (hasPriorUsage) {
-      localStorage.setItem('fr_legacy_free', '1');
-      S.legacyFree = true;
-      S.entitlement = 'legacy_free';
-      localStorage.setItem('fr_entitlement', 'legacy_free');
-    }
-  }
-
-  // ── Post-checkout redirect handling ─────────────────────────────────────
-  // Stripe redirects back to success_url/cancel_url from create-checkout-
-  // session.js with these query params. Clean the URL either way so a
-  // refresh doesn't re-trigger this block, and on success force an
-  // immediate entitlement check (don't wait for it to happen to land in the
-  // fire-and-forget check above on its own timing) since this is the exact
-  // moment the driver is waiting to be let back into the app.
-  (function() {
-    var qs = new URLSearchParams(window.location.search);
-    var checkoutResult = qs.get('checkout');
-    if (checkoutResult) {
-      window.history.replaceState({}, '', window.location.pathname);
-      if (checkoutResult === 'success' && S.userEmail) {
-        fetch('/.netlify/functions/check-entitlement', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: S.userEmail })
-        }).then(function(r) { return r.json(); }).then(function(d) {
-          if (d.paid) {
-            S.entitlement = 'paid';
-            localStorage.setItem('fr_entitlement', 'paid');
-            S.phase = 'input';
-            render();
-            toast('🎉 You\'re all set — welcome to FlexRoute Premium!');
-          } else {
-            // Stripe sometimes takes a few seconds to fully process before
-            // the subscription is queryable — not a failure, just timing.
-            // The fire-and-forget check on next load will catch it; for
-            // now let them back into the app rather than stranding them
-            // on the paywall right after they just paid.
-            S.phase = 'input'; render();
-            toast('Payment received — finishing setup…');
-          }
-        }).catch(function() { S.phase = 'input'; render(); });
-      } else if (checkoutResult === 'cancelled') {
-        S.phase = 'paywall';
-      }
-    }
-  })();
-
-  // ── Live entitlement check (fire-and-forget) ────────────────────────────
-  // If we have a verified email, ask Stripe directly whether it's currently
-  // paid. Doesn't block the initial render — a driver shouldn't stare at a
-  // blank screen waiting on a network call just to see their own route
-  // screen. Corrects local state (and re-renders) only if the server
-  // disagrees with what's cached, e.g. paid on another device, or a
-  // subscription lapsed and the local flag hasn't caught up yet. Never
-  // downgrades legacy_free — that status is permanent once granted.
-  if (S.userEmail && S.legacyFree !== true) {
-    fetch('/.netlify/functions/check-entitlement', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: S.userEmail })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-      var newEntitlement = d.paid ? 'paid' : (S.entitlement === 'trial_used' ? 'trial_used' : 'trial_available');
-      if (newEntitlement !== S.entitlement) {
-        S.entitlement = newEntitlement;
-        localStorage.setItem('fr_entitlement', newEntitlement);
-        // If the driver is currently stuck on the paywall and just got
-        // confirmed as paid (e.g. completed checkout in another tab/device
-        // and came back), let them back into the app immediately.
-        if (newEntitlement === 'paid' && S.phase === 'paywall') {
-          S.phase = 'input';
-        }
-        render();
-      }
-    }).catch(function() { /* network hiccup — keep local cached state, try again next load */ });
-  }
-
   try {
     const saved = localStorage.getItem('fr_session');
     if (saved) {
@@ -1134,13 +997,8 @@ window.addEventListener('load', () => {
         S.savings = p.savings || null; S.lastId = p.lastId || null;
         if (p.startAddr) S.startAddr = p.startAddr;
         S.uid = p.uid || 0;
-        S.rDone = p.rDone || [];
         S.geoFailed = p.geoFailed || [];
-        if (p.companion) {
-          S.companion=p.companion; S.cIdx=p.cIdx||0; S.cDone=p.cDone||[]; S.cShiftStart=p.cShiftStart||null;
-          if (p.cNavApp) S.cNavApp = p.cNavApp;
-          if (typeof p.cAutoNav === 'boolean') S.cAutoNav = p.cAutoNav;
-        }
+        if (p.companion) { S.companion=p.companion; S.cIdx=p.cIdx||0; S.cDone=p.cDone||[]; S.cShiftStart=p.cShiftStart||null; }
         S.phase = (p.optimized && p.optimized.length > 0) ? 'result' : 'input';
         render();
         setTimeout(() => {
@@ -1310,8 +1168,6 @@ function bind() {
       var ac=e.target.closest('a[data-chunk]'), aw=e.target.closest('a[data-stop]');
       if (ac) trackEvent('maps_opened',{map_type:'google_chunk',chunk:parseInt(ac.dataset.chunk),stop_count:S.optimized.length});
       if (aw) trackEvent('maps_opened',{map_type:'waze_stop',stop_num:parseInt(aw.dataset.stop),stop_count:S.optimized.length});
-      var rdoneBtn=e.target.closest('[data-rdone-id]');
-      if (rdoneBtn) { toggleRowDone(rdoneBtn.getAttribute('data-rdone-id')); return; }
       var retryBtn=e.target.closest('[data-retry]');
       if (retryBtn) {
         var ridx=parseInt(retryBtn.getAttribute('data-retry'));
@@ -2103,7 +1959,7 @@ function langPill() {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
-  const v = { setup: vSetup, input: vInput, optimizing: vOptimizing, fixing: vFix, result: vResult, auth: vAuth, paywall: vPaywall };
+  const v = { setup: vSetup, input: vInput, optimizing: vOptimizing, fixing: vFix, result: vResult };
   if (S.companion) { app.innerHTML = vCompanion(); bindCompanion(); return; }
   // Track screen transitions
   const prev = S._lastPhase;
@@ -2114,8 +1970,6 @@ function render() {
   }
   app.innerHTML = (v[S.phase] || vInput)();
   bind();
-  if (S.phase === 'auth') bindAuth();
-  if (S.phase === 'paywall') bindPaywall();
   if (S.phase === 'result') bindGestures();
   // Apply route view zoom class only on result phase
   document.body.classList.remove('rzoom-1', 'rzoom-2');
@@ -2127,170 +1981,6 @@ function render() {
   if (_sel) _sel.value = S.userState || '';
 }
 
-// ─── Auth (email + one-time code) ──────────────────────────────────────────
-// S.authStep: 'email' (enter address) -> 'code' (enter 6-digit code) -> done
-function vAuth() {
-  const step = S.authStep || 'email';
-  const err = S._authErr ? `<div style="color:#e15c5c;font-size:14px;margin-top:10px">${S._authErr}</div>` : '';
-  if (step === 'code') {
-    return `
-<div class="hdr"><div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div></div>
-<div style="max-width:420px;margin:40px auto;padding:0 20px;text-align:center">
-  <div style="font-size:22px;font-weight:700;margin-bottom:8px">Enter your code</div>
-  <div style="color:var(--t2);font-size:15px;margin-bottom:24px">We sent a 6-digit code to ${S._authEmail || ''}</div>
-  <input id="authCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="••••••"
-    style="width:100%;font-size:28px;letter-spacing:8px;text-align:center;padding:16px;border-radius:var(--rs);border:1.5px solid var(--brd2);background:transparent;color:var(--t1)">
-  ${err}
-  <button id="authVerifyBtn" class="btn bp" style="margin-top:20px">Verify &amp; continue</button>
-  <button id="authResendBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;margin-top:14px;cursor:pointer;text-decoration:underline">Resend code</button>
-</div>`;
-  }
-  return `
-<div class="hdr"><div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div></div>
-<div style="max-width:420px;margin:40px auto;padding:0 20px;text-align:center">
-  <div style="font-size:22px;font-weight:700;margin-bottom:8px">Verify your email</div>
-  <div style="color:var(--t2);font-size:15px;margin-bottom:24px">No password needed — we'll send you a one-time code.</div>
-  <input id="authEmailInput" type="email" placeholder="you@example.com" autocomplete="email"
-    style="width:100%;font-size:17px;text-align:center;padding:14px;border-radius:var(--rs);border:1.5px solid var(--brd2);background:transparent;color:var(--t1)">
-  ${err}
-  <button id="authSendBtn" class="btn bp" style="margin-top:20px">Send code</button>
-</div>`;
-}
-
-function bindAuth() {
-  var sendBtn = document.getElementById('authSendBtn');
-  if (sendBtn) sendBtn.addEventListener('click', async function() {
-    var email = (document.getElementById('authEmailInput').value || '').trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      S._authErr = 'Enter a valid email address.'; render(); return;
-    }
-    sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
-    try {
-      var r = await fetch('/.netlify/functions/send-code', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email })
-      });
-      if (!r.ok) throw new Error('send failed');
-      S._authEmail = email; S._authErr = ''; S.authStep = 'code'; render();
-    } catch (e) {
-      S._authErr = "Couldn't send code — check your connection and try again.";
-      sendBtn.disabled = false; sendBtn.textContent = 'Send code'; render();
-    }
-  });
-
-  var verifyBtn = document.getElementById('authVerifyBtn');
-  if (verifyBtn) verifyBtn.addEventListener('click', async function() {
-    var code = (document.getElementById('authCodeInput').value || '').trim();
-    if (!/^\d{6}$/.test(code)) { S._authErr = 'Enter the 6-digit code.'; render(); return; }
-    verifyBtn.disabled = true; verifyBtn.textContent = 'Verifying…';
-    try {
-      var r = await fetch('/.netlify/functions/verify-code', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: S._authEmail, code: code })
-      });
-      var d = await r.json();
-      if (!r.ok || !d.token) throw new Error(d.error || 'verify failed');
-      S.userEmail = S._authEmail;
-      S.sessionToken = d.token;
-      localStorage.setItem('fr_email', S.userEmail);
-      localStorage.setItem('fr_session_token', S.sessionToken);
-      // Reconcile local trial flag with the server record now that we have
-      // a verified email — server is authoritative if it disagrees.
-      var serverUsed = await checkServerTrialStatus(S.userEmail);
-      if (serverUsed === true && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid') {
-        S.entitlement = 'trial_used';
-        localStorage.setItem('fr_entitlement', 'trial_used');
-      }
-      S._authErr = ''; S._postAuthAction ? S._postAuthAction() : (S.phase = 'input');
-      render();
-    } catch (e) {
-      S._authErr = 'Invalid or expired code. Try again or resend.';
-      verifyBtn.disabled = false; verifyBtn.textContent = 'Verify & continue'; render();
-    }
-  });
-
-  var resendBtn = document.getElementById('authResendBtn');
-  if (resendBtn) resendBtn.addEventListener('click', async function() {
-    resendBtn.disabled = true; resendBtn.textContent = 'Sending…';
-    try {
-      await fetch('/.netlify/functions/send-code', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: S._authEmail })
-      });
-      resendBtn.textContent = 'Code resent ✓';
-    } catch (e) {
-      resendBtn.textContent = 'Resend code'; resendBtn.disabled = false;
-    }
-  });
-}
-
-// ─── Paywall ────────────────────────────────────────────────────────────────
-function vPaywall() {
-  return `
-<div class="hdr"><div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div></div>
-<div style="max-width:440px;margin:32px auto;padding:0 20px;text-align:center">
-  <div style="font-size:24px;font-weight:800;margin-bottom:6px">You've used your free route</div>
-  <div style="color:var(--t2);font-size:15px;margin-bottom:28px">Keep optimizing every shift for less than a tank of gas.</div>
-
-  <div style="display:flex;gap:10px;margin-bottom:20px">
-    <button id="planMonthlyBtn" class="planCard" data-plan="monthly" style="flex:1;padding:18px 10px;border-radius:var(--rs);border:1.5px solid var(--acc);background:var(--acc-d);cursor:pointer;text-align:left">
-      <div style="font-size:13px;color:var(--t2);font-weight:700;letter-spacing:1px">MONTHLY</div>
-      <div style="font-size:22px;font-weight:800;color:var(--acc);margin-top:4px">$9.99</div>
-      <div style="font-size:12px;color:var(--t3)">per month</div>
-    </button>
-    <button id="planYearlyBtn" class="planCard" data-plan="yearly" style="flex:1;padding:18px 10px;border-radius:var(--rs);border:1.5px solid var(--brd2);background:transparent;cursor:pointer;text-align:left;position:relative">
-      <div style="position:absolute;top:-9px;right:8px;background:var(--acc);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px">SAVE</div>
-      <div style="font-size:13px;color:var(--t2);font-weight:700;letter-spacing:1px">YEARLY</div>
-      <div style="font-size:22px;font-weight:800;margin-top:4px">$79</div>
-      <div style="font-size:12px;color:var(--t3)">per year ($6.58/mo)</div>
-    </button>
-  </div>
-
-  <button id="checkoutBtn" class="btn bp" style="margin-bottom:10px">Continue to payment</button>
-  <button id="paywallBackBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline">Back</button>
-  <div style="margin-top:18px;font-size:12px;color:var(--t3)">Billing question? <a href="mailto:flexrouteapp@gmail.com" style="color:var(--t3);text-decoration:underline">flexrouteapp@gmail.com</a></div>
-</div>`;
-}
-
-function bindPaywall() {
-  var selected = 'monthly';
-  function refreshCardStyles() {
-    document.querySelectorAll('.planCard').forEach(function(el) {
-      var isSel = el.getAttribute('data-plan') === selected;
-      el.style.borderColor = isSel ? 'var(--acc)' : 'var(--brd2)';
-      el.style.background = isSel ? 'var(--acc-d)' : 'transparent';
-    });
-  }
-  document.querySelectorAll('.planCard').forEach(function(el) {
-    el.addEventListener('click', function() {
-      selected = el.getAttribute('data-plan'); refreshCardStyles();
-    });
-  });
-  var backBtn = document.getElementById('paywallBackBtn');
-  if (backBtn) backBtn.addEventListener('click', function() { S.phase = 'input'; render(); });
-
-  var checkoutBtn = document.getElementById('checkoutBtn');
-  if (checkoutBtn) checkoutBtn.addEventListener('click', async function() {
-    if (!S.userEmail) {
-      // Not verified yet — send them through auth first, then back here.
-      S._postAuthAction = function() { S.phase = 'paywall'; };
-      S.authStep = 'email'; S.phase = 'auth'; render(); return;
-    }
-    checkoutBtn.disabled = true; checkoutBtn.textContent = 'Redirecting…';
-    try {
-      var r = await fetch('/.netlify/functions/create-checkout-session', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: S.userEmail, plan: selected })
-      });
-      var d = await r.json();
-      if (!r.ok || !d.url) throw new Error(d.error || 'checkout failed');
-      window.location.href = d.url;
-    } catch (e) {
-      checkoutBtn.disabled = false; checkoutBtn.textContent = 'Continue to payment';
-      toast("Couldn't start checkout — try again in a moment");
-    }
-  });
-}
 // ─── Setup ────────────────────────────────────────────────────────────────────
 function vSetup() {
   return `
@@ -2790,7 +2480,7 @@ function vResult() {
 
 
   <div class="rmeta">
-    <div class="rcnt">${S.optimized.length} stops &mdash; shortest order${S.rDone.length ? ` &middot; <span style="color:var(--ok)">${S.rDone.length} done</span>` : ''}</div>
+    <div class="rcnt">${S.optimized.length} stops &mdash; shortest order</div>
     <div style="display:flex;gap:7px">
       <button class="rcp" id="cpBtn">Copy all</button>' +
       '<button class="rcp" id="shareBtn" style="background:rgba(91,168,255,.15);border-color:var(--inf);color:var(--inf)">&#8679; Share</button>
@@ -2900,11 +2590,6 @@ function vCompanion() {
     '<div class="comp-hdr">' +
       '<button id="compBkBtn" style="background:transparent;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:4px 10px">&#8592;</button>' +
       '<div style="font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--t2)">SHIFT MODE</div>' +
-      '<button id="compAutoNavBtn" title="Auto-open nav for next stop after Delivered" ' +
-        'style="background:transparent;border:1px solid var(--brd2);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;color:' +
-        (S.cAutoNav ? 'var(--acc);border-color:var(--acc)' : 'var(--t3)') + '">' +
-        (S.cAutoNav ? '&#9655; AUTO-NAV ON' : 'AUTO-NAV OFF') +
-      '</button>' +
       '<div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--acc)">' + done + '/' + total + '</div>' +
     '</div>' +
     '<div class="comp-prog"><div class="comp-prog-fill" style="width:' + pct + '%"></div></div>' +
@@ -2980,39 +2665,12 @@ function markDelivered() {
   var stops = S.optimized.filter(function(s){ return !s.geoFailed; });
   if (S.cIdx >= stops.length) return;
   if (S.cDone.indexOf(S.cIdx) < 0) S.cDone.push(S.cIdx);
-  var wasLast = S.cIdx >= stops.length - 1;
-  if (!wasLast) { S.cIdx++; }
+  if (S.cIdx < stops.length - 1) { S.cIdx++; }
   else {
     S.cIdx = stops.length;
     trackEvent('companion_completed', { stop_count: stops.length, elapsed_mins: Math.round((Date.now() - S.cShiftStart) / 60000) });
   }
   saveSession(); render();
-
-  // Auto-relaunch nav for the NEW current stop, using whichever app the
-  // driver last tapped (Waze or Maps). This is the whole point of this
-  // change: collapse "look at the new address, decide, tap Waze/Maps again"
-  // into a single action triggered by the "Delivered" tap itself, since
-  // that round-trip (FlexRoute -> nav app -> back to FlexRoute -> nav app
-  // again) is real, measurable time lost on every one of 14-30+ stops.
-  //
-  // Deliberately does NOT fire on the shift-complete screen (wasLast) —
-  // there's no "next stop" to navigate to; the Home button there is a
-  // separate, explicit tap, which is correct (driving home isn't an
-  // automatic action a driver should have sprung on them).
-  if (!wasLast && S.cNavApp && S.cAutoNav) {
-    var nextStop = stops[S.cIdx];
-    if (nextStop && nextStop.address) {
-      var url = S.cNavApp === 'waze'
-        ? 'https://waze.com/ul?q=' + encodeURIComponent(nextStop.address) + '&navigate=yes'
-        : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(nextStop.address);
-      // This is a direct, synchronous result of the user's own click on
-      // "Delivered" — most mobile browsers only allow window.open without
-      // a popup block when it's triggered this way, so calling it inline
-      // here (not after an async delay) matters.
-      window.open(url, '_blank');
-      trackEvent('maps_opened', { map_type: 'companion_autonav_' + S.cNavApp });
-    }
-  }
 }
 
 function bindCompanion() {
@@ -3024,24 +2682,10 @@ function bindCompanion() {
   // Completion Done button
   var doneC = document.getElementById('compFinishBtn');
   if (doneC) doneC.addEventListener('click', exitCompanion);
-  var autoNavBtn = document.getElementById('compAutoNavBtn');
-  if (autoNavBtn) autoNavBtn.addEventListener('click', function(){
-    S.cAutoNav = !S.cAutoNav;
-    try { localStorage.setItem('fr_auto_nav', S.cAutoNav ? '1' : '0'); } catch(e) {}
-    render();
-  });
   var wBtn = document.getElementById('compWazeBtn');
-  if (wBtn) wBtn.addEventListener('click', function(){
-    S.cNavApp = 'waze';
-    try { localStorage.setItem('fr_nav_app', 'waze'); } catch(e) {}
-    trackEvent('maps_opened', { map_type: 'companion_waze' });
-  });
+  if (wBtn) wBtn.addEventListener('click', function(){ trackEvent('maps_opened', { map_type: 'companion_waze' }); });
   var mBtn = document.getElementById('compMapsBtn');
-  if (mBtn) mBtn.addEventListener('click', function(){
-    S.cNavApp = 'maps';
-    try { localStorage.setItem('fr_nav_app', 'maps'); } catch(e) {}
-    trackEvent('maps_opened', { map_type: 'companion_maps' });
-  });
+  if (mBtn) mBtn.addEventListener('click', function(){ trackEvent('maps_opened', { map_type: 'companion_maps' }); });
 }
 
 function vSavings(sv) {
@@ -3140,15 +2784,13 @@ function rRow(s, i) {
   }
 
   // ── Normal stop ──────────────────────────────────────────────────────────
-  const isDone = S.rDone.indexOf(s.id) >= 0;
-  return `<div class="ri ${isL ? 'rl' : ''} ${isDone ? 'ri-done' : ''}" data-ridx="${i}">
+  return `<div class="ri ${isL ? 'rl' : ''}" data-ridx="${i}">
   <div class="ri-l">
-    <button class="rn rn-toggle" data-rdone-id="${escH(s.id)}" title="${isDone ? 'Mark as not done' : 'Mark as done'}"
-      style="${isDone ? 'background:var(--ok);color:#000' : ''};border:none;cursor:pointer;padding:0">${isDone ? '&#10003;' : (i + 1)}</button>
+    <div class="rn">${i + 1}</div>
     ${hn ? `<div class="rpkg"><div class="rpkg-l">pkg</div><div class="rpkg-v">${'#'+s.flexNum}</div></div>` : '<div style="height:4px"></div>'}
   </div>
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-    <div class="ri-addr" style="flex:1${isDone ? ';text-decoration:line-through;opacity:.55' : ''}">${escH(s.address)}</div>
+    <div class="ri-addr" style="flex:1">${escH(s.address)}</div>
     ${s.coords ? `<a href="https://www.google.com/maps/search/?api=1&query=${s.coords.lat},${s.coords.lon}" target="_blank"
       style="flex-shrink:0;font-size:11px;color:var(--t3);text-decoration:none;padding:3px 7px;border:1px solid var(--brd);border-radius:6px;white-space:nowrap;margin-top:2px"
       title="Verify this location on Google Maps">&#128205; verify</a>` : ''}
@@ -3156,22 +2798,6 @@ function rRow(s, i) {
   ${(s.pkgCount||1) > 1 ? `<div style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,153,0,.15);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:700;padding:3px 9px;border-radius:10px;margin-top:6px;font-family:var(--sans)">&#128230; ${s.pkgCount} packages at this stop</div>` : ''}
   ${isL ? `<div class="ri-tag">LAST</div>` : ''}
 </div>`;
-}
-
-function toggleRowDone(stopId) {
-  var idx = S.rDone.indexOf(stopId);
-  if (idx >= 0) S.rDone.splice(idx, 1);
-  else {
-    S.rDone.push(stopId);
-    // Only fires the FIRST time a driver uses this — confirms whether the
-    // static-list checkbox (vs. Shift Mode) is actually a workflow people
-    // use, separate from companion_started.
-    if (!S._rowDoneTracked) {
-      S._rowDoneTracked = true;
-      trackEvent('static_list_marked_done', { stop_count: S.optimized.length });
-    }
-  }
-  saveSession(); render();
 }
 
 function addStop(text, flexNum, skipRender, pkgCount) {
@@ -3484,29 +3110,11 @@ async function handleFiles(files) {
   }
   if (added === 0 && failed === imgs.length) {
     S.errMsg = lastErr || 'OCR failed to read the image.';
-    // Every image in this batch threw — OCR itself failed outright (not just
-    // "found 0 addresses"), e.g. network error, timeout, or a thrown
-    // exception from the Vision/Tesseract call chain. Distinct from the
-    // "ocr_zero_stops_found" case below, where OCR succeeded but parsing
-    // found nothing — these are different failure modes needing different
-    // fixes (reliability vs. parser coverage).
-    trackEvent('ocr_extraction_failed', {
-      images_uploaded: imgs.length,
-      reason: (lastErr || 'unknown').substring(0, 80)
-    });
   } else if (added === 0) {
     // Show debug info — what did Tesseract actually read?
     const rawLines = (S._lastOCR || '').split('\n').filter(l => l.trim()).length;
     S.errMsg = `OCR read ${rawLines} lines but found no delivery addresses. Tip: take 3-4 overlapping screenshots scrolling through your Flex list and upload them all at once — works better than one long scrolling shot.`;
     S._showDebug = true;
-    // OCR itself worked (we got text back), but the address parser found
-    // zero stops in it — a parser-coverage problem, not an OCR reliability
-    // problem. raw_line_count helps tell "OCR returned garbage" apart from
-    // "OCR returned real text but parseFlexOCR's patterns didn't match it".
-    trackEvent('ocr_zero_stops_found', {
-      images_uploaded: imgs.length,
-      raw_line_count: rawLines
-    });
   } else {
     S._showDebug = false;
     saveSession();
@@ -3588,58 +3196,7 @@ async function tryCensusBureau(address, ctxState, biasLat, biasLon, maxKm) {
 }
 
 // ─── Main optimize flow ───────────────────────────────────────────────────────
-// Called once, right after a route successfully optimizes, from BOTH success
-// paths (OSRM GPS and the haversine/2-opt fallback) — a successful trip
-// counts as "the trial" regardless of which optimizer produced it. Never
-// downgrades legacy_free or paid status; only advances a fresh device from
-// 'unknown'/'trial_available' to 'trial_used'.
-function _consumeTrialIfApplicable() {
-  if (S.entitlement === 'legacy_free' || S.entitlement === 'paid') return;
-  S.entitlement = 'trial_used';
-  localStorage.setItem('fr_entitlement', 'trial_used');
-  trackEvent('trial_consumed', { stop_count: S.optimized.length });
-  if (S.userEmail) {
-    fetch('/.netlify/functions/trial-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: S.userEmail, action: 'consume' })
-    }).catch(function(){});
-  }
-}
-
-// Checks server-side trial status for a verified email. Returns true if the
-// trial is already used (per the server record), false if available.
-// Called right after email verification succeeds, and used to correct
-// S.entitlement if the device-local flag disagrees with the server (e.g.
-// driver cleared localStorage but the server still remembers their email).
-async function checkServerTrialStatus(email) {
-  try {
-    var r = await fetch('/.netlify/functions/trial-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, action: 'check' })
-    });
-    var d = await r.json();
-    return !!d.trialUsed;
-  } catch (e) {
-    return null; // unknown — caller should fall back to local state, not assume used
-  }
-}
-
 async function optimize() {
-  // ── Trial gate ───────────────────────────────────────────────────────────
-  // Checked BEFORE any geocoding/OCR cost is incurred — no point burning a
-  // real OSRM/Vision API call on a route we're not going to let them see.
-  // legacy_free and paid users always pass. A fresh device with no
-  // entitlement yet is implicitly trial_available (handled by the absence
-  // of 'trial_used' below) — we only need to actively block once they've
-  // already used their one free route and aren't paid.
-  if (S.entitlement === 'trial_used') {
-    S.phase = 'paywall';
-    render();
-    trackEvent('paywall_shown', { reason: 'trial_used' });
-    return;
-  }
   // Save startAddr immediately — persists through all render() calls during optimization
   if (S.startAddr && S.startAddr.trim()) {
     localStorage.setItem('fr_sa', S.startAddr);
@@ -3765,18 +3322,6 @@ async function optimize() {
 
   // Store cluster centroid on S so fix screen handler can use it (it runs outside optimize() scope).
   S._biasLat = biasLat; S._biasLon = biasLon;
-
-  // Geocoding-stage summary — fires regardless of what happens downstream
-  // (OSRM success/fail, fallback, fix screen). This is the one number that
-  // tells us how much of any downstream failure traces back to geocoding
-  // itself vs. the routing stage, since geocoding runs sequentially with a
-  // deliberate 400ms delay between calls (rate-limit avoidance) and is the
-  // slowest, most failure-prone stage for routes with many stops.
-  trackEvent('geocoding_stage_complete', {
-    total_addresses: toGeocode.length,
-    failed_count: S.geoFailed.length,
-    succeeded_count: toGeocode.length - S.geoFailed.length
-  });
 
   // Auto-detect region from cluster centroid if driver hasn't set one
   if (!S.userState && biasLat && biasLon) {
@@ -4185,86 +3730,15 @@ async function optimize() {
       if (origResult) { origDist = origResult.distance; origDur = origResult.duration; }
       const startOffset = startPt ? 1 : 0;
       const endOffset   = S.homeCoords ? 1 : 0;
-
-      // Refinement pass: OSRM's /trip uses a single heuristic pass (nearest-
-      // neighbor + limited local search) — not guaranteed optimal, and your
-      // real route (69.5km result vs 68.7km Amazon order) proved it can
-      // land on a genuinely suboptimal answer. twoOptImprove() runs 2-opt +
-      // Or-opt on top using haversine distance as its internal cost function
-      // (fast, no extra API calls per iteration) to PROPOSE a possibly-
-      // better order — but haversine straight-line distance can disagree
-      // with real road distance, which is exactly why this was previously
-      // disabled entirely (see removed comment: "haversine post-processing
-      // breaks geographic clustering"). The fix isn't to leave it off, it's
-      // to never trust haversine's opinion on its own: re-verify the
-      // PROPOSED order with one more real OSRM /route call, and only adopt
-      // it if real road distance confirms it's actually shorter. This can
-      // only help or do nothing — never hurt — at the cost of one extra
-      // OSRM call when 2-opt finds a candidate worth checking.
-      const haversineCoords = tripCoords; // same coords osrmTrip was called with
-      const refinedWaypoints = twoOptImprove(tripResult.waypoints, haversineCoords);
-      const refinedChanged = refinedWaypoints.some((wp, i) => wp.waypoint_index !== tripResult.waypoints[i].waypoint_index);
-      if (refinedChanged) {
-        const refinedOrderFull = refinedWaypoints
-          .map((wp, inputIdx) => ({ inputIdx, routePos: wp.waypoint_index }))
-          .sort((a, b) => a.routePos - b.routePos)
-          .map(x => haversineCoords[x.inputIdx]);
-        const refinedResult = await osrmRoute(refinedOrderFull);
-        if (refinedResult && refinedResult.distance < tripDist - 1) { // require >1m real improvement, not noise
-          console.log('[FlexRoute] 2-opt refinement confirmed better on real roads: '
-            + (tripDist/1000).toFixed(2) + 'km -> ' + (refinedResult.distance/1000).toFixed(2) + 'km');
-          trackEvent('osrm_trip_refined', {
-            stop_count: geocodedStops.length,
-            before_km: round1(tripDist / 1000),
-            after_km: round1(refinedResult.distance / 1000),
-          });
-          tripResult.waypoints = refinedWaypoints;
-          tripDist = refinedResult.distance;
-          tripDur = refinedResult.duration;
-        } else {
-          console.log('[FlexRoute] 2-opt proposed a reorder, but real-road distance was not actually better — kept OSRM\'s original trip order.');
-        }
-      }
-
       optimizedOrder = tripResult.waypoints
         .slice(startOffset, tripResult.waypoints.length - endOffset)
         .map((wp, inputIdx) => ({ inputIdx, routePos: wp.waypoint_index }))
         .sort((a, b) => a.routePos - b.routePos)
         .map(x => orderedForTrip[x.inputIdx])
         .filter(Boolean);
-
-      // Safety fallback: even after the refinement above, OSRM's heuristic
-      // (now possibly improved by 2-opt) can still end up worse than simply
-      // keeping Amazon's original order, especially when source=first/
-      // destination=last constraints box it into a locally-good-but-not-
-      // best arrangement. If that happens here, use Amazon's original order
-      // as the final result instead of presenting an inferior route to the
-      // driver as "optimized."
-      if (origDist != null && tripDist != null && origDist < tripDist) {
-        console.warn('[FlexRoute] OSRM trip result worse than original order ('
-          + (tripDist/1000).toFixed(1) + 'km vs ' + (origDist/1000).toFixed(1)
-          + 'km) — falling back to Amazon\'s original order.');
-        trackEvent('osrm_trip_worse_than_original', {
-          stop_count: geocodedStops.length,
-          trip_km: round1(tripDist / 1000),
-          orig_km: round1(origDist / 1000),
-        });
-        optimizedOrder = orderedForTrip.slice(startOffset, orderedForTrip.length - endOffset);
-        tripDist = origDist; tripDur = origDur;
-      }
     }
   } catch (e) {
     console.warn('[FlexRoute] OSRM failed:', e);
-    // This was previously invisible in analytics — OSRM throwing (timeout,
-    // bad coords, the implausible-distance sanity check above, network
-    // failure) silently fell through to the local fallback optimizer below
-    // with no record of it happening. Without this, "OSRM works but the
-    // fallback also works" and "OSRM is failing a lot" look identical in
-    // route_optimized counts — this is what tells them apart.
-    trackEvent('osrm_trip_failed', {
-      stop_count: geocodedStops.length,
-      reason: (e && e.message || 'unknown').substring(0, 100)
-    });
   }
 
   if (!optimizedOrder) { await optimizeWithGemini(); return; }
@@ -4274,14 +3748,8 @@ async function optimize() {
   S.cIdx = 0; S.cDone = []; S.cShiftStart = null;
 
   if (origDist != null && tripDist != null) {
-    // No more Math.max(0, ...) clamp here — with the fallback above, tripDist
-    // can never legitimately exceed origDist anymore (we'd have already
-    // swapped to the original order), so savedKm/savedMin should always be
-    // >= 0 on their own merits now. Removing the clamp means if this
-    // invariant is ever violated by a future change, it will show up
-    // visibly as a negative number instead of being silently hidden again.
-    const savedKm  = round1((origDist - tripDist) / 1000);
-    const savedMin = Math.round((origDur - tripDur) / 60);
+    const savedKm  = Math.max(0, round1((origDist - tripDist) / 1000));
+    const savedMin = Math.max(0, Math.round((origDur - tripDur) / 60));
     S.savings = {
       origKm: round1(origDist / 1000), optKm: round1(tripDist / 1000),
       origMin: Math.round(origDur / 60), optMin: Math.round(tripDur / 60),
@@ -4297,7 +3765,6 @@ async function optimize() {
     geo_failed: S.geoFailed.length,
     region: S.userState || 'unknown'
   });
-  _consumeTrialIfApplicable();
   saveSession();
   S.phase = 'result'; render();
 }
@@ -4305,26 +3772,12 @@ async function optimize() {
 
 // ─── Fallback: local 2-opt optimization using haversine distances ────────────
 // Used when OSRM is unavailable. Still significantly better than Amazon's order.
-// Despite the name, this is NOT a Gemini/LLM API call — it's a pure local
-// fallback optimizer (nearest-neighbor seed + 2-opt improvement on haversine
-// distances) used when OSRM is unavailable or fails. The name is historical;
-// worth knowing when tracing failures, since "optimizeWithGemini failed"
-// would otherwise misleadingly suggest an external API problem.
 async function optimizeWithGemini() {
   S.ldStep = 1; render();
 
   const geocodedStops = S.stops.filter(s => s.coords);
   if (geocodedStops.length < 2) {
     S.optimized = [...S.stops];
-    // Total dead end — OSRM failed AND the local fallback can't run either
-    // (fewer than 2 stops have usable coordinates). Previously this just
-    // rendered the unoptimized stop list with zero analytics signal, so it
-    // was indistinguishable from a successful-but-zero-savings result.
-    trackEvent('optimization_failed', {
-      reason: 'fallback_insufficient_coords',
-      total_stops: S.stops.length,
-      geocoded: geocodedStops.length
-    });
     S.phase = 'result'; render(); return;
   }
 
@@ -4444,7 +3897,6 @@ async function optimizeWithGemini() {
     geo_failed: S.geoFailed.length,
     region: S.userState || 'unknown'
   });
-  _consumeTrialIfApplicable();
   var _failedStops = S.stops.filter(function(s){ return s.geoFailed; });
   if (_failedStops.length > 0) {
     trackEvent('fix_screen_shown', {
@@ -5131,6 +4583,9 @@ function inferRegionContext() {
 
 async function geocode(address, biasLat, biasLon) {
   if (!address?.trim()) return null;
+  // Cache check first
+  var _cached = _geoGet(address, biasLat, biasLon);
+  if (_cached) return _cached;
   // Fix concatenated abbrev+city: "RdScarborough" → "Rd Scarborough"
   address = address.replace(/\b(Rd|St|Ave|Dr|Blvd|Cres|Crt|Pl|Ln|Hwy)([A-Z][a-z])/g, '$1 $2');
   // Strip OCR garbage after street type, keep valid city
@@ -5141,25 +4596,6 @@ async function geocode(address, biasLat, biasLon) {
     .replace(/,?\s*[A-Z]\d[A-Z]\s+\d[A-Z]\d\b/g, '')   // Canadian M1S 4A4
     .replace(/,\s*(?:[A-Z]{2}\s+)?\d{5}(-\d{4})?\b/g, '')  // ZIP — requires comma, never strips house numbers              // US ZIP 12345
     .replace(/,\s*,/g, ',').replace(/,\s*$/g, '').trim();
-
-  // Cache check — AFTER deterministic text cleanup above (whitespace, OCR
-  // garbage, postal codes), so two OCR reads of the SAME physical address
-  // that differ only in noise (extra space, a postal code one screenshot
-  // captured and another didn't) normalize to the same key and actually hit
-  // the cache. Checking the raw un-cleaned address here (the previous
-  // behavior) meant the cache almost never hit for recurring real-world
-  // addresses, since _geoSet below stores under the CLEANED address —
-  // a mismatched key on read vs. write silently broke caching for the
-  // exact case it exists to speed up.
-  //
-  // Deliberately still BEFORE city/state/country inference below — that
-  // inference depends on mutable route context (S._inferredCity, the
-  // driver's selected region) that can change between optimize() runs for
-  // genuinely the same physical address, so caching past that point risks
-  // a false hit using stale inferred context from a different route.
-  var _cached = _geoGet(address, biasLat, biasLon);
-  if (_cached) return _cached;
-
 
   // Append inferred city from other stops when address has no city
   // e.g. "252 Church Street" → "252 Church Street, Toronto"
@@ -5188,15 +4624,6 @@ async function geocode(address, biasLat, biasLon) {
     }
   }
 
-  // Second cache check — AFTER city/state/country inference, since THIS is
-  // the fully-resolved address _geoSet writes under at the end of this
-  // function. The first check above (pre-inference) catches pure OCR-noise
-  // duplicates cheaply; this one catches the case where inference itself
-  // resolved two differently-formatted raw addresses to the identical final
-  // string (e.g. one OCR read already had ", Ontario" and another needed it
-  // appended — both end up identical here even though they differed above).
-  var _cached2 = _geoGet(address, biasLat, biasLon);
-  if (_cached2) return _cached2;
 
   // Strategy: fetch multiple candidates and pick the one closest to cluster centroid
   
@@ -5633,18 +5060,10 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── Geocoding cache (localStorage, 30-day TTL) ────────────────────────────
 const _GEO_CACHE_KEY = 'fr_geo_v3';
-// Collapses incidental whitespace differences (OCR commonly introduces
-// double spaces, e.g. from a misread character or line-wrap join) into a
-// single space before using the address as a cache key. Without this, two
-// reads of the exact same physical address that differ only in spacing
-// never hit the cache, even after the read/write-key-mismatch fix below —
-// caught by testing two raw OCR variants of "1342 Victoria Park Ave" that
-// matched after street-type cleanup but still differed by one stray space.
-function _geoKey(addr) { return addr.toLowerCase().trim().replace(/\s+/g, ' '); }
 function _geoLoad() { try { return JSON.parse(localStorage.getItem(_GEO_CACHE_KEY)||'{}'); } catch { return {}; } }
 function _geoGet(addr, bLat, bLon) {
   try {
-    var e = _geoLoad()[_geoKey(addr)];
+    var e = _geoLoad()[addr.toLowerCase().trim()];
     if (!e || Date.now()-e.t > 30*864e5) return null;
     if (bLat && bLon && haversineKm(e.lat, e.lon, bLat, bLon) > 150) { console.warn('[FlexRoute] Cache stale:', addr); return null; }
     return { lat: e.lat, lon: e.lon };
@@ -5652,7 +5071,7 @@ function _geoGet(addr, bLat, bLon) {
 }
 function _geoSet(addr, coords) {
   try {
-    var c = _geoLoad(), k = _geoKey(addr);
+    var c = _geoLoad(), k = addr.toLowerCase().trim();
     c[k] = { lat: coords.lat, lon: coords.lon, t: Date.now() };
     var keys = Object.keys(c);
     if (keys.length > 1000) { keys.sort((a,b)=>(c[a].t||0)-(c[b].t||0)).slice(0,200).forEach(k=>delete c[k]); }
