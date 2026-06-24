@@ -17,15 +17,24 @@
 // Contract:
 //   POST /.netlify/functions/trial-status
 //   Body: { email: "<verified email>", action: "check" | "consume" }
-//   Response (200): { trialUsed: boolean }
+//   Response (200): { trialUsed: boolean, routesUsed: number, limit: number }
 //   Response (4xx/5xx): { error, code }
 //
 // Storage: Netlify Blobs, store name "trials", one key per normalized email,
-// value is a small JSON record (so we can extend it later — e.g. timestamp,
-// stop count — without a schema migration).
+// value tracks a COUNT (routesUsed), not a single used/unused boolean —
+// this must stay in sync with FREE_TRIAL_ROUTE_LIMIT in flexroute.html.
+// Updated from a binary flag to a count when the trial allowance increased
+// from 1 to 3 routes; a boolean couldn't express "used 2 of 3."
 
 const { getStore } = require('@netlify/blobs');
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
+
+// Keep this in sync with FREE_TRIAL_ROUTE_LIMIT in flexroute.html. There is
+// no shared module between the frontend and Netlify Functions to enforce
+// this automatically — if the frontend's limit ever changes, this constant
+// needs updating here too, or the server-side gate will disagree with what
+// the UI promises.
+const FREE_TRIAL_ROUTE_LIMIT = 3;
 
 function normalizeEmail(raw) {
   return (raw || '').trim().toLowerCase();
@@ -54,18 +63,37 @@ async function handleTrialRequest(body, store) {
   try {
     if (action === 'check') {
       const existing = await store.get(email, { type: 'json' });
-      return { statusCode: 200, body: { trialUsed: !!(existing && existing.used) } };
+      const routesUsed = (existing && typeof existing.routesUsed === 'number') ? existing.routesUsed : 0;
+      return { statusCode: 200, body: {
+        trialUsed: routesUsed >= FREE_TRIAL_ROUTE_LIMIT,
+        routesUsed: routesUsed,
+        limit: FREE_TRIAL_ROUTE_LIMIT,
+      } };
     }
     // action === 'consume'
     const existing = await store.get(email, { type: 'json' });
-    if (existing && existing.used) {
-      // Already consumed — idempotent, not an error. Lets the client
-      // safely call this even if it's not 100% sure whether a prior
-      // request already went through (e.g. after a flaky connection).
-      return { statusCode: 200, body: { trialUsed: true } };
+    const currentCount = (existing && typeof existing.routesUsed === 'number') ? existing.routesUsed : 0;
+    if (currentCount >= FREE_TRIAL_ROUTE_LIMIT) {
+      // Already at/over the limit — idempotent, not an error. Lets the
+      // client safely call this even if it's not 100% sure whether a prior
+      // request already went through (e.g. after a flaky connection), and
+      // also correctly refuses to let a 4th+ consume call increment further.
+      return { statusCode: 200, body: { trialUsed: true, routesUsed: currentCount, limit: FREE_TRIAL_ROUTE_LIMIT } };
     }
-    await store.setJSON(email, { used: true, consumedAt: new Date().toISOString() });
-    return { statusCode: 200, body: { trialUsed: true } };
+    const newCount = currentCount + 1;
+    await store.setJSON(email, {
+      routesUsed: newCount,
+      lastConsumedAt: new Date().toISOString(),
+      // Kept for one release as a transitional read-compat field in case
+      // any older deployed frontend code still checks `.used` directly —
+      // safe to remove once we're confident nothing reads it anymore.
+      used: newCount >= FREE_TRIAL_ROUTE_LIMIT,
+    });
+    return { statusCode: 200, body: {
+      trialUsed: newCount >= FREE_TRIAL_ROUTE_LIMIT,
+      routesUsed: newCount,
+      limit: FREE_TRIAL_ROUTE_LIMIT,
+    } };
   } catch (e) {
     console.error('[FlexRoute] trial-status storage error:', e && e.message);
     return { statusCode: 502, body: { error: 'Storage error', code: 'STORAGE' } };
