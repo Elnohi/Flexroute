@@ -721,6 +721,11 @@ if (!navigator.onLine) document.getElementById('offlineBar').classList.add('show
  * Terms of Service: https://flexrouteapp.com/tos.html
  * Contact: flexrouteapp.com
  * ============================================================ */
+// Number of free optimized routes allowed before the paywall — referenced
+// by vPaywall() (declared earlier in the script than this used to be
+// declared), so this must come before any code that could call vPaywall().
+const FREE_TRIAL_ROUTE_LIMIT = 3;
+
 const S = {
   apiKey:     ''  /* legacy Gemini key — unused */,   // Google Gemini key
   stops:      [],
@@ -2184,6 +2189,15 @@ async function checkServerTrialStatus(email) {
       body: JSON.stringify({ email: email, action: 'check' })
     });
     var d = await r.json();
+    // Reconcile the local route counter with the server's authoritative
+    // count — this is the actual fix for the browser-data-clear bypass:
+    // even if S.trialRoutesUsed reset to 0 locally, the server remembers
+    // the real count per email and we adopt it here, never trusting a
+    // local count lower than what the server reports.
+    if (typeof d.routesUsed === 'number' && d.routesUsed > (S.trialRoutesUsed || 0)) {
+      S.trialRoutesUsed = d.routesUsed;
+      localStorage.setItem('fr_trial_routes_used', String(d.routesUsed));
+    }
     return !!d.trialUsed;
   } catch (e) {
     return null;
@@ -3520,15 +3534,17 @@ function _consumeTrialIfApplicable() {
   }
   trackEvent('trial_consumed', { stop_count: S.optimized.length, routes_used: S.trialRoutesUsed });
   if (S.userEmail) {
+    // Note: deliberately NOT sending routes_used here — trial-status.js
+    // computes and owns the authoritative count server-side itself. A
+    // client-reported count would be exactly the kind of value an abuser
+    // could fake; the server only trusts what it has stored.
     fetch('/.netlify/functions/trial-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: S.userEmail, action: 'consume', routes_used: S.trialRoutesUsed })
+      body: JSON.stringify({ email: S.userEmail, action: 'consume' })
     }).catch(function(){});
   }
 }
-
-const FREE_TRIAL_ROUTE_LIMIT = 3;
 
 async function optimize() {
   // ── Trial gate ───────────────────────────────────────────────────────────
