@@ -1056,6 +1056,75 @@ window.addEventListener('load', () => {
     }
   }
 
+  // ── Post-checkout redirect handling ─────────────────────────────────────
+  // Stripe redirects back to success_url/cancel_url from create-checkout-
+  // session.js with these query params. Clean the URL either way so a
+  // refresh doesn't re-trigger this block, and on success force an
+  // immediate entitlement check (don't wait for it to happen to land in the
+  // fire-and-forget check above on its own timing) since this is the exact
+  // moment the driver is waiting to be let back into the app.
+  (function() {
+    var qs = new URLSearchParams(window.location.search);
+    var checkoutResult = qs.get('checkout');
+    if (checkoutResult) {
+      window.history.replaceState({}, '', window.location.pathname);
+      if (checkoutResult === 'success' && S.userEmail) {
+        fetch('/.netlify/functions/check-entitlement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: S.userEmail })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+          if (d.paid) {
+            S.entitlement = 'paid';
+            localStorage.setItem('fr_entitlement', 'paid');
+            S.phase = 'input';
+            render();
+            toast('🎉 You\'re all set — welcome to FlexRoute Premium!');
+          } else {
+            // Stripe sometimes takes a few seconds to fully process before
+            // the subscription is queryable — not a failure, just timing.
+            // The fire-and-forget check on next load will catch it; for
+            // now let them back into the app rather than stranding them
+            // on the paywall right after they just paid.
+            S.phase = 'input'; render();
+            toast('Payment received — finishing setup…');
+          }
+        }).catch(function() { S.phase = 'input'; render(); });
+      } else if (checkoutResult === 'cancelled') {
+        S.phase = 'paywall';
+      }
+    }
+  })();
+
+  // ── Live entitlement check (fire-and-forget) ────────────────────────────
+  // If we have a verified email, ask Stripe directly whether it's currently
+  // paid. Doesn't block the initial render — a driver shouldn't stare at a
+  // blank screen waiting on a network call just to see their own route
+  // screen. Corrects local state (and re-renders) only if the server
+  // disagrees with what's cached, e.g. paid on another device, or a
+  // subscription lapsed and the local flag hasn't caught up yet. Never
+  // downgrades legacy_free — that status is permanent once granted.
+  if (S.userEmail && S.legacyFree !== true) {
+    fetch('/.netlify/functions/check-entitlement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: S.userEmail })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      var newEntitlement = d.paid ? 'paid' : (S.entitlement === 'trial_used' ? 'trial_used' : 'trial_available');
+      if (newEntitlement !== S.entitlement) {
+        S.entitlement = newEntitlement;
+        localStorage.setItem('fr_entitlement', newEntitlement);
+        // If the driver is currently stuck on the paywall and just got
+        // confirmed as paid (e.g. completed checkout in another tab/device
+        // and came back), let them back into the app immediately.
+        if (newEntitlement === 'paid' && S.phase === 'paywall') {
+          S.phase = 'input';
+        }
+        render();
+      }
+    }).catch(function() { /* network hiccup — keep local cached state, try again next load */ });
+  }
+
   try {
     const saved = localStorage.getItem('fr_session');
     if (saved) {
@@ -4116,12 +4185,73 @@ async function optimize() {
       if (origResult) { origDist = origResult.distance; origDur = origResult.duration; }
       const startOffset = startPt ? 1 : 0;
       const endOffset   = S.homeCoords ? 1 : 0;
+
+      // Refinement pass: OSRM's /trip uses a single heuristic pass (nearest-
+      // neighbor + limited local search) — not guaranteed optimal, and your
+      // real route (69.5km result vs 68.7km Amazon order) proved it can
+      // land on a genuinely suboptimal answer. twoOptImprove() runs 2-opt +
+      // Or-opt on top using haversine distance as its internal cost function
+      // (fast, no extra API calls per iteration) to PROPOSE a possibly-
+      // better order — but haversine straight-line distance can disagree
+      // with real road distance, which is exactly why this was previously
+      // disabled entirely (see removed comment: "haversine post-processing
+      // breaks geographic clustering"). The fix isn't to leave it off, it's
+      // to never trust haversine's opinion on its own: re-verify the
+      // PROPOSED order with one more real OSRM /route call, and only adopt
+      // it if real road distance confirms it's actually shorter. This can
+      // only help or do nothing — never hurt — at the cost of one extra
+      // OSRM call when 2-opt finds a candidate worth checking.
+      const haversineCoords = tripCoords; // same coords osrmTrip was called with
+      const refinedWaypoints = twoOptImprove(tripResult.waypoints, haversineCoords);
+      const refinedChanged = refinedWaypoints.some((wp, i) => wp.waypoint_index !== tripResult.waypoints[i].waypoint_index);
+      if (refinedChanged) {
+        const refinedOrderFull = refinedWaypoints
+          .map((wp, inputIdx) => ({ inputIdx, routePos: wp.waypoint_index }))
+          .sort((a, b) => a.routePos - b.routePos)
+          .map(x => haversineCoords[x.inputIdx]);
+        const refinedResult = await osrmRoute(refinedOrderFull);
+        if (refinedResult && refinedResult.distance < tripDist - 1) { // require >1m real improvement, not noise
+          console.log('[FlexRoute] 2-opt refinement confirmed better on real roads: '
+            + (tripDist/1000).toFixed(2) + 'km -> ' + (refinedResult.distance/1000).toFixed(2) + 'km');
+          trackEvent('osrm_trip_refined', {
+            stop_count: geocodedStops.length,
+            before_km: round1(tripDist / 1000),
+            after_km: round1(refinedResult.distance / 1000),
+          });
+          tripResult.waypoints = refinedWaypoints;
+          tripDist = refinedResult.distance;
+          tripDur = refinedResult.duration;
+        } else {
+          console.log('[FlexRoute] 2-opt proposed a reorder, but real-road distance was not actually better — kept OSRM\'s original trip order.');
+        }
+      }
+
       optimizedOrder = tripResult.waypoints
         .slice(startOffset, tripResult.waypoints.length - endOffset)
         .map((wp, inputIdx) => ({ inputIdx, routePos: wp.waypoint_index }))
         .sort((a, b) => a.routePos - b.routePos)
         .map(x => orderedForTrip[x.inputIdx])
         .filter(Boolean);
+
+      // Safety fallback: even after the refinement above, OSRM's heuristic
+      // (now possibly improved by 2-opt) can still end up worse than simply
+      // keeping Amazon's original order, especially when source=first/
+      // destination=last constraints box it into a locally-good-but-not-
+      // best arrangement. If that happens here, use Amazon's original order
+      // as the final result instead of presenting an inferior route to the
+      // driver as "optimized."
+      if (origDist != null && tripDist != null && origDist < tripDist) {
+        console.warn('[FlexRoute] OSRM trip result worse than original order ('
+          + (tripDist/1000).toFixed(1) + 'km vs ' + (origDist/1000).toFixed(1)
+          + 'km) — falling back to Amazon\'s original order.');
+        trackEvent('osrm_trip_worse_than_original', {
+          stop_count: geocodedStops.length,
+          trip_km: round1(tripDist / 1000),
+          orig_km: round1(origDist / 1000),
+        });
+        optimizedOrder = orderedForTrip.slice(startOffset, orderedForTrip.length - endOffset);
+        tripDist = origDist; tripDur = origDur;
+      }
     }
   } catch (e) {
     console.warn('[FlexRoute] OSRM failed:', e);
@@ -4144,8 +4274,14 @@ async function optimize() {
   S.cIdx = 0; S.cDone = []; S.cShiftStart = null;
 
   if (origDist != null && tripDist != null) {
-    const savedKm  = Math.max(0, round1((origDist - tripDist) / 1000));
-    const savedMin = Math.max(0, Math.round((origDur - tripDur) / 60));
+    // No more Math.max(0, ...) clamp here — with the fallback above, tripDist
+    // can never legitimately exceed origDist anymore (we'd have already
+    // swapped to the original order), so savedKm/savedMin should always be
+    // >= 0 on their own merits now. Removing the clamp means if this
+    // invariant is ever violated by a future change, it will show up
+    // visibly as a negative number instead of being silently hidden again.
+    const savedKm  = round1((origDist - tripDist) / 1000);
+    const savedMin = Math.round((origDur - tripDur) / 60);
     S.savings = {
       origKm: round1(origDist / 1000), optKm: round1(tripDist / 1000),
       origMin: Math.round(origDur / 60), optMin: Math.round(tripDur / 60),
