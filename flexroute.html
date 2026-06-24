@@ -752,12 +752,33 @@ const S = {
   cIdx:       0,
   cDone:      [],
   cShiftStart: null,
+  // Which nav app the driver last tapped during Shift Mode ('waze'|'maps'|null).
+  // Used to auto-relaunch the SAME app for the next stop after "Delivered"
+  // is tapped, instead of making the driver look at the screen and tap
+  // Waze/Maps again every single stop.
+  cNavApp:    localStorage.getItem('fr_nav_app') || null,
+  // Whether "Delivered" auto-relaunches nav for the next stop. Defaults ON,
+  // but easy to flip off from the Shift Mode header.
+  cAutoNav:   localStorage.getItem('fr_auto_nav') !== '0',
   iosDismissed: localStorage.getItem('fr_ios_dismissed') === '1',
   gpsCoords:  null,   // kept for future use
   gpsAddr:    '',
   gmapsKey:   localStorage.getItem('fr_gk2') || '',
   startAddr:  localStorage.getItem('fr_start') || '',
-  startAddr:  localStorage.getItem('fr_sa') || ''
+  startAddr:  localStorage.getItem('fr_sa') || '',
+  // ── Monetization / entitlement state ────────────────────────────────────
+  // userEmail + sessionToken: set once the driver verifies a one-time code.
+  userEmail:    localStorage.getItem('fr_email') || null,
+  sessionToken: localStorage.getItem('fr_session_token') || null,
+  // entitlement: 'unknown' | 'trial_available' | 'trial_used' | 'paid' | 'legacy_free'
+  entitlement:      localStorage.getItem('fr_entitlement') || 'unknown',
+  entitlementCheckedAt: parseInt(localStorage.getItem('fr_entitlement_checked_at') || '0', 10),
+  // legacyFree: true if this device already had real route history BEFORE
+  // the paywall shipped — grandfathered free.
+  legacyFree:   localStorage.getItem('fr_legacy_free') === '1',
+  // Number of free optimized routes used so far (trial = 3 routes, per
+  // updated plan — was 1, increased to 3).
+  trialRoutesUsed: parseInt(localStorage.getItem('fr_trial_routes_used') || '0', 10)
 };
 const mkId = () => `s${++S.uid}`;
 
@@ -874,7 +895,8 @@ function saveSession() {
       stops: S.stops, optimized: S.optimized, savings: S.savings,
       lastId: S.lastId, startAddr: S.startAddr, uid: S.uid,
       geoFailed: S.geoFailed,
-      companion: S.companion, cIdx: S.cIdx, cDone: S.cDone, cShiftStart: S.cShiftStart
+      companion: S.companion, cIdx: S.cIdx, cDone: S.cDone, cShiftStart: S.cShiftStart,
+      cNavApp: S.cNavApp, cAutoNav: S.cAutoNav
     }));
   } catch(e) {}
 }
@@ -988,6 +1010,73 @@ window.addEventListener('unhandledrejection', function(e) {
 });
 
 window.addEventListener('load', () => {
+  // ── Grandfathering check (runs once, before paywall logic) ─────────────
+  // Anyone who already has evidence of using FlexRoute pre-paywall gets
+  // permanently marked free. Checks several independent, long-lived
+  // localStorage keys (not just the current session, which could have been
+  // cleared) so a returning user doesn't lose grandfathered status just
+  // because they cleared one piece of data. Only ever WRITES the flag once.
+  if (localStorage.getItem('fr_legacy_free') !== '1') {
+    var priorUsageSignals = [
+      'fr_session', 'fr_nav_app', 'fr_route_zoom', 'fr_imperial', 'fr_sa', 'fr_hm',
+    ];
+    var hasPriorUsage = priorUsageSignals.some(function(k) { return localStorage.getItem(k) != null; });
+    if (hasPriorUsage) {
+      localStorage.setItem('fr_legacy_free', '1');
+      S.legacyFree = true;
+      S.entitlement = 'legacy_free';
+      localStorage.setItem('fr_entitlement', 'legacy_free');
+    }
+  }
+
+  // ── Post-checkout redirect handling ─────────────────────────────────────
+  (function() {
+    var qs = new URLSearchParams(window.location.search);
+    var checkoutResult = qs.get('checkout');
+    if (checkoutResult) {
+      window.history.replaceState({}, '', window.location.pathname);
+      if (checkoutResult === 'success' && S.userEmail) {
+        fetch('/.netlify/functions/check-entitlement', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: S.userEmail })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+          if (d.paid) {
+            S.entitlement = 'paid';
+            localStorage.setItem('fr_entitlement', 'paid');
+            S.phase = 'input';
+            render();
+            toast('🎉 You\'re all set — welcome to FlexRoute Premium!');
+          } else {
+            S.phase = 'input'; render();
+            toast('Payment received — finishing setup…');
+          }
+        }).catch(function() { S.phase = 'input'; render(); });
+      } else if (checkoutResult === 'cancelled') {
+        S.phase = 'paywall';
+      }
+    }
+  })();
+
+  // ── Live entitlement check (fire-and-forget) ────────────────────────────
+  if (S.userEmail && S.legacyFree !== true) {
+    fetch('/.netlify/functions/check-entitlement', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: S.userEmail })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      var newEntitlement = d.paid ? 'paid' : (S.entitlement === 'trial_used' ? 'trial_used' : 'trial_available');
+      if (newEntitlement !== S.entitlement) {
+        S.entitlement = newEntitlement;
+        localStorage.setItem('fr_entitlement', newEntitlement);
+        if (newEntitlement === 'paid' && S.phase === 'paywall') {
+          S.phase = 'input';
+        }
+        render();
+      }
+    }).catch(function() { /* network hiccup — keep local cached state */ });
+  }
+
   try {
     const saved = localStorage.getItem('fr_session');
     if (saved) {
@@ -998,7 +1087,11 @@ window.addEventListener('load', () => {
         if (p.startAddr) S.startAddr = p.startAddr;
         S.uid = p.uid || 0;
         S.geoFailed = p.geoFailed || [];
-        if (p.companion) { S.companion=p.companion; S.cIdx=p.cIdx||0; S.cDone=p.cDone||[]; S.cShiftStart=p.cShiftStart||null; }
+        if (p.companion) {
+          S.companion=p.companion; S.cIdx=p.cIdx||0; S.cDone=p.cDone||[]; S.cShiftStart=p.cShiftStart||null;
+          if (p.cNavApp) S.cNavApp = p.cNavApp;
+          if (typeof p.cAutoNav === 'boolean') S.cAutoNav = p.cAutoNav;
+        }
         S.phase = (p.optimized && p.optimized.length > 0) ? 'result' : 'input';
         render();
         setTimeout(() => {
@@ -1959,7 +2052,7 @@ function langPill() {
 
 // ─── Render ───────────────────────────────────────────────────────────────────
 function render() {
-  const v = { setup: vSetup, input: vInput, optimizing: vOptimizing, fixing: vFix, result: vResult };
+  const v = { setup: vSetup, input: vInput, optimizing: vOptimizing, fixing: vFix, result: vResult, auth: vAuth, paywall: vPaywall };
   if (S.companion) { app.innerHTML = vCompanion(); bindCompanion(); return; }
   // Track screen transitions
   const prev = S._lastPhase;
@@ -1970,6 +2063,8 @@ function render() {
   }
   app.innerHTML = (v[S.phase] || vInput)();
   bind();
+  if (S.phase === 'auth') bindAuth();
+  if (S.phase === 'paywall') bindPaywall();
   if (S.phase === 'result') bindGestures();
   // Apply route view zoom class only on result phase
   document.body.classList.remove('rzoom-1', 'rzoom-2');
@@ -1979,6 +2074,187 @@ function render() {
   // Restore state/province selector after DOM rebuild (static HTML loses selected value)
   var _sel = document.getElementById('stateSelectMain');
   if (_sel) _sel.value = S.userState || '';
+}
+
+// ─── Auth (email + one-time code) ──────────────────────────────────────────
+// S.authStep: 'email' (enter address) -> 'code' (enter 6-digit code) -> done
+function vAuth() {
+  const step = S.authStep || 'email';
+  const err = S._authErr ? `<div style="color:#e15c5c;font-size:14px;margin-top:10px">${S._authErr}</div>` : '';
+  if (step === 'code') {
+    return `
+<div class="hdr"><div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div></div>
+<div style="max-width:420px;margin:40px auto;padding:0 20px;text-align:center">
+  <div style="font-size:22px;font-weight:700;margin-bottom:8px">Enter your code</div>
+  <div style="color:var(--t2);font-size:15px;margin-bottom:24px">We sent a 6-digit code to ${S._authEmail || ''}</div>
+  <input id="authCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="••••••"
+    style="width:100%;font-size:28px;letter-spacing:8px;text-align:center;padding:16px;border-radius:var(--rs);border:1.5px solid var(--brd2);background:transparent;color:var(--t1)">
+  ${err}
+  <button id="authVerifyBtn" class="btn bp" style="margin-top:20px">Verify &amp; continue</button>
+  <button id="authResendBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;margin-top:14px;cursor:pointer;text-decoration:underline">Resend code</button>
+</div>`;
+  }
+  return `
+<div class="hdr"><div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div></div>
+<div style="max-width:420px;margin:40px auto;padding:0 20px;text-align:center">
+  <div style="font-size:22px;font-weight:700;margin-bottom:8px">Verify your email</div>
+  <div style="color:var(--t2);font-size:15px;margin-bottom:24px">No password needed — we'll send you a one-time code.</div>
+  <input id="authEmailInput" type="email" placeholder="you@example.com" autocomplete="email"
+    style="width:100%;font-size:17px;text-align:center;padding:14px;border-radius:var(--rs);border:1.5px solid var(--brd2);background:transparent;color:var(--t1)">
+  ${err}
+  <button id="authSendBtn" class="btn bp" style="margin-top:20px">Send code</button>
+</div>`;
+}
+
+function bindAuth() {
+  var sendBtn = document.getElementById('authSendBtn');
+  if (sendBtn) sendBtn.addEventListener('click', async function() {
+    var email = (document.getElementById('authEmailInput').value || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      S._authErr = 'Enter a valid email address.'; render(); return;
+    }
+    sendBtn.disabled = true; sendBtn.textContent = 'Sending…';
+    try {
+      var r = await fetch('/.netlify/functions/send-code', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email })
+      });
+      if (!r.ok) throw new Error('send failed');
+      S._authEmail = email; S._authErr = ''; S.authStep = 'code'; render();
+    } catch (e) {
+      S._authErr = "Couldn't send code — check your connection and try again.";
+      sendBtn.disabled = false; sendBtn.textContent = 'Send code'; render();
+    }
+  });
+
+  var verifyBtn = document.getElementById('authVerifyBtn');
+  if (verifyBtn) verifyBtn.addEventListener('click', async function() {
+    var code = (document.getElementById('authCodeInput').value || '').trim();
+    if (!/^\d{6}$/.test(code)) { S._authErr = 'Enter the 6-digit code.'; render(); return; }
+    verifyBtn.disabled = true; verifyBtn.textContent = 'Verifying…';
+    try {
+      var r = await fetch('/.netlify/functions/verify-code', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: S._authEmail, code: code })
+      });
+      var d = await r.json();
+      if (!r.ok || !d.token) throw new Error(d.error || 'verify failed');
+      S.userEmail = S._authEmail;
+      S.sessionToken = d.token;
+      localStorage.setItem('fr_email', S.userEmail);
+      localStorage.setItem('fr_session_token', S.sessionToken);
+      // Reconcile local trial flag with the server record now that we have
+      // a verified email — server is authoritative if it disagrees.
+      var serverUsed = await checkServerTrialStatus(S.userEmail);
+      if (serverUsed === true && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid') {
+        S.entitlement = 'trial_used';
+        localStorage.setItem('fr_entitlement', 'trial_used');
+      }
+      S._authErr = ''; S._postAuthAction ? S._postAuthAction() : (S.phase = 'input');
+      render();
+    } catch (e) {
+      S._authErr = 'Invalid or expired code. Try again or resend.';
+      verifyBtn.disabled = false; verifyBtn.textContent = 'Verify & continue'; render();
+    }
+  });
+
+  var resendBtn = document.getElementById('authResendBtn');
+  if (resendBtn) resendBtn.addEventListener('click', async function() {
+    resendBtn.disabled = true; resendBtn.textContent = 'Sending…';
+    try {
+      await fetch('/.netlify/functions/send-code', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: S._authEmail })
+      });
+      resendBtn.textContent = 'Code resent ✓';
+    } catch (e) {
+      resendBtn.textContent = 'Resend code'; resendBtn.disabled = false;
+    }
+  });
+}
+
+// Checks server-side trial status for a verified email. Returns true if the
+// trial is already used (per the server record), false if available, null
+// if the check itself failed (caller should fall back to local state).
+async function checkServerTrialStatus(email) {
+  try {
+    var r = await fetch('/.netlify/functions/trial-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email, action: 'check' })
+    });
+    var d = await r.json();
+    return !!d.trialUsed;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ─── Paywall ────────────────────────────────────────────────────────────────
+function vPaywall() {
+  return `
+<div class="hdr"><div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div></div>
+<div style="max-width:440px;margin:32px auto;padding:0 20px;text-align:center">
+  <div style="font-size:24px;font-weight:800;margin-bottom:6px">You've used your ${FREE_TRIAL_ROUTE_LIMIT} free routes</div>
+  <div style="color:var(--t2);font-size:15px;margin-bottom:28px">Keep optimizing every shift for less than a tank of gas.</div>
+
+  <div style="display:flex;gap:10px;margin-bottom:20px">
+    <button id="planMonthlyBtn" class="planCard" data-plan="monthly" style="flex:1;padding:18px 10px;border-radius:var(--rs);border:1.5px solid var(--acc);background:var(--acc-d);cursor:pointer;text-align:left">
+      <div style="font-size:13px;color:var(--t2);font-weight:700;letter-spacing:1px">MONTHLY</div>
+      <div style="font-size:22px;font-weight:800;color:var(--acc);margin-top:4px">$9.99</div>
+      <div style="font-size:12px;color:var(--t3)">per month</div>
+    </button>
+    <button id="planYearlyBtn" class="planCard" data-plan="yearly" style="flex:1;padding:18px 10px;border-radius:var(--rs);border:1.5px solid var(--brd2);background:transparent;cursor:pointer;text-align:left;position:relative">
+      <div style="position:absolute;top:-9px;right:8px;background:var(--acc);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px">SAVE</div>
+      <div style="font-size:13px;color:var(--t2);font-weight:700;letter-spacing:1px">YEARLY</div>
+      <div style="font-size:22px;font-weight:800;margin-top:4px">$79</div>
+      <div style="font-size:12px;color:var(--t3)">per year ($6.58/mo)</div>
+    </button>
+  </div>
+
+  <button id="checkoutBtn" class="btn bp" style="margin-bottom:10px">Continue to payment</button>
+  <button id="paywallBackBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline">Back</button>
+  <div style="margin-top:18px;font-size:12px;color:var(--t3)">Billing question? <a href="mailto:flexrouteapp@gmail.com" style="color:var(--t3);text-decoration:underline">flexrouteapp@gmail.com</a></div>
+</div>`;
+}
+
+function bindPaywall() {
+  var selected = 'monthly';
+  function refreshCardStyles() {
+    document.querySelectorAll('.planCard').forEach(function(el) {
+      var isSel = el.getAttribute('data-plan') === selected;
+      el.style.borderColor = isSel ? 'var(--acc)' : 'var(--brd2)';
+      el.style.background = isSel ? 'var(--acc-d)' : 'transparent';
+    });
+  }
+  document.querySelectorAll('.planCard').forEach(function(el) {
+    el.addEventListener('click', function() {
+      selected = el.getAttribute('data-plan'); refreshCardStyles();
+    });
+  });
+  var backBtn = document.getElementById('paywallBackBtn');
+  if (backBtn) backBtn.addEventListener('click', function() { S.phase = 'input'; render(); });
+
+  var checkoutBtn = document.getElementById('checkoutBtn');
+  if (checkoutBtn) checkoutBtn.addEventListener('click', async function() {
+    if (!S.userEmail) {
+      S._postAuthAction = function() { S.phase = 'paywall'; };
+      S.authStep = 'email'; S.phase = 'auth'; render(); return;
+    }
+    checkoutBtn.disabled = true; checkoutBtn.textContent = 'Redirecting…';
+    try {
+      var r = await fetch('/.netlify/functions/create-checkout-session', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: S.userEmail, plan: selected })
+      });
+      var d = await r.json();
+      if (!r.ok || !d.url) throw new Error(d.error || 'checkout failed');
+      window.location.href = d.url;
+    } catch (e) {
+      checkoutBtn.disabled = false; checkoutBtn.textContent = 'Continue to payment';
+      toast("Couldn't start checkout — try again in a moment");
+    }
+  });
 }
 
 // ─── Setup ────────────────────────────────────────────────────────────────────
@@ -2590,6 +2866,11 @@ function vCompanion() {
     '<div class="comp-hdr">' +
       '<button id="compBkBtn" style="background:transparent;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:4px 10px">&#8592;</button>' +
       '<div style="font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--t2)">SHIFT MODE</div>' +
+      '<button id="compAutoNavBtn" title="Auto-open nav for next stop after Delivered" ' +
+        'style="background:transparent;border:1px solid var(--brd2);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;color:' +
+        (S.cAutoNav ? 'var(--acc);border-color:var(--acc)' : 'var(--t3)') + '">' +
+        (S.cAutoNav ? '&#9655; AUTO-NAV ON' : 'AUTO-NAV OFF') +
+      '</button>' +
       '<div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--acc)">' + done + '/' + total + '</div>' +
     '</div>' +
     '<div class="comp-prog"><div class="comp-prog-fill" style="width:' + pct + '%"></div></div>' +
@@ -2665,12 +2946,27 @@ function markDelivered() {
   var stops = S.optimized.filter(function(s){ return !s.geoFailed; });
   if (S.cIdx >= stops.length) return;
   if (S.cDone.indexOf(S.cIdx) < 0) S.cDone.push(S.cIdx);
-  if (S.cIdx < stops.length - 1) { S.cIdx++; }
+  var wasLast = S.cIdx >= stops.length - 1;
+  if (!wasLast) { S.cIdx++; }
   else {
     S.cIdx = stops.length;
     trackEvent('companion_completed', { stop_count: stops.length, elapsed_mins: Math.round((Date.now() - S.cShiftStart) / 60000) });
   }
   saveSession(); render();
+
+  // Auto-relaunch nav for the NEW current stop, using whichever app the
+  // driver last tapped (Waze or Maps) — collapses "look at the new address,
+  // decide, tap Waze/Maps again" into the single "Delivered" tap.
+  if (!wasLast && S.cNavApp && S.cAutoNav) {
+    var nextStop = stops[S.cIdx];
+    if (nextStop && nextStop.address) {
+      var url = S.cNavApp === 'waze'
+        ? 'https://waze.com/ul?q=' + encodeURIComponent(nextStop.address) + '&navigate=yes'
+        : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(nextStop.address);
+      window.open(url, '_blank');
+      trackEvent('maps_opened', { map_type: 'companion_autonav_' + S.cNavApp });
+    }
+  }
 }
 
 function bindCompanion() {
@@ -2682,10 +2978,24 @@ function bindCompanion() {
   // Completion Done button
   var doneC = document.getElementById('compFinishBtn');
   if (doneC) doneC.addEventListener('click', exitCompanion);
+  var autoNavBtn = document.getElementById('compAutoNavBtn');
+  if (autoNavBtn) autoNavBtn.addEventListener('click', function(){
+    S.cAutoNav = !S.cAutoNav;
+    try { localStorage.setItem('fr_auto_nav', S.cAutoNav ? '1' : '0'); } catch(e) {}
+    render();
+  });
   var wBtn = document.getElementById('compWazeBtn');
-  if (wBtn) wBtn.addEventListener('click', function(){ trackEvent('maps_opened', { map_type: 'companion_waze' }); });
+  if (wBtn) wBtn.addEventListener('click', function(){
+    S.cNavApp = 'waze';
+    try { localStorage.setItem('fr_nav_app', 'waze'); } catch(e) {}
+    trackEvent('maps_opened', { map_type: 'companion_waze' });
+  });
   var mBtn = document.getElementById('compMapsBtn');
-  if (mBtn) mBtn.addEventListener('click', function(){ trackEvent('maps_opened', { map_type: 'companion_maps' }); });
+  if (mBtn) mBtn.addEventListener('click', function(){
+    S.cNavApp = 'maps';
+    try { localStorage.setItem('fr_nav_app', 'maps'); } catch(e) {}
+    trackEvent('maps_opened', { map_type: 'companion_maps' });
+  });
 }
 
 function vSavings(sv) {
@@ -3196,7 +3506,42 @@ async function tryCensusBureau(address, ctxState, biasLat, biasLon, maxKm) {
 }
 
 // ─── Main optimize flow ───────────────────────────────────────────────────────
+// Called once, right after a route successfully optimizes, from BOTH success
+// paths (OSRM GPS and the haversine/2-opt fallback) — a successful trip
+// counts toward the trial limit regardless of which optimizer produced it.
+// Never increments for legacy_free or paid users.
+function _consumeTrialIfApplicable() {
+  if (S.entitlement === 'legacy_free' || S.entitlement === 'paid') return;
+  S.trialRoutesUsed = (S.trialRoutesUsed || 0) + 1;
+  localStorage.setItem('fr_trial_routes_used', String(S.trialRoutesUsed));
+  if (S.trialRoutesUsed >= FREE_TRIAL_ROUTE_LIMIT) {
+    S.entitlement = 'trial_used';
+    localStorage.setItem('fr_entitlement', 'trial_used');
+  }
+  trackEvent('trial_consumed', { stop_count: S.optimized.length, routes_used: S.trialRoutesUsed });
+  if (S.userEmail) {
+    fetch('/.netlify/functions/trial-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: S.userEmail, action: 'consume', routes_used: S.trialRoutesUsed })
+    }).catch(function(){});
+  }
+}
+
+const FREE_TRIAL_ROUTE_LIMIT = 3;
+
 async function optimize() {
+  // ── Trial gate ───────────────────────────────────────────────────────────
+  // Checked BEFORE any geocoding/OCR cost is incurred. legacy_free and paid
+  // users always pass. Everyone else gets FREE_TRIAL_ROUTE_LIMIT (3) free
+  // optimized routes, tracked by a counter rather than a single used/unused
+  // flag (was 1 free route; increased to 3 per updated plan).
+  if (S.entitlement !== 'legacy_free' && S.entitlement !== 'paid' && S.trialRoutesUsed >= FREE_TRIAL_ROUTE_LIMIT) {
+    S.phase = 'paywall';
+    render();
+    trackEvent('paywall_shown', { reason: 'trial_used', routes_used: S.trialRoutesUsed });
+    return;
+  }
   // Save startAddr immediately — persists through all render() calls during optimization
   if (S.startAddr && S.startAddr.trim()) {
     localStorage.setItem('fr_sa', S.startAddr);
@@ -3765,6 +4110,7 @@ async function optimize() {
     geo_failed: S.geoFailed.length,
     region: S.userState || 'unknown'
   });
+  _consumeTrialIfApplicable();
   saveSession();
   S.phase = 'result'; render();
 }
@@ -3897,6 +4243,7 @@ async function optimizeWithGemini() {
     geo_failed: S.geoFailed.length,
     region: S.userState || 'unknown'
   });
+  _consumeTrialIfApplicable();
   var _failedStops = S.stops.filter(function(s){ return s.geoFailed; });
   if (_failedStops.length > 0) {
     trackEvent('fix_screen_shown', {
