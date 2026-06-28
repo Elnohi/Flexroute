@@ -32,7 +32,7 @@ function isPlausibleEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
 }
 
-async function handleCreateCheckout(body, stripe, originHost) {
+async function handleCreateCheckout(body, stripe, originHost, internalTestSecret) {
   const email = normalizeEmail(body.email);
   const plan = body.plan;
   if (!email || !isPlausibleEmail(email)) {
@@ -49,19 +49,39 @@ async function handleCreateCheckout(body, stripe, originHost) {
   // though the webhook (separate function, still to build) is what actually
   // grants entitlement; the redirect is just where the driver lands.
   const baseUrl = 'https://' + originHost;
+
+  // ── TEMPORARY: internal live-mode test path ──────────────────────────────
+  // REMOVE THIS BLOCK once live-mode testing is confirmed working. Applies
+  // a 100%-off coupon (INTERNAL-TEST-100, must already exist in Stripe) so
+  // we can verify the full live checkout + webhook + entitlement pipeline
+  // with a real Checkout Session but a genuine $0.00 charge — no refund
+  // needed afterward, no real money ever moves.
+  //
+  // Double-gated so a real driver's checkout call can NEVER trigger this:
+  //   1. body._internalTestSecret must match an env var only we know
+  //   2. body._applyTestCoupon must be explicitly true
+  // Neither field is ever sent by the real frontend checkout flow — both
+  // only exist for this one manual verification step.
+  const isInternalTest = internalTestSecret
+    && body._internalTestSecret === internalTestSecret
+    && body._applyTestCoupon === true;
+
+  const sessionParams = {
+    mode: 'subscription',
+    customer_email: email,
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: baseUrl + '/flexroute.html?checkout=success&session_id={CHECKOUT_SESSION_ID}',
+    cancel_url: baseUrl + '/flexroute.html?checkout=cancelled',
+    metadata: { flexroute_email: email, flexroute_plan: plan },
+  };
+  if (isInternalTest) {
+    sessionParams.discounts = [{ coupon: 'INTERNAL-TEST-100' }];
+    console.log('[FlexRoute] INTERNAL TEST CHECKOUT — 100% off coupon applied for', email);
+  }
+  // ── END TEMPORARY BLOCK ───────────────────────────────────────────────────
+
   try {
-    const session = await stripe.checkout.sessions.create({
-      mode: 'subscription',
-      customer_email: email,
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: baseUrl + '/flexroute.html?checkout=success&session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: baseUrl + '/flexroute.html?checkout=cancelled',
-      // Carried through to the webhook payload so it can match the
-      // completed session back to a FlexRoute email without re-parsing
-      // customer_email (which Stripe does populate, but metadata is the
-      // documented-stable way to round-trip our own identifiers).
-      metadata: { flexroute_email: email, flexroute_plan: plan },
-    });
+    const session = await stripe.checkout.sessions.create(sessionParams);
     return { statusCode: 200, body: { url: session.url } };
   } catch (e) {
     console.error('[FlexRoute] create-checkout-session error:', e && e.message);
@@ -100,7 +120,7 @@ exports.handler = async function(event) {
   // flexrouteapp.com once that's the live deploy — no hardcoded domain.
   const originHost = (event.headers.origin || event.headers.referer || 'flexrouteapp.com')
     .replace(/^https?:\/\//, '').split('/')[0];
-  const result = await handleCreateCheckout(body, stripe, originHost);
+  const result = await handleCreateCheckout(body, stripe, originHost, process.env.INTERNAL_TEST_SECRET);
   return { statusCode: result.statusCode, headers: cors, body: JSON.stringify(result.body) };
 };
 
