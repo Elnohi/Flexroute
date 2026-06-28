@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FlexRoute — Internal Checkout Test Trigger</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 480px; margin: 60px auto; padding: 0 20px; color: #222; }
+  h1 { font-size: 20px; }
+  label { display: block; margin-top: 16px; font-weight: 600; font-size: 14px; }
+  input, select { width: 100%; padding: 10px; margin-top: 6px; font-size: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+  button { margin-top: 24px; width: 100%; padding: 14px; font-size: 16px; font-weight: 600; background: #D97000; color: #fff; border: none; border-radius: 8px; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #result { margin-top: 20px; padding: 14px; border-radius: 8px; font-size: 14px; white-space: pre-wrap; word-break: break-all; }
+  .ok { background: #e6f7ee; border: 1px solid #2e9e5b; }
+  .err { background: #fdecea; border: 1px solid #d93025; }
+  .warn { background: #fff8e1; border: 1px solid #f0ad4e; font-size: 13px; margin-bottom: 16px; padding: 12px; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<h1>🔧 FlexRoute — Internal Checkout Test Trigger</h1>
+
+<div class="warn">
+  <strong>This page is for one-time internal testing only.</strong><br>
+  It calls the SAME function the real app uses, but with two extra hidden
+  fields that gate a 100%-off test coupon. Those fields only work if
+  <code>INTERNAL_TEST_SECRET</code> is currently set in Netlify — once
+  you remove that env var (or the code block in create-checkout-session.js),
+  this page stops working entirely, by design. Delete this file after testing.
+</div>
+
+<label for="endpoint">Function URL</label>
+<input id="endpoint" type="text" value="https://melodious-strudel-3bff01.netlify.app/.netlify/functions/create-checkout-session">
+
+<label for="email">Your real email (for the Checkout session)</label>
+<input id="email" type="email" placeholder="you@example.com">
+
+<label for="plan">Plan</label>
+<select id="plan">
+  <option value="monthly">Monthly ($9.99 — will show as $0.00 with coupon)</option>
+  <option value="yearly">Yearly ($79 — will show as $0.00 with coupon)</option>
+</select>
+
+<label for="secret">Internal test secret (must match Netlify's INTERNAL_TEST_SECRET)</label>
+<input id="secret" type="password" placeholder="paste the random value you set in Netlify">
+
+<button id="goBtn">Create test Checkout session →</button>
+
+<div id="result"></div>
+
+<script>
+document.getElementById('goBtn').addEventListener('click', async function() {
+  var btn = this;
+  var resultEl = document.getElementById('result');
+  var endpoint = document.getElementById('endpoint').value.trim();
+  var email = document.getElementById('email').value.trim();
+  var plan = document.getElementById('plan').value;
+  var secret = document.getElementById('secret').value;
+
+  if (!email || !secret) {
+    resultEl.className = 'err';
+    resultEl.textContent = 'Email and secret are both required.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Creating session…';
+  resultEl.className = '';
+  resultEl.textContent = '';
+
+  try {
+    var resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email,
+        plan: plan,
+        _applyTestCoupon: true,
+        _internalTestSecret: secret
+      })
+    });
+    var data = await resp.json();
+
+    if (resp.ok && data.url) {
+      resultEl.className = 'ok';
+      resultEl.textContent = '✅ Session created. Redirecting to Stripe Checkout in 2 seconds...\n\nURL: ' + data.url;
+      setTimeout(function() { window.location.href = data.url; }, 2000);
+    } else {
+      resultEl.className = 'err';
+      resultEl.textContent = '❌ Server responded with an error:\n\n' + JSON.stringify(data, null, 2)
+        + '\n\nMost likely cause: INTERNAL_TEST_SECRET is not set in Netlify yet, the value here doesn\'t match it exactly, or the deploy hasn\'t picked up the env var yet (needs a fresh deploy after setting it).';
+    }
+  } catch (e) {
+    resultEl.className = 'err';
+    resultEl.textContent = '❌ Request failed: ' + e.message;
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Create test Checkout session →';
+});
+</script>
+
+</body>
+</html>
