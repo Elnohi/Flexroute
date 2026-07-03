@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="color-scheme" content="light"/>
+  <meta name="theme-color" content="#7b2ff7"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Premium Trainer — SpellRightPro</title>
+  <meta name="description" content="Your premium SpellRightPro practice — School, OET Medical, and Spelling Bee with unlimited words and full progress tracking." />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="canonical" href="https://spellrightpro.org/trainer" />
+  <!-- Open Graph -->
+  <meta property="og:type"        content="website" />
+  <meta property="og:title"       content="Premium Trainer — SpellRightPro" />
+  <meta property="og:description" content="Premium spelling practice with School, OET Medical, and Spelling Bee modes." />
+  <meta property="og:url"         content="https://spellrightpro.org/trainer" />
+  <meta property="og:image"       content="https://spellrightpro.org/assets/og-image.png" />
+  <meta property="og:site_name"   content="SpellRightPro" />
+  <!-- Twitter Card -->
+  <meta name="twitter:card"        content="summary_large_image" />
+  <meta name="twitter:title"       content="Premium Trainer — SpellRightPro" />
+  <meta name="twitter:description" content="Premium spelling practice with School, OET Medical, and Spelling Bee modes." />
+  <meta name="twitter:image"       content="https://spellrightpro.org/assets/og-image.png" />
+
+
+  <link rel="stylesheet" href="/css/styles.css" />
+  <link rel="stylesheet" href="/css/premium.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+
+  <!-- Shared config must come first -->
+  <script src="/js/config.js"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+
+
+  <!-- Premium support modules -->
+  <script src="/js/firebase-utils.js"></script>
+  <script src="/js/common.js"></script>
+  <script src="/js/hw-canvas.js"></script>
+  <script src="/js/progress-dashboard.js"></script>
+  <script src="/js/mistake-review.js"></script>
+  <script src="/js/adaptive-drill.js"></script>
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-H09MF13297"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date()); gtag('config', 'G-H09MF13297');
+  </script>
+
+  <style>
+    /* ── Trainer-specific layout on top of premium.css ── */
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap');
+
+    :root {
+      --brand: #7b2ff7; --accent: #f72585;
+      --ok: #00c57a;    --fail: #ff4560;
+      --warn: #ffb800;
+      --surface: #ffffff; --surface2: #f4f0fc;
+      --border: rgba(123,47,247,0.15);
+      --text: #1a0533;   --muted: #7b6f8a;
+      --radius: 16px;
+      --shadow: 0 8px 32px rgba(100,30,200,0.12);
+    }
+    body.dark-mode {
+      --surface: #160829; --surface2: #1f0d3a;
+      --border: rgba(255,255,255,0.10);
+      --text: #f0e8ff;    --muted: #9d8fc0;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    /* ── Auth Overlay ── */
+    #loginOverlay {
+      position: fixed; inset: 0;
+      background: linear-gradient(145deg,#3a0087,#8b00d4 50%,#f72585);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999; padding: 20px;
+    }
+    .auth-card {
+      background: #fff; border-radius: 22px;
+      padding: 40px 36px; width: 100%; max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    body.dark-mode .auth-card { background: #1f0d3a; color: #f0e8ff; }
+    .auth-card h2 {
+      font-family: 'DM Sans',sans-serif; font-size: 1.6rem;
+      color: var(--brand); margin: 0 0 6px; text-align: center;
+    }
+    .auth-card p { text-align:center; color:var(--muted); font-size:0.9rem; margin:0 0 24px; }
+    .auth-field {
+      width:100%; padding:11px 14px; border-radius:10px;
+      border:1.5px solid var(--border); background:var(--surface2);
+      color:var(--text); font-size:1rem; font-family:'DM Sans',sans-serif;
+      margin-bottom:12px; display:block;
+    }
+    .auth-field:focus { outline:none; border-color:var(--brand); }
+    .auth-submit {
+      width:100%; padding:13px; background:var(--brand); color:#fff;
+      border:none; border-radius:12px; font-size:1rem; font-weight:700;
+      font-family:'DM Sans',sans-serif; cursor:pointer; margin-top:4px;
+      transition:all .2s;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      line-height:1.2; white-space:nowrap;
+    }
+    .auth-submit:hover { background:#5b1ec4; transform:translateY(-1px); }
+    .auth-link { color:var(--brand); cursor:pointer; font-weight:600; }
+    .auth-link:hover { text-decoration:underline; }
+    .auth-toggle { text-align:center; margin-top:14px; font-size:0.88rem; color:var(--muted); }
+
+
+    /* ── Header ── */
+    header {
+      width:100%; max-width:860px;
+      background:var(--surface); border-radius:var(--radius);
+      padding:10px 18px; display:flex; justify-content:space-between;
+      align-items:center; margin-bottom:16px; box-shadow:var(--shadow);
+      border:1px solid var(--border);
+    }
+    .brand { display:flex; align-items:center; gap:10px; }
+    .brand img { height:42px; border-radius:10px; }
+    .brand h1 { font-size:1.1rem; font-weight:700; color:var(--brand); margin:0; }
+    .brand small { font-size:0.7rem; color:var(--muted); display:block; }
+    .nav-right { display:flex; gap:8px; align-items:center; }
+    .nav-btn {
+      background:var(--surface2); color:var(--brand);
+      border:1px solid var(--border); border-radius:10px;
+      padding:7px 13px; font-size:0.82rem; font-weight:600;
+      cursor:pointer; display:flex; align-items:center; gap:6px; transition:all .2s;
+      font-family:'DM Sans',sans-serif;
+    }
+    .nav-btn:hover { background:rgba(123,47,247,.12); }
+    #btnLogout { color:var(--fail); border-color:rgba(255,69,96,.25); }
+    #btnLogout:hover { background:rgba(255,69,96,.08); }
+    /* Blog button — icon only, fixed square size */
+    .nav-btn[onclick*="blog"] { padding:7px 10px; min-width:36px; justify-content:center; }
+
+    /* ── Glass card / main container ── */
+    .glass-card {
+      width:100%; max-width:860px;
+      background:var(--surface); border-radius:22px;
+      box-shadow:var(--shadow); border:1px solid var(--border);
+      padding:28px 28px 32px; overflow:hidden;
+    }
+
+    /* ── Mode selector tabs ── */
+    .mode-tabs {
+      display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap;
+    }
+    .mode-btn {
+      flex:1; min-width:130px; padding:11px 16px;
+      border-radius:12px; border:2px solid var(--border);
+      background:var(--surface2); color:var(--muted);
+      font-weight:700; font-size:0.9rem;
+      font-family:'DM Sans',sans-serif; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      transition:all .2s;
+    }
+    .mode-btn.active, .mode-btn:hover {
+      background:var(--brand); color:#fff; border-color:var(--brand);
+      box-shadow:0 4px 16px rgba(123,47,247,.3);
+    }
+
+    /* ── Trainer areas ── */
+    .trainer-area { display:none; }
+    .trainer-area.active { display:block; }
+
+    .trainer-area h3 {
+      font-size:1.25rem; font-weight:700; color:var(--brand);
+      margin:0 0 18px; display:flex; align-items:center; gap:10px;
+    }
+
+    /* Accent selector */
+    .accent-row {
+      display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;
+    }
+    .accent-row label { font-size:0.82rem; font-weight:600; color:var(--muted); }
+    .accent-select {
+      padding:7px 12px; border-radius:10px;
+      border:1.5px solid var(--border); background:var(--surface2);
+      color:var(--text); font-size:0.85rem; font-family:'DM Sans',sans-serif;
+    }
+    /* OET exam mode radio */
+    .exam-row { display:flex; gap:16px; margin-bottom:14px; align-items:center; }
+    .exam-row label { font-size:0.85rem; color:var(--muted); font-weight:600; cursor:pointer; }
+
+    /* Progress bar */
+    .progress-track {
+      height:5px; background:var(--surface2); border-radius:99px;
+      margin-bottom:6px; overflow:hidden;
+    }
+    .progress-fill {
+      height:100%; background:linear-gradient(90deg,var(--brand),var(--accent));
+      border-radius:99px; width:0%; transition:width .4s ease;
+    }
+    .progress-text {
+      font-size:0.8rem; font-weight:600; color:var(--muted); margin-bottom:14px;
+    }
+
+    /* Feedback pill */
+    .feedback-pill {
+      min-height:38px; display:flex; align-items:center; justify-content:center;
+      font-size:1rem; font-weight:600; border-radius:50px;
+      padding:8px 20px; margin:0 0 18px;
+      background:var(--surface2); color:var(--muted); transition:all .25s;
+    }
+
+    /* ── Answer zone ── */
+    .answer-zone {
+      background:linear-gradient(135deg,rgba(123,47,247,.07),rgba(247,37,133,.05));
+      border:2.5px solid var(--brand); border-radius:18px;
+      padding:20px; margin-bottom:18px; position:relative;
+    }
+    .answer-zone-label {
+      position:absolute; top:-12px; left:18px;
+      background:var(--brand); color:#fff;
+      font-size:0.7rem; font-weight:800; letter-spacing:.1em;
+      text-transform:uppercase; padding:3px 12px; border-radius:99px;
+    }
+    .answer-zone-label i { margin-right:5px; }
+    .answer-input {
+      width:100%; background:transparent; border:none; outline:none;
+      font-size:1.6rem; font-weight:700; font-family:'DM Mono',monospace;
+      color:var(--text); text-align:center; resize:none;
+      caret-color:var(--brand); min-height:56px;
+      letter-spacing:.05em; line-height:1.4;
+    }
+    .answer-input::placeholder { color:rgba(123,47,247,.3); font-weight:400; font-size:1.1rem; letter-spacing:normal; }
+    .real-time-hint {
+      text-align:center; font-size:0.72rem; color:var(--muted); margin-top:6px;
+    }
+    /* Hint text colour tokens — match the JS feedback colours for each mode */
+    .rt-ok   { font-weight:600; color:#007048; }
+    .rt-warn { font-weight:600; color:#7a5200; }
+    .rt-fail { font-weight:600; color:#c8002a; }
+    body.dark-mode .rt-ok   { color:#00c57a; }
+    body.dark-mode .rt-warn { color:#ffb800; }
+    body.dark-mode .rt-fail { color:#ff4560; }
+
+    /* ── Input mode toggle (keyboard / write) ── */
+    .input-mode-toggle { display:flex; gap:8px; margin-bottom:10px; }
+    .mode-toggle-btn {
+      flex:1; padding:7px 10px; border-radius:8px; font-size:0.8rem; font-weight:600;
+      border:1.5px solid rgba(123,47,247,0.25); background:transparent;
+      color:var(--muted,#6b7280); cursor:pointer; transition:all 0.2s;
+    }
+    .mode-toggle-btn.active {
+      background:rgba(123,47,247,0.1); border-color:rgba(123,47,247,0.5);
+      color:#7b2ff7;
+    }
+    .mode-toggle-btn:hover:not(.active) { background:rgba(123,47,247,0.05); }
+
+    /* ── Handwriting canvas wrap ── */
+    .hw-wrap { display:none; }
+    .hw-wrap.visible { display:block; }
+
+    /* ── Input group (used by real-time validation) ── */
+    .input-group { position:relative; }
+
+    /* ── Bee voice UI ── */
+    #beeVoiceStatus {
+      display:none; text-align:center; padding:20px;
+      background:rgba(123,47,247,.08); border-radius:14px;
+      margin-bottom:18px; border:2px solid rgba(123,47,247,.3);
+    }
+    #beeVoiceText { font-weight:700; font-size:1rem; color:var(--brand); margin-bottom:12px; }
+    .voice-bars {
+      display:flex; align-items:flex-end; gap:4px; justify-content:center; height:40px;
+    }
+    .voice-bar {
+      width:6px; background:var(--brand); border-radius:3px; height:8px;
+      transition:height .1s;
+    }
+    #beeRecognizedText {
+      display:none; margin-top:14px; padding:14px;
+      background:rgba(0,197,122,.1); border-radius:12px;
+      border:1.5px solid rgba(0,197,122,.3); text-align:center;
+    }
+    #beeRecognizedText p { margin:0 0 4px; font-size:0.85rem; color:var(--muted); }
+    #beeSpokenText { font-size:1.3rem; font-weight:700; color:#007a4d; }
+
+    /* ── Button grid ── */
+    .btn-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .btn-start {
+      grid-column:1/-1; background:linear-gradient(135deg,var(--brand),var(--accent));
+      color:#fff; border:none; border-radius:14px; padding:15px;
+      font-size:1.05rem; font-weight:800; font-family:'DM Sans',sans-serif;
+      cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px;
+      box-shadow:0 6px 24px rgba(123,47,247,.35); transition:all .2s;
+    }
+    .btn-start:hover { transform:translateY(-2px); box-shadow:0 8px 30px rgba(123,47,247,.45); }
+    .start-btn { /* alias used by main-premium.js */ }
+    .btn-submit-answer {
+      grid-column:1/-1; background:var(--brand); color:#fff;
+      border:none; border-radius:14px; padding:13px;
+      font-size:1rem; font-weight:700; font-family:'DM Sans',sans-serif;
+      cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+      box-shadow:0 4px 16px rgba(123,47,247,.3); transition:all .2s;
+    }
+    .btn-submit-answer:hover { background:#5b1ec4; }
+    .btn-sec {
+      background:var(--surface2); color:var(--brand);
+      border:1.5px solid var(--border); border-radius:12px; padding:11px;
+      font-size:0.88rem; font-weight:600; font-family:'DM Sans',sans-serif;
+      cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px;
+      transition:all .2s;
+    }
+    .btn-sec:hover { background:rgba(123,47,247,.1); }
+    .btn-end {
+      grid-column:1/-1; background:rgba(255,69,96,.08); color:var(--fail);
+      border:1.5px solid rgba(255,69,96,.25); border-radius:12px; padding:11px;
+      font-size:0.88rem; font-weight:600; font-family:'DM Sans',sans-serif;
+      cursor:pointer; display:flex; align-items:center; justify-content:center; gap:7px;
+      transition:all .2s;
+    }
+    .btn-end:hover { background:rgba(255,69,96,.14); }
+
+    /* ── Word navigation row (Previous / Next / Jump) ── */
+    .nav-row {
+      display:flex; align-items:center; gap:8px;
+      margin-top:12px; padding-top:12px;
+      border-top:1px solid var(--border);
+      flex-wrap:wrap;
+    }
+    .btn-nav {
+      background:var(--surface2); color:var(--brand);
+      border:1.5px solid rgba(123,47,247,0.35); border-radius:10px;
+      padding:9px 14px; font-size:0.85rem; font-weight:600;
+      font-family:'DM Sans',sans-serif; cursor:pointer;
+      display:inline-flex; align-items:center; gap:6px; transition:all .2s;
+      white-space:nowrap;
+    }
+    .btn-nav:hover { background:rgba(123,47,247,.12); border-color:var(--brand); }
+    .btn-nav:disabled { opacity:.45; cursor:not-allowed; filter:grayscale(30%); }
+    /* btn-end sits in its own full-width row below the nav row */
+    .btn-end-row { margin-top:8px; }
+    .btn-end-row .btn-end { width:100%; }
+    .jump-wrap {
+      display:flex; align-items:center; gap:6px;
+      margin-left:auto;
+    }
+    .jump-input {
+      width:56px; padding:8px 8px; border-radius:9px;
+      border:1.5px solid var(--border); font-size:0.88rem;
+      font-family:'DM Sans',sans-serif; text-align:center;
+      background:var(--surface2); color:var(--text);
+      outline:none;
+    }
+    .jump-input:focus { border-color:var(--brand); }
+    .btn-jump {
+      padding:9px 13px; border-radius:9px; font-size:0.85rem;
+      font-weight:700; font-family:'DM Sans',sans-serif;
+      background:var(--brand); color:#fff; border:none; cursor:pointer;
+      transition:all .2s;
+    }
+    .btn-jump:hover { background:#5b1ec4; }
+    @media (max-width:520px) {
+      .nav-row { gap:5px; flex-wrap:nowrap; }
+      .btn-nav { padding:9px 10px; font-size:0; gap:0; flex-shrink:0; }
+      .btn-nav i { font-size:15px; display:block; margin:0; }
+      .jump-wrap { margin-left:auto; flex-shrink:0; }
+      .jump-input { width:46px; font-size:0.82rem; padding:7px 5px; }
+      .btn-jump { padding:8px 10px; font-size:0.8rem; white-space:nowrap; }
+    }
+
+
+    /* ── Summary ── */
+    .summary-panel { margin-top:24px; }
+    .summary-panel h3 { color:var(--brand); font-size:1.2rem; margin:0 0 12px; }
+    .score-grid {
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+      gap:12px; margin-bottom:18px;
+    }
+    .score-cell {
+      background:var(--surface2); border-radius:12px; padding:14px;
+      text-align:center; border:1px solid var(--border);
+    }
+    .score-cell .value { font-size:2rem; font-weight:800; color:var(--brand); }
+    .score-cell .label { font-size:0.78rem; color:var(--muted); }
+
+    /* ── Session summary header (Score: X/Y) ── */
+    .summary-header { text-align:center; margin-bottom:20px; }
+    .summary-header h3 { color:var(--text); font-size:1.3rem; font-weight:800; margin:0 0 8px; }
+    .summary-header .score { font-size:1.5rem; font-weight:800; color:#7b2ff7; }
+
+    /* ── Incorrect / correct / flagged word lists ──
+       WCAG AA requires 4.5:1 contrast for body text. The colours below
+       are chosen against both light (--surface2) and dark backgrounds. */
+    .incorrect-words, .correct-words, .flagged-words {
+      margin:20px 0; padding:16px 18px; border-radius:12px;
+    }
+    .incorrect-words {
+      background:#fef2f2; border:1px solid rgba(239,68,68,0.3);
+    }
+    .correct-words {
+      background:#f0fdf4; border:1px solid rgba(34,197,94,0.3);
+    }
+    .flagged-words {
+      background:#fffbeb; border:1px solid rgba(245,158,11,0.35);
+    }
+    .incorrect-words h4, .correct-words h4, .flagged-words h4 {
+      margin:0 0 12px; font-size:0.95rem; font-weight:700;
+    }
+    .incorrect-words h4 { color:#b91c1c; }
+    .correct-words h4   { color:#15803d; }
+    .flagged-words h4   { color:#b45309; }
+    body.dark-mode .incorrect-words { background:rgba(239,68,68,0.12); border-color:rgba(239,68,68,0.35); }
+    body.dark-mode .correct-words   { background:rgba(34,197,94,0.12); border-color:rgba(34,197,94,0.35); }
+    body.dark-mode .flagged-words   { background:rgba(245,158,11,0.14); border-color:rgba(245,158,11,0.4); }
+    body.dark-mode .incorrect-words h4 { color:#fca5a5; }
+    body.dark-mode .correct-words h4   { color:#86efac; }
+    body.dark-mode .flagged-words h4   { color:#fcd34d; }
+
+    .word-list {
+      display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+      gap:8px;
+    }
+    .word-item {
+      background:var(--surface); border-radius:8px; padding:8px 12px;
+      font-size:0.88rem; color:var(--text); border:1px solid var(--border);
+    }
+    .word-item strong { color:var(--text); font-weight:700; }
+
+    /* ── Divider between sections ── */
+    .section-divider { height:1px; background:var(--border); margin:24px 0; }
+
+    /* ── Premium feature panels (injected by JS) ── */
+    .premium-feature { margin-top:24px; }
+
+    /* ── Mobile ── */
+    @media (max-width:520px) {
+      .glass-card { padding:18px 14px 24px; }
+      .answer-input { font-size:1.25rem; }
+      .btn-grid { grid-template-columns:1fr; }
+      .btn-submit-answer, .btn-start, .btn-end { grid-column:1; }
+      .mode-tabs { flex-direction:column; }
+    }
+
+    /* ── Voice bars animation ── */
+    @keyframes voicePulse {
+      from { height:6px; }
+      to   { height:36px; }
+    }
+  
+    /* ══════════════════════════════════════════════════════════
+       MOBILE REDESIGN — trainer.html max-width 520px
+    ══════════════════════════════════════════════════════════ */
+    @media (max-width: 520px) {
+      body { padding: 0 0 72px; }
+
+      /* Auth card tighter */
+      .auth-card { padding: 24px 18px 22px; }
+      .auth-card h2 { font-size: 1.25rem; }
+      .auth-field { font-size: 0.95rem; padding: 10px 12px; }
+      .auth-submit { padding: 12px; font-size: 0.95rem; }
+
+      /* Header */
+      header { border-radius:0; padding:8px 12px; position:sticky; top:0; z-index:100; }
+      header .brand h1 { font-size:0.95rem; }
+      header .brand img { height:30px; }
+      .nav-right { gap:4px; flex-wrap:nowrap; overflow:hidden; }
+      .nav-btn { padding:7px 9px; font-size:0 !important; gap:0; }
+      .nav-btn i { font-size:14px; margin:0; }
+      #btnLogout { font-size:0 !important; padding:7px 10px; }
+      #btnLogout i { font-size:14px; margin:0; }
+
+      /* Main content */
+      main { padding: 0 !important; }
+      .glass-card { border-radius:0; padding:14px 12px 20px; box-shadow:none; }
+
+      /* Mode tabs → horizontal scroll, no wrap */
+      .mode-tabs {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 8px;
+        padding-bottom: 4px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        margin-bottom: 16px;
+      }
+      .mode-tabs::-webkit-scrollbar { display: none; }
+      .mode-btn {
+        flex-shrink: 0;
+        min-width: 0;
+        white-space: nowrap;
+        padding: 10px 16px;
+        font-size: 0.82rem;
+        border-radius: 20px;
+      }
+
+      /* Trainer area */
+      .trainer-area h3 { font-size: 1rem; margin-bottom: 12px; }
+      .accent-row { gap:8px; margin-bottom:10px; }
+      .accent-row label { font-size:0.78rem; white-space:nowrap; }
+      .accent-select { font-size:0.85rem; padding:6px 8px; }
+      .exam-row { gap:12px; margin-bottom:10px; }
+      .exam-row label { font-size:0.82rem; }
+
+      /* Progress */
+      .progress-text { font-size:0.85rem; font-weight:700; margin-bottom:4px; }
+      .progress-track { height:5px; margin-bottom:10px; }
+
+      /* Feedback pill */
+      .feedback-pill { font-size:0.92rem; padding:10px 14px; margin-bottom:12px; min-height:40px; }
+
+      /* Answer zone */
+      .answer-zone { padding:14px 10px 10px; margin-bottom:12px; }
+      .answer-input { font-size:1.45rem; min-height:50px; }
+      .real-time-hint { font-size:0.72rem; }
+
+      /* Button grid: submit full-width, helpers 3-col row */
+      .btn-grid { grid-template-columns: 1fr 1fr 1fr !important; gap:6px; }
+      .btn-start { grid-column:1/-1 !important; padding:15px; font-size:1rem; border-radius:14px; }
+      .btn-submit-answer { grid-column:1/-1 !important; padding:14px; font-size:0.98rem; border-radius:14px; }
+      .btn-sec { padding:11px 4px; font-size:0; gap:0; border-radius:11px; }
+      .btn-sec i { font-size:16px; margin:0; display:block; }
+      .btn-end { grid-column:1/-1 !important; padding:11px; font-size:0.88rem; }
+
+      /* Bee voice area */
+      #beeVoiceStatus { padding:14px; margin-bottom:12px; }
+      #beeVoiceText { font-size:0.9rem; }
+      #beeSpokenText { font-size:1.1rem; }
+
+      /* No-mode placeholder */
+      #noModeMsg { padding:30px 16px; }
+
+      /* Mobile tab bar */
+      .trainer-tab-bar { display: flex; }
+    }
+    /* Tab bar hidden on desktop */
+    .trainer-tab-bar { display: none; }
+    .trainer-tab-bar {
+      position:fixed; bottom:0; left:0; right:0;
+      background:var(--surface); border-top:1px solid var(--border);
+      z-index:200; padding:6px 0 max(10px,env(safe-area-inset-bottom));
+      box-shadow:0 -2px 12px rgba(0,0,0,0.07);
+    }
+    .trainer-tab-bar a {
+      flex:1; display:flex; flex-direction:column; align-items:center;
+      gap:3px; text-decoration:none; color:var(--muted);
+      font-size:0.65rem; font-weight:600; padding:4px 0; cursor:pointer;
+    }
+    .trainer-tab-bar a.active { color:var(--brand); }
+    .trainer-tab-bar a i { font-size:18px; }
+
+  
+    /* ── Word source selector (premium trainer) ─────────────────── */
+    .word-source-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .source-btn {
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 10px;
+      background: var(--surface2);
+      cursor: pointer;
+      text-align: center;
+      transition: all .2s;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text);
+    }
+    .source-btn.active {
+      border-color: var(--brand);
+      background: rgba(123,47,247,.1);
+    }
+    .source-btn i      { font-size:1.25rem; color:var(--brand); display:block; margin-bottom:5px; }
+    .source-btn strong { font-size:0.82rem; display:block; color:var(--text); }
+    .source-btn small  { font-size:0.68rem; color:var(--muted); }
+    .app-word-hint {
+      background: rgba(0,197,122,.08);
+      border: 1px solid rgba(0,197,122,.25);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.82rem;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .app-word-hint i { color:#00c57a; font-size:0.95rem; flex-shrink:0; }
+    /* Custom panel — collapsed by default, opened by JS.
+       !important is intentional here: a previous bug in premium.css
+       silently overrode this with a higher-specificity selector,
+       making the panel impossible to hide. !important guarantees
+       this exact rule always wins regardless of what any other
+       stylesheet does, now or in the future. */
+    .custom-words-area {
+      display: none !important;
+      margin-bottom: 14px;
+    }
+    .custom-words-area.open { display: block !important; }
+    /* Quick-create textarea */
+    #quickWordsInput {
+      width: 100%;
+      min-height: 80px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: 0.85rem;
+      padding: 10px 12px;
+      resize: vertical;
+      font-family: 'DM Mono', monospace;
+      box-sizing: border-box;
+      margin-bottom: 6px;
+    }
+    #quickWordsInput:focus { outline:none; border-color:var(--brand); }
+    /* Saved lists */
+    .upload-label { font-size:0.78rem; font-weight:600; color:var(--muted); display:block; margin-bottom:5px; }
+    .upload-row   { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
+    .lists-container { display:flex; flex-direction:column; gap:6px; }
+    .list-card {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+    }
+    .list-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+    .list-header strong { font-size:0.85rem; color:var(--text); }
+    .word-count { font-size:0.72rem; color:var(--muted); }
+    .list-words-preview { font-size:0.75rem; color:var(--muted); margin-bottom:8px; font-style:italic; }
+    .list-actions { display:flex; gap:6px; }
+    .btn-small {
+      padding:5px 10px; border-radius:8px; font-size:0.75rem;
+      border:1px solid var(--border); background:var(--surface);
+      color:var(--brand); cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .15s;
+    }
+    .btn-small:hover { background:rgba(123,47,247,.1); }
+    .btn-small.btn-danger { color:var(--fail); border-color:rgba(255,69,96,.25); }
+    .btn-small.btn-danger:hover { background:rgba(255,69,96,.08); }
+    /* Mobile tweaks */
+    @media (max-width:520px) {
+      .word-source-row { gap:8px; }
+      .source-btn { padding:12px 8px; border-radius:12px; }
+      .source-btn i { font-size:1.1rem; }
+    }
+
+  
+    /* ── Word list selector ── */
+    .word-list-selector { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:0; }
+    .word-list-btn {
+      border:2px solid var(--border); border-radius:14px; padding:14px 10px;
+      background:var(--surface); cursor:pointer; text-align:center;
+      transition:all .2s; font-family:'DM Sans',sans-serif; color:var(--text);
+    }
+    .word-list-btn.active { border-color:var(--brand); background:rgba(123,47,247,.1); }
+    .word-list-btn i      { font-size:1.25rem; color:var(--brand); display:block; margin-bottom:5px; }
+    .word-list-btn strong { font-size:0.82rem; display:block; color:var(--text); }
+    .word-list-btn small  { font-size:0.68rem; color:var(--muted); }
+
+    /* ── Setup / Training phase system ─────────────────────────────────────── */
+    .setup-phase   { display: block; }
+    .training-phase { display: none; }
+    .trainer-area.training-active .setup-phase   { display: none; }
+    .trainer-area.training-active .training-phase { display: block; }
+
+    /* Setup card */
+    .setup-card {
+      background: var(--surface2);
+      border-radius: 16px;
+      padding: 22px 20px;
+      margin-bottom: 16px;
+      border: 1px solid var(--border);
+    }
+    .setup-card h4 {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin: 0 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .setup-card h4 i { color: var(--brand); }
+
+    /* OET mode pills */
+    .oet-mode-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .oet-mode-btn {
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 12px;
+      background: var(--surface);
+      cursor: pointer;
+      text-align: center;
+      transition: all .2s;
+      font-family: 'DM Sans', sans-serif;
+      color: var(--text);
+    }
+    .oet-mode-btn.active {
+      border-color: var(--brand);
+      background: rgba(123,47,247,.1);
+    }
+    .oet-mode-btn i      { font-size:1.25rem; color:var(--brand); display:block; margin-bottom:5px; }
+    .oet-mode-btn strong { font-size:0.85rem; display:block; }
+    .oet-mode-btn small  { font-size:0.7rem; color:var(--muted); }
+
+    /* Start training button — large, prominent */
+    .btn-start-training {
+      width: 100%;
+      padding: 17px;
+      background: linear-gradient(135deg, var(--brand), #f72585);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-size: 1.05rem;
+      font-weight: 700;
+      font-family: 'DM Sans', sans-serif;
+      cursor: pointer;
+      margin-top: 6px;
+      transition: all .2s;
+      box-shadow: 0 4px 20px rgba(123,47,247,.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .btn-start-training:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(123,47,247,.45);
+    }
+
+    /* Back to setup link */
+    .back-to-setup {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      cursor: pointer;
+      margin-bottom: 12px;
+      background: none;
+      border: none;
+      font-family: 'DM Sans', sans-serif;
+      padding: 0;
+    }
+    .back-to-setup:hover { color: var(--brand); }
+
+    /* Accent select row */
+    .accent-setup-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .accent-setup-row label { font-size:0.88rem; font-weight:600; color:var(--text); white-space:nowrap; }
+    .accent-setup-row select { flex:1; }
+
+    /* Mobile */
+    @media (max-width:520px) {
+      .setup-card { padding:16px 14px; }
+      .oet-mode-row { gap:8px; }
+      .oet-mode-btn { padding:12px 8px; }
+      .btn-start-training { padding:15px; font-size:0.98rem; }
+    }
+
+  
+    /* ── Rating prompt (premium trainer) ───────────────────────── */
+    .rating-prompt { background:var(--surface2); border:1px solid var(--border); border-radius:16px; padding:22px 20px; margin-top:20px; text-align:center; }
+    .rating-prompt h4 { font-size:1rem; font-weight:700; color:var(--text); margin:0 0 6px; }
+    .rating-prompt p { font-size:0.85rem; color:var(--muted); margin:0 0 16px; }
+    .star-row { display:flex; justify-content:center; gap:8px; margin-bottom:14px; }
+    .star-btn { font-size:2rem; background:none; border:none; cursor:pointer; color:#c9bfe0; transition:color .15s,transform .15s; padding:0; line-height:1; font-family:inherit; }
+    body.dark-mode .star-btn { color:#5a4a78; }
+    .star-btn:hover,.star-btn.selected { color:#ffb800; transform:scale(1.15); }
+    .rating-actions { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .rating-action-btn { padding:10px 20px; border-radius:10px; font-size:0.88rem; font-weight:600; cursor:pointer; font-family:'DM Sans',sans-serif; transition:all .15s; border:none; }
+    .rating-action-btn.primary { background:linear-gradient(135deg,#7b2ff7,#f72585); color:#fff; }
+    .rating-action-btn.secondary { background:transparent; color:var(--muted); border:1px solid var(--border); }
+    .rating-action-btn:hover { opacity:.85; }
+    .rating-thanks { font-size:0.95rem; font-weight:600; color:#00c57a; padding:10px 0; }
+
+    /* ── Premium Bee adaptive-difficulty badge ─────────────────────────────── */
+    .bee-difficulty-badge {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 14px;
+      margin: 8px auto 12px;
+      background: linear-gradient(135deg, rgba(123,47,247,0.12), rgba(247,37,133,0.08));
+      border: 1px solid rgba(123,47,247,0.25);
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--brand, #7b2ff7);
+      width: fit-content;
+      max-width: 100%;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .bee-difficulty-badge.visible { display: inline-flex; }
+    .bee-difficulty-badge .icon { font-size: 1.05rem; }
+    .bee-difficulty-badge .label { letter-spacing: 0.02em; }
+    .bee-difficulty-badge .meta {
+      font-size: 0.7rem;
+      font-weight: 600;
+      opacity: 0.7;
+      margin-left: 4px;
+    }
+    @keyframes srpBeeLevelUp {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.08); box-shadow: 0 0 20px rgba(123,47,247,0.4); }
+      100% { transform: scale(1); }
+    }
+    .bee-difficulty-badge.level-up { animation: srpBeeLevelUp 0.6s ease; }
+    body.dark-mode .bee-difficulty-badge {
+      background: linear-gradient(135deg, rgba(123,47,247,0.2), rgba(247,37,133,0.15));
+      color: #f0e8ff;
+    }
+
+  </style>
+</head>
+
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     AUTH OVERLAY — shown when not logged in / not premium
+══════════════════════════════════════════════════════════ -->
+  <!-- ── Security note ───────────────────────────────────────────────────
+       The overlay is ALWAYS shown on page load. The main content starts
+       as display:none and is only revealed after Firebase Auth confirms:
+         1. User is signed in (auth.onAuthStateChanged)
+         2. User has an active premium record (Firestore or localStorage cache)
+       localStorage srpPremium is a CACHE that speeds up step 2 only.
+       It never bypasses step 1 (must be signed in).
+  ─────────────────────────────────────────────────────────────────── -->
+  <script>
+  (function() {
+    // Pre-load hint: if srpPremium is valid, set a flag so Firebase auth
+    // can activate premium instantly without a Firestore round-trip.
+    // The overlay is still shown — only auth.onAuthStateChanged removes it.
+    try {
+      var stored = JSON.parse(localStorage.getItem('srpPremium') || 'null');
+      if (stored && stored.active && new Date(stored.expiry) > new Date()) {
+        window._srpLocalPremium = true; // hint only — not a gate
+        console.log('💾 localStorage hint: premium record found, awaiting Firebase auth');
+      } else {
+        // Clear stale/expired record
+        localStorage.removeItem('srpPremium');
+      }
+    } catch(e) {
+      localStorage.removeItem('srpPremium');
+    }
+    // Overlay stays visible; main stays hidden — Firebase auth decides everything
+  })();
+  </script>
+
+<div id="loginOverlay">
+  <!-- Shown immediately while we wait to find out if the user is already signed in.
+       Prevents the screen from looking "stuck" on a slow connection, and avoids the
+       login form flashing for an instant for already-authenticated premium users. -->
+  <div class="auth-card" id="authLoadingCard" style="text-align:center;">
+    <i class="fa fa-spinner fa-spin" style="font-size:2rem;color:#7b2ff7;margin-bottom:16px;"></i>
+    <p style="margin:0;color:var(--muted);">Checking your account…</p>
+  </div>
+  <div class="auth-card" id="authCardContent" style="display:none;">
+    <h2><i class="fa fa-crown" style="color:#f72585;"></i> Premium Trainer</h2>
+    <p>Sign in to access your premium spelling practice</p>
+    <p style="margin:-16px 0 20px;font-size:0.8rem;color:var(--muted);">
+      <a href="/" style="color:var(--muted);text-decoration:none;">
+        <i class="fa fa-arrow-left"></i> Back to home
+      </a>
+      &nbsp;·&nbsp;
+      <a href="/premium.html" style="color:var(--brand);font-weight:600;">
+        Get Premium
+      </a>
+    </p>
+
+    <!-- Login form -->
+    <form id="loginForm" autocomplete="on">
+      <input class="auth-field" type="email" id="loginEmail"
+             placeholder="Email address" required autocomplete="email" />
+      <input class="auth-field" type="password" id="loginPassword"
+             placeholder="Password" required autocomplete="current-password" />
+      <button class="auth-submit" type="submit">
+        <i class="fa fa-sign-in-alt"></i> Sign In
+      </button>
+    </form>
+
+    <div class="auth-toggle">
+      Don't have an account?
+      <span class="auth-link" id="showRegister">Create one</span>
+      <span id="showLogin" style="display:none;">Already have an account?
+        <span class="auth-link">Sign in</span>
+      </span>
+    </div>
+
+    <!-- Register form (hidden by default) -->
+    <form id="registerForm" style="display:none;" autocomplete="on">
+      <input class="auth-field" type="email" id="regEmail"
+             placeholder="Email address" required autocomplete="email" />
+      <input class="auth-field" type="password" id="regPassword"
+             placeholder="Password (min 6 chars)" required autocomplete="new-password" />
+      <input class="auth-field" type="password" id="regConfirmPassword"
+             placeholder="Confirm password" required autocomplete="new-password" />
+      <button class="auth-submit" type="submit">
+        <i class="fa fa-user-plus"></i> Create Account
+      </button>
+    </form>
+
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════════════════ -->
+<header>
+  <div class="brand">
+    <img src="/assets/logo.png" alt="SpellRightPro" />
+    <div>
+      <h1>SpellRightPro</h1>
+      <small>Premium Trainer</small>
+    </div>
+  </div>
+  <div class="nav-right">
+    <button class="nav-btn" onclick="window.location.href='/'">
+      <i class="fa fa-home"></i> Home
+    </button>
+    <button class="nav-btn" onclick="window.location.href='/blog'" title="Blog"><i class="fa fa-book-open"></i></button>
+    <button class="nav-btn" id="toggleDark">
+      <i class="fa fa-moon"></i>
+    </button>
+    <button class="nav-btn" id="btnLogout">
+      <i class="fa fa-sign-out-alt"></i> Sign Out
+    </button>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════
+     MAIN TRAINER — hidden until auth passes
+══════════════════════════════════════════════════════════ -->
+<main style="width:100%;max-width:860px;display:none;">
+
+  <!-- Glass card wraps everything (required by main-premium.js) -->
+  <div class="glass-card">
+
+    <!-- Mode selector -->
+    <div class="mode-tabs">
+      <button class="mode-btn" data-mode="practice">
+        <i class="fa fa-book-open"></i> OET / School
+      </button>
+      <button class="mode-btn" data-mode="bee">
+        <i class="fa fa-deaf"></i> Spelling Bee
+      </button>
+    </div>
+
+    <!-- ── PRACTICE TRAINER (OET Medical + School) ─────────────── -->
+    <div class="trainer-area" id="practice-area">
+      <!-- ════ SETUP PHASE ════ -->
+      <div class="setup-phase">
+        <h3><i class="fa fa-book-open"></i> Spelling Practice</h3>
+
+        <!-- Word source selector — injected by createCustomWordsUI() -->
+
+        <!-- Word list: OET Medical or School -->
+        <div class="setup-card">
+          <h4><i class="fa fa-list-alt"></i> Word List</h4>
+          <div class="word-list-selector">
+            <button class="word-list-btn active" id="btnListOET"
+                    onclick="selectWordList('oet')">
+              <i class="fa fa-stethoscope"></i>
+              <strong>OET Medical</strong>
+              <small>1,511 medical words</small>
+            </button>
+            <button class="word-list-btn" id="btnListSchool"
+                    onclick="selectWordList('school')">
+              <i class="fa fa-graduation-cap"></i>
+              <strong>School</strong>
+              <small>307 curriculum words</small>
+            </button>
+          </div>
+          <!-- OET sub-mode (hidden when School selected) -->
+          <div id="oetModePanel" style="margin-top:12px;">
+            <div class="oet-mode-row">
+              <button class="oet-mode-btn active" id="oetModePractice"
+                      onclick="selectOetMode('practice')">
+                <i class="fa fa-book-open"></i>
+                <strong>Full List</strong>
+                <small>All 1,511 words</small>
+              </button>
+              <button class="oet-mode-btn" id="oetModeTest"
+                      onclick="selectOetMode('test')">
+                <i class="fa fa-clock"></i>
+                <strong>Exam Simulation</strong>
+                <small>Random 24 words</small>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Accent -->
+        <div class="setup-card">
+          <h4><i class="fa fa-globe"></i> Pronunciation</h4>
+          <div class="accent-setup-row">
+            <label for="practiceAccent">Accent</label>
+            <select class="accent-select" id="practiceAccent">
+              <option value="en-GB">🇬🇧 British</option>
+              <option value="en-US">🇺🇸 American</option>
+              <option value="en-AU">🇦🇺 Australian</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Hidden radio for loadOETWords() -->
+        <input type="radio" name="examType" id="examTypePractice" value="practice" checked style="display:none;" />
+        <input type="radio" name="examType" id="examTypeTest"     value="test"     style="display:none;" />
+
+        <!-- Start button -->
+        <button class="btn-start-training start-btn" data-mode="practice" id="practiceStartBtn">
+          <i class="fa fa-play"></i> Start OET Full List Practice
+        </button>
+
+      </div><!-- /.setup-phase -->
+
+      <!-- ════ TRAINING PHASE ════ -->
+      <div class="training-phase">
+        <button class="back-to-setup" onclick="backToSetup('practice')">
+          <i class="fa fa-arrow-left"></i> Change settings
+        </button>
+        <div id="practiceProgress" class="progress-text"></div>
+        <div class="progress-track"><div class="progress-fill" id="practiceProgressFill"></div></div>
+
+
+        <div id="practiceFeedback" class="feedback-pill">
+          Listen carefully and type the word…
+        </div>
+        <div class="answer-zone">
+          <span class="answer-zone-label" id="practiceZoneLabel"><i class="fa fa-keyboard"></i> Type your spelling here</span>
+
+          <!-- Input mode toggle -->
+          <div class="input-mode-toggle" style="display:flex;gap:8px;margin-bottom:10px;">
+            <button id="practiceModeKeyboard" class="mode-toggle-btn active"
+              onclick="window.HW && HW.setMode('practice','keyboard')"
+              title="Type your answer">
+              <i class="fa fa-keyboard"></i> Keyboard
+            </button>
+            <button id="practiceModeHandwriting" class="mode-toggle-btn"
+              onclick="window.HW && HW.setMode('practice','handwriting')"
+              title="Write your answer with finger or stylus">
+              <i class="fa fa-pen-nib"></i> Write
+            </button>
+          </div>
+
+          <!-- Keyboard input -->
+          <div id="practiceKeyboardWrap">
+            <div class="input-group">
+              <textarea id="practiceInput" class="answer-input"
+                placeholder="type it…"
+                autocomplete="off" autocorrect="off"
+                autocapitalize="off" spellcheck="false"
+                rows="2"></textarea>
+            </div>
+            <p class="real-time-hint">Real-time feedback — <span class="rt-ok">green</span> = correct · <span class="rt-warn">amber</span> = on track · <span class="rt-fail">red</span> = wrong</p>
+          </div>
+
+          <!-- Handwriting canvas (hidden until Write mode selected) -->
+          <div id="practiceHwWrap" class="hw-wrap">
+            <canvas id="practiceHwCanvas" class="hw-canvas"
+              style="width:100%;height:140px;border:2px dashed rgba(123,47,247,0.3);border-radius:10px;cursor:crosshair;background:rgba(123,47,247,0.03);touch-action:none;">
+            </canvas>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+              <span id="practiceHwStatus" style="font-size:0.82rem;color:var(--muted);">
+                Write your word on the canvas above
+              </span>
+              <button id="practiceHwClearBtn" style="font-size:0.78rem;background:none;border:1px solid var(--border,rgba(0,0,0,0.15));border-radius:6px;padding:3px 10px;cursor:pointer;color:var(--muted);">
+                ✕ Clear
+              </button>
+            </div>
+            <div style="margin-top:6px;font-size:0.9rem;font-weight:600;min-height:1.4em;" id="practiceHwText">—</div>
+          </div>
+        </div>
+        <div class="btn-grid">
+          <button class="btn-submit-answer" id="practiceSubmit">
+            <i class="fa fa-check"></i> Submit
+          </button>
+          <button class="btn-sec" id="practiceSayAgain">
+            <i class="fa fa-volume-up"></i> Say Again
+          </button>
+          <button class="btn-sec" id="practiceFlag">
+            <i class="fa fa-flag"></i> Flag
+          </button>
+        </div>
+
+        <!-- Word navigation: Previous · Next · Jump to # -->
+        <div class="nav-row" id="practiceNavRow">
+          <button class="btn-nav" id="practicePrev" onclick="navigateWord('practice','prev')" title="Previous word">
+            <i class="fa fa-step-backward"></i> Previous
+          </button>
+          <button class="btn-nav" id="practiceNext" onclick="navigateWord('practice','next')" title="Skip to next word">
+            <i class="fa fa-step-forward"></i> Next
+          </button>
+          <div class="jump-wrap">
+            <input class="jump-input" id="practiceJumpInput" type="number" min="1" placeholder="#"
+              title="Jump to word number"
+              onkeydown="if(event.key==='Enter')navigateWord('practice','jump')">
+            <button class="btn-jump" onclick="navigateWord('practice','jump')" title="Go to word number">Go</button>
+          </div>
+        </div>
+
+        <div class="btn-end-row">
+          <button class="btn-end" id="practiceEnd">
+            <i class="fa fa-stop"></i> End Session
+          </button>
+        </div>
+      </div><!-- /.training-phase -->
+
+      <div id="practiceSummary" class="summary-panel" style="display:none;"></div>
+    </div>
+    <!-- ── BEE TRAINER ──────────────────────────────────────── -->
+    <div class="trainer-area" id="bee-area">
+      <h3><i class="fa fa-deaf"></i> Spelling Bee — Voice Mode</h3>
+
+      <!-- ════ SETUP PHASE ════ -->
+      <div class="setup-phase">
+
+        <div class="setup-card" style="border-left:3px solid #f72585;background:rgba(247,37,133,0.05);">
+          <h4><i class="fa fa-microphone" style="color:#f72585;"></i> How it works</h4>
+          <p style="font-size:0.85rem;color:var(--muted);margin:0;line-height:1.6;">
+            The app speaks each word aloud. You spell it back by saying the letters one by one into your microphone — e.g. say <em>"a-c-c-o-m-m-o-d-a-t-e"</em>. Your spelling is marked automatically.
+          </p>
+        </div>
+
+        <!-- Word source selector — injected by createCustomWordsUI() -->
+
+        <!-- Accent -->
+        <div class="setup-card">
+          <h4><i class="fa fa-globe"></i> Pronunciation</h4>
+          <div class="accent-setup-row">
+            <label for="beeAccent">Accent</label>
+            <select class="accent-select" id="beeAccent">
+              <option value="en-GB">🇬🇧 British</option>
+              <option value="en-US">🇺🇸 American</option>
+              <option value="en-AU">🇦🇺 Australian</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Start button -->
+        <button class="btn-start-training start-btn" data-mode="bee">
+          <i class="fa fa-microphone"></i> Start Spelling Bee
+        </button>
+
+      </div><!-- /.setup-phase -->
+
+      <!-- ════ TRAINING PHASE ════ -->
+      <div class="training-phase">
+
+        <button class="back-to-setup" onclick="backToSetup('bee')">
+          <i class="fa fa-arrow-left"></i> Change settings
+        </button>
+
+        <!-- Adaptive difficulty badge (Bee mode only) -->
+        <div id="beeDifficultyBadge" class="bee-difficulty-badge">
+          <span class="icon">🌱</span>
+          <span class="label">Beginner pace</span>
+          <span class="meta">— get ready</span>
+        </div>
+
+        <!-- Progress -->
+        <div id="beeProgress" class="progress-text"></div>
+        <div class="progress-track"><div class="progress-fill" id="beeProgressFill"></div></div>
+
+
+        <!-- Feedback -->
+        <div id="beeFeedback" class="feedback-pill">
+          Listen to the word, then spell it aloud…
+        </div>
+
+        <!-- Voice recognition UI -->
+        <div id="beeVoiceStatus">
+          <div id="beeVoiceText">Listening… spell the word now</div>
+          <div class="voice-bars">
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+            <div class="voice-bar"></div>
+          </div>
+        </div>
+
+        <!-- Recognized text display -->
+        <div id="beeRecognizedText">
+          <p>I heard you spell:</p>
+          <div id="beeSpokenText"></div>
+        </div>
+
+        <!-- Controls -->
+        <div class="btn-grid">
+          <button class="btn-primary" id="beeListen" style="
+            width:100%; padding:16px; font-size:1.05rem; font-weight:700;
+            background:linear-gradient(135deg,#7b2ff7,#f72585);
+            color:#fff; border:none; border-radius:12px; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; gap:10px;
+            box-shadow:0 4px 16px rgba(123,47,247,0.3); margin-bottom:8px;">
+            <i class="fa fa-microphone" style="font-size:1.2rem;"></i>
+            Press &amp; Spell the Word
+          </button>
+          <button class="btn-sec" id="beeSayAgain">
+            <i class="fa fa-volume-up"></i> Say Again
+          </button>
+          <button class="btn-sec" id="beeFlag">
+            <i class="fa fa-flag"></i> Flag
+          </button>
+        </div>
+
+        <!-- Word navigation: Previous · Next · Jump to # -->
+        <div class="nav-row" id="beeNavRow">
+          <button class="btn-nav" id="beePrev" onclick="navigateWord('bee','prev')" title="Previous word">
+            <i class="fa fa-step-backward"></i> Previous
+          </button>
+          <button class="btn-nav" id="beeNext" onclick="navigateWord('bee','next')" title="Skip to next word">
+            <i class="fa fa-step-forward"></i> Next
+          </button>
+          <div class="jump-wrap">
+            <input class="jump-input" id="beeJumpInput" type="number" min="1" placeholder="#"
+              title="Jump to word number"
+              onkeydown="if(event.key==='Enter')navigateWord('bee','jump')">
+            <button class="btn-jump" onclick="navigateWord('bee','jump')" title="Go to word number">Go</button>
+          </div>
+        </div>
+
+        <div class="btn-end-row">
+          <button class="btn-end" id="beeEnd">
+            <i class="fa fa-stop"></i> End Session
+          </button>
+        </div>
+
+      </div><!-- /.training-phase -->
+
+      <!-- Session summary -->
+      <div id="beeSummary" class="summary-panel" style="display:none;"></div>
+    </div>
+
+    <!-- ── PLACEHOLDER when no mode selected ── -->
+    <div id="noModeMsg" style="text-align:center;padding:40px 20px;color:var(--muted);">
+      <i class="fa fa-hand-pointer" style="font-size:2.5rem;color:var(--border);display:block;margin-bottom:12px;"></i>
+      <strong>Choose a practice mode above</strong> to begin your premium session.
+    </div>
+
+  </div><!-- /.glass-card -->
+
+</main>
+
+<!-- ══════════════════════════════════════════════════════
+     SCRIPTS — order matters
+══════════════════════════════════════════════════════════ -->
+<!-- OET word list (loaded on demand by main-premium.js via script tag) -->
+<script src="/js/oet_word_list.js"></script>
+
+<!-- selectedWordList shared state — read by main-premium.js -->
+<!-- selectWordList() and selectOetMode() are defined in main-premium.js -->
+<script>
+  var selectedWordList = 'oet';
+</script>
+<!-- Main premium logic -->
+<script src="/js/main-premium.js"></script>
+
+<script>
+  // ── Progress bar sync helper ─────────────────────────────────────────────
+  // Called by main-premium.js after each word via nextWord()
+  (function() {
+    const modeProgressFills = {
+      practice: document.getElementById('practiceProgressFill'),
+      bee:      document.getElementById('beeProgressFill'),
+    };
+
+    // Patch nextWord to also update the visual fill
+    const _originalNextWord = window.nextWord;
+    // We can't patch before it's defined — use a MutationObserver to watch
+    // progress text and sync the bar whenever it changes.
+    const observer = new MutationObserver(() => {
+      const fill = modeProgressFills[window.currentMode];
+      if (!fill || !window.currentList || !window.currentList.length) return;
+      const pct = Math.min(100,
+        Math.round((window.currentIndex / window.currentList.length) * 100));
+      fill.style.width = pct + '%';
+    });
+
+    ['practiceProgress','beeProgress'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el, { childList:true, subtree:true, characterData:true });
+    });
+  })();
+
+  // ── "No mode" placeholder hide/show ─────────────────────────────────────
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('noModeMsg').style.display = 'none';
+    });
+  });
+
+  // ── Dark mode persistence ────────────────────────────────────────────────
+  (function() {
+    const toggle = document.getElementById('toggleDark');
+    const apply = () => {
+      const on = localStorage.getItem('dark') === 'true';
+      document.body.classList.toggle('dark-mode', on);
+      const icon = toggle?.querySelector('i');
+      if (icon) icon.className = on ? 'fa fa-sun' : 'fa fa-moon';
+    };
+    toggle?.addEventListener('click', () => {
+      localStorage.setItem('dark', !(localStorage.getItem('dark') === 'true'));
+      apply();
+    });
+    apply();
+  })();
+
+  // ── OET mode buttons — direct listeners (bypass onclick reliability issues)
+  document.addEventListener('DOMContentLoaded', function() {
+    var testBtn      = document.getElementById('oetModeTest');
+    var practiceBtn  = document.getElementById('oetModePractice');
+    var startBtn     = document.getElementById('practiceStartBtn');
+    var testRadio    = document.getElementById('examTypeTest');
+    var practiceRadio= document.getElementById('examTypePractice');
+    if (testBtn) testBtn.addEventListener('click', function() {
+      if (startBtn)     startBtn.innerHTML = '<i class="fa fa-clock"></i> Start Exam Simulation (24 words)';
+      testBtn.classList.add('active');
+      if (practiceBtn)  practiceBtn.classList.remove('active');
+      if (testRadio)    testRadio.checked = true;
+    });
+    if (practiceBtn) practiceBtn.addEventListener('click', function() {
+      if (startBtn)     startBtn.innerHTML = '<i class="fa fa-play"></i> Start OET Full List Practice';
+      practiceBtn.classList.add('active');
+      if (testBtn)      testBtn.classList.remove('active');
+      if (practiceRadio) practiceRadio.checked = true;
+    });
+  });
+</script>
+
+
+<nav class="trainer-tab-bar" aria-label="Navigation">
+  <a onclick="switchMode('practice')" id="tab-practice"><i class="fa fa-book-open"></i>OET/School</a>
+  <a onclick="switchMode('bee')"     id="tab-bee"><i class="fa fa-deaf"></i>Bee</a>
+  <a href="/" ><i class="fa fa-home"></i>Home</a>
+</nav>
+
+<script>
+// Sync bottom tab bar with active mode
+(function() {
+  function updateTabBar(mode) {
+    ['practice','bee'].forEach(function(m) {
+      var el = document.getElementById('tab-' + m);
+      if (el) el.classList.toggle('active', m === mode);
+    });
+  }
+  window.switchMode = function(mode) {
+    // Trigger the existing mode-btn click
+    var btn = document.querySelector('.mode-btn[data-mode="' + mode + '"]');
+    if (btn) btn.click();
+    updateTabBar(mode);
+  };
+  // Watch for mode changes triggered by top tabs
+  document.querySelectorAll('.mode-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      updateTabBar(this.getAttribute('data-mode'));
+    });
+  });
+})();
+</script>
+
+<script>
+// Show welcome message for new signups arriving from /login?welcome=1
+(function() {
+  if (window.location.search.indexOf('welcome=1') >= 0) {
+    document.addEventListener('DOMContentLoaded', function() {
+      // Remove the param from URL without reload
+      history.replaceState({}, '', '/trainer');
+      // Show a brief welcome toast after auth clears the overlay
+      var check = setInterval(function() {
+        var overlay = document.getElementById('loginOverlay');
+        if (overlay && overlay.style.display === 'none') {
+          clearInterval(check);
+          var toast = document.createElement('div');
+          toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);' +
+            'background:#00c57a;color:#fff;padding:12px 24px;border-radius:12px;' +
+            'font-weight:600;font-size:0.92rem;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.2);';
+          toast.textContent = '🎉 Welcome to SpellRightPro! Choose a practice mode to begin.';
+          document.body.appendChild(toast);
+          setTimeout(function() {
+            toast.style.transition = 'opacity .4s';
+            toast.style.opacity = '0';
+            setTimeout(function() { toast.remove(); }, 400);
+          }, 4000);
+        }
+      }, 300);
+    });
+  }
+})();
+</script>
+
+  <script>
+  window.addEventListener('error', function(e) {
+    if (typeof gtag !== 'undefined' && e.error)
+      gtag('event', 'exception', { description: e.error.message, fatal: false });
+  });
+</script>
+
+
+
+
+<!-- ── Service Worker registration + update handling — see /js/sw-register.js ── -->
+<script src="/js/sw-register.js"></script>
+</body>
+</html>
