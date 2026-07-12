@@ -269,214 +269,169 @@ ang="en">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#08080F;--surf:#11111E;--surf2:#1A1A2A;
-  --brd:#252538;--brd2:#353550;
-  --acc:#FF9900;--acc-d:rgba(255,153,0,.14);
-  --ok:#22CC88;--ok-d:rgba(34,204,136,.14);
-  --err:#FF4455;--err-d:rgba(255,68,85,.14);
-  --inf:#4A9EFF;--inf-d:rgba(74,158,255,.14);
-  --warn:#FFD600;--warn-d:rgba(255,214,0,.12);
-  --t1:#FFF;--t2:#AAAACC;--t3:#666688;
+  --bg:#0A0A12;--surf:#13131E;--surf2:#1A1A28;--surf3:#222235;
+  --brd:#2A2A40;--brd2:#3A3A55;
+  --acc:#FF9900;--acc2:#FFB740;--acc-d:rgba(255,153,0,.12);
+  --ok:#22D98A;--ok-d:rgba(34,217,138,.12);
+  --err:#FF4455;--err-d:rgba(255,68,85,.12);
+  --inf:#4A9EFF;--inf-d:rgba(74,158,255,.12);
+  --warn:#FFD600;--warn-d:rgba(255,214,0,.1);
+  --t1:#FFFFFF;--t2:#C8C8E8;--t3:#7878A0;
   --sans:'Barlow Condensed',sans-serif;
+  --body:'DM Sans',sans-serif;
   --mono:'IBM Plex Mono',monospace;
-  --r:10px;--rs:6px
+  --r:12px;--rs:8px
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{height:100%;background:var(--bg);color:var(--t1);font-family:var(--sans);overscroll-behavior:none}
+html,body{height:100%;background:var(--bg);color:var(--t1);font-family:var(--body);overscroll-behavior:none}
 body{padding-bottom:env(safe-area-inset-bottom)}
-#app{max-width:480px;margin:0 auto;height:100vh;max-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(255,153,0,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,153,0,.025) 1px,transparent 1px);background-size:60px 60px;pointer-events:none;z-index:0}
+#app{max-width:480px;margin:0 auto;height:100vh;max-height:100vh;display:flex;flex-direction:column;overflow:hidden;position:relative;z-index:1}
 .scr{flex:1;display:flex;flex-direction:column;padding:0 16px 28px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-
-/* Header */
-.hdr{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--brd);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.hdr{position:sticky;top:0;z-index:10;background:rgba(10,10,18,.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--brd);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .hbrand{display:flex;align-items:center;gap:10px}
-.hhex{width:28px;height:28px;background:var(--acc);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
-.htitle{font-size:21px;font-weight:800;letter-spacing:2px;color:var(--acc)}
-.hsub{font-size:9px;letter-spacing:3px;color:var(--t3);margin-top:-2px}
 .hbtns{display:flex;gap:8px}
-.ib{background:transparent;border:1px solid var(--brd);border-radius:var(--rs);width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);font-size:14px}
+.ib{background:transparent;border:1px solid var(--brd);border-radius:var(--rs);width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t3);font-size:14px}
 .ib:active{background:var(--surf)}
-
-/* Cards */
 .card{background:var(--surf);border:1px solid var(--brd);border-radius:var(--r);padding:13px 15px;margin-top:11px}
-.ct{font-size:10px;font-weight:700;letter-spacing:3px;color:var(--t3);margin-bottom:11px;text-transform:uppercase}
-
-/* Free badge */
-.free-badge{display:inline-flex;align-items:center;gap:5px;background:var(--ok-d);border:1px solid var(--ok);color:var(--ok);font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:20px;margin-bottom:10px}
-
-/* Savings Card */
+.ct{font-size:10px;font-weight:700;letter-spacing:3px;color:var(--t3);margin-bottom:11px;text-transform:uppercase;font-family:var(--sans)}
+.free-badge{display:inline-flex;align-items:center;gap:5px;background:var(--ok-d);border:1px solid var(--ok);color:var(--ok);font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:20px;margin-bottom:10px;font-family:var(--sans)}
 .sv-card{background:var(--surf);border:1px solid var(--ok);border-radius:var(--r);margin-top:14px;overflow:hidden}
 .sv-head{background:var(--ok-d);border-bottom:1px solid var(--ok);padding:10px 15px;display:flex;align-items:center;gap:8px}
-.sv-hl{font-size:16px;font-weight:800;color:var(--ok);letter-spacing:.5px;flex:1}
+.sv-hl{font-size:16px;font-weight:800;color:var(--ok);letter-spacing:.5px;flex:1;font-family:var(--sans)}
 .sv-body{padding:13px 15px}
 .sv-big{display:flex;gap:8px;margin-bottom:12px}
 .sv-stat{flex:1;background:var(--surf2);border-radius:var(--rs);padding:10px 8px;text-align:center;border:1px solid var(--brd)}
-.sv-val{font-size:26px;font-weight:800;color:var(--ok);line-height:1}
-.sv-unit{font-size:10px;font-weight:700;color:var(--ok);opacity:.8}
-.sv-lbl{font-size:9px;color:var(--t3);margin-top:4px;letter-spacing:1px;text-transform:uppercase}
+.sv-val{font-size:26px;font-weight:900;color:var(--ok);line-height:1;font-family:var(--sans)}
+.sv-unit{font-size:10px;font-weight:700;color:var(--ok);opacity:.8;font-family:var(--sans)}
+.sv-lbl{font-size:9px;color:var(--t3);margin-top:4px;letter-spacing:1px;text-transform:uppercase;font-family:var(--sans)}
 .sv-cmp{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
 .cbox{background:var(--surf2);border-radius:var(--rs);padding:9px 10px;border:1px solid var(--brd)}
 .cbox.orig{border-color:var(--err);opacity:.8}
 .cbox.opt{border-color:var(--ok)}
-.cbox-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px}
-.cbox-km{font-size:18px;font-weight:800;color:var(--t1)}
-.cbox-min{font-size:14px;color:var(--t2);margin-top:2px}
+.cbox-lbl{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--t3);margin-bottom:4px;font-family:var(--sans)}
+.cbox-km{font-size:18px;font-weight:800;color:var(--t1);font-family:var(--sans)}
+.cbox-min{font-size:13px;color:var(--t2);margin-top:2px}
 .sv-arr{text-align:center;font-size:20px;color:var(--ok)}
 .sv-src{font-size:10px;color:var(--t3);margin-top:10px;text-align:center;line-height:1.5}
 .sv-src a{color:var(--t3)}
 .warn-card{background:var(--surf);border:1px solid var(--warn);border-radius:var(--r);padding:12px 15px;margin-top:14px;display:flex;gap:10px;align-items:flex-start}
 .warn-txt{font-size:14px;color:var(--warn);line-height:1.5}
 .geo-warn{background:var(--warn-d);border:1px solid var(--warn);border-radius:var(--rs);padding:8px 11px;font-size:12px;color:var(--warn);margin-top:9px;line-height:1.5}
-
-/* Tag */
-.tag{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;letter-spacing:.5px;flex-shrink:0}
+.tag{font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700;letter-spacing:.5px;flex-shrink:0;font-family:var(--sans)}
 .tag-gps{background:var(--ok-d);color:var(--ok);border:1px solid var(--ok)}
 .tag-est{background:var(--acc-d);color:var(--acc);border:1px solid var(--acc)}
-
-/* Inputs */
-input[type=text],input[type=password]{width:100%;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);color:var(--t1);padding:10px 12px;font-size:14px;font-family:var(--mono);outline:none;-webkit-appearance:none}
+input[type=text],input[type=email],input[type=password]{width:100%;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);color:var(--t1);padding:11px 14px;font-size:15px;font-family:var(--body);outline:none;-webkit-appearance:none}
 input:focus{border-color:var(--brd2)}
+input::placeholder{color:var(--t3);font-size:14px}
 .ir{display:flex;gap:8px}.ir input{flex:1}
-
-/* Buttons */
-.btn{font-family:var(--sans);font-weight:700;letter-spacing:1px;cursor:pointer;border:none;border-radius:var(--rs)}
+.btn{font-family:var(--sans);font-weight:800;letter-spacing:.5px;cursor:pointer;border:none;border-radius:10px;transition:background .15s,transform .1s}
 .btn:active{transform:scale(.98)}
-.bp{background:var(--acc);color:#000;padding:13px 20px;font-size:16px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
-.bp:disabled{background:var(--surf2);color:var(--t3);cursor:not-allowed;transform:none}
-.bg{background:transparent;border:1px solid var(--brd);color:var(--t3);padding:10px 16px;font-size:14px;width:100%}
-.badd{background:var(--acc);color:#000;padding:0 16px;font-size:22px;font-weight:700;height:44px;flex-shrink:0;border-radius:var(--rs);border:none;cursor:pointer}
+.bp{background:var(--acc);color:#000;padding:16px 20px;font-size:18px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
+.bp:disabled{background:var(--surf2);color:var(--t3);cursor:not-allowed;transform:none;opacity:.5}
+.bg{background:transparent;border:1px solid var(--brd);color:var(--t3);padding:11px 16px;font-size:14px;width:100%;letter-spacing:.5px;border-radius:var(--rs)}
+.badd{background:var(--acc);color:#000;padding:0 16px;font-size:22px;font-weight:800;height:44px;flex-shrink:0;border-radius:var(--rs);border:none;cursor:pointer}
 .bmaps{display:block;background:#1976D2;color:#fff;padding:13px 20px;font-size:16px;font-weight:700;letter-spacing:1px;text-align:center;text-decoration:none;border-radius:var(--rs);width:100%;font-family:var(--sans)}
 .bwaze{display:block;background:#00B4FF;color:#000;padding:13px 20px;font-size:16px;font-weight:700;letter-spacing:1px;text-align:center;text-decoration:none;border-radius:var(--rs);width:100%;font-family:var(--sans)}
-
-/* Drop zone */
-.dz{display:block;cursor:pointer;border:2px dashed var(--brd2);border-radius:var(--r);padding:18px 14px;text-align:center;cursor:pointer;transition:.15s}
-.dz:active,.dz.over,.dz.scanning{border-color:var(--acc);background:var(--acc-d)}
-.dz.locked{border-color:var(--brd);background:transparent;cursor:default}
+.dz{display:block;cursor:pointer;border:1.5px dashed var(--brd2);border-radius:16px;padding:28px 16px;text-align:center;transition:border-color .15s,background .15s;background:var(--surf)}
+.dz:active,.dz.over,.dz.scanning{border-color:var(--acc);background:rgba(255,153,0,.06)}
 .dz.scanning{border-style:solid}
-.dz-t{font-size:14px;font-weight:600;color:var(--t2)}
-.dz-s{font-size:13px;color:var(--t3);margin-top:3px}
-.dz-tip{font-size:11px;color:var(--acc);margin-top:7px;font-weight:600;line-height:1.4}
-.pb{height:3px;background:var(--brd);border-radius:2px;overflow:hidden;margin-top:9px}
+.dz-t{font-family:var(--sans);font-size:18px;font-weight:700;color:var(--t1);letter-spacing:.3px}
+.dz-s{font-size:13px;color:var(--t2);margin-top:5px}
+.dz-tip{font-size:11px;color:var(--acc);margin-top:8px;font-weight:600;line-height:1.4;font-family:var(--sans)}
+.pb{height:3px;background:var(--brd);border-radius:2px;overflow:hidden;margin-top:12px}
 .pf{height:100%;background:var(--acc);transition:width .4s;border-radius:2px}
-.pl{font-size:13px;color:var(--t3);margin-top:4px}
-
-/* Stop list */
+.pl{font-size:12px;color:var(--t3);margin-top:5px}
 .slist{display:flex;flex-direction:column;gap:6px;margin-top:4px}
 .sscr{max-height:340px;overflow-y:auto;padding-right:2px}
 .sscr::-webkit-scrollbar{width:3px}
 .sscr::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px}
-.si{display:flex;align-items:flex-start;gap:8px;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:8px 9px}
+.si{display:flex;align-items:flex-start;gap:8px;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:9px 10px}
 .si.islast{border-color:var(--ok);background:var(--ok-d)}
-.fn{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:var(--surf);border:2px solid var(--acc);color:var(--acc);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.fn{flex-shrink:0;width:30px;height:30px;border-radius:50%;background:var(--surf);border:2px solid var(--acc);color:var(--acc);font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;font-family:var(--sans)}
 .fn.nnum{border-color:var(--brd2);color:var(--t3)}
 .sb{flex:1;min-width:0}
-.sa{font-size:12px;font-family:var(--mono);color:var(--t2);line-height:1.4;word-break:break-word}
+.sa{font-size:13px;font-family:var(--body);color:var(--t2);line-height:1.4;word-break:break-word;font-weight:500}
 .sm{font-size:10px;color:var(--t3);margin-top:3px}
 .sbtns{display:flex;gap:4px;flex-shrink:0;margin-top:1px}
 .sbtn{width:28px;height:28px;background:transparent;border:1px solid var(--brd);border-radius:5px;cursor:pointer;color:var(--t3);font-size:12px;display:flex;align-items:center;justify-content:center}
 .sbtn:active{background:var(--surf)}
 .sbtn.lon{border-color:var(--ok);color:var(--ok);background:var(--ok-d)}
 .sbtn.del{color:var(--err)}
-.lbdg{font-size:9px;font-weight:700;letter-spacing:2px;color:var(--ok);border:1px solid var(--ok);padding:2px 5px;border-radius:4px;flex-shrink:0;align-self:center}
-.empty{text-align:center;padding:18px 0;color:var(--t3);font-size:14px}
-
-/* Alerts */
+.lbdg{font-size:9px;font-weight:700;letter-spacing:2px;color:var(--ok);border:1px solid var(--ok);padding:2px 5px;border-radius:4px;flex-shrink:0;align-self:center;font-family:var(--sans)}
+.empty{text-align:center;padding:20px 0;color:var(--t3);font-size:14px}
 .al{border-radius:var(--rs);padding:9px 12px;font-size:14px;margin-top:9px}
 .ae{background:var(--err-d);border:1px solid var(--err);color:#FF8899}
 .ai{background:var(--inf-d);border:1px solid var(--inf);color:var(--inf)}
-
-/* Loading */
 .ldw{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px}
 .ldh{width:46px;height:46px;background:var(--acc);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);animation:pulse 1s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:.3;transform:scale(.9)}50%{opacity:1;transform:scale(1)}}
-.ldt{font-size:18px;font-weight:700;color:var(--t2);letter-spacing:1px}
+.ldt{font-family:var(--sans);font-size:18px;font-weight:700;color:var(--t2);letter-spacing:1px}
 .ld-steps{display:flex;flex-direction:column;gap:10px;margin-top:4px;width:100%;max-width:280px}
 .ld-step{display:flex;align-items:center;gap:10px}
-.ld-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--brd2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px}
+.ld-dot{width:20px;height:20px;border-radius:50%;border:2px solid var(--brd2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-family:var(--sans)}
 .ld-step.done .ld-dot{background:var(--ok);border-color:var(--ok);color:#000}
 .ld-step.active .ld-dot{border-color:var(--acc);animation:pulse 1s ease-in-out infinite}
 .ld-label{font-size:14px}
 .ld-step.done .ld-label{color:var(--ok)}
 .ld-step.active .ld-label{color:var(--acc)}
 .ld-step.waiting .ld-label{color:var(--t3)}
-.ld-sub{font-size:13px;color:var(--t3);margin-top:2px}
+.ld-sub{font-size:12px;color:var(--t3);margin-top:2px}
 .ld-prog{width:100%;max-width:280px}
 .ld-pbar{height:2px;background:var(--brd);border-radius:1px;overflow:hidden;margin-top:6px}
 .ld-pfill{height:100%;background:var(--acc);border-radius:1px;transition:width .3s}
-
-/* Result rows */
-.ri{display:flex;align-items:flex-start;gap:12px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);padding:14px 13px}
+.ri{display:flex;align-items:flex-start;gap:12px;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:14px 13px}
 .ri.rl{border-color:var(--ok);background:var(--ok-d)}
 .ri.rh{border-color:var(--ok);background:var(--ok-d)}
+.ri-active{outline:2px solid var(--acc)!important;background:rgba(255,153,0,.08)!important}
+body.rzoom-1 .rlist .ri{padding:18px 17px;gap:16px}
+body.rzoom-1 .rlist .ri-addr{font-size:20px;line-height:1.5;font-weight:600}
+body.rzoom-1 .rlist .rn{width:42px;height:42px;font-size:18px}
+body.rzoom-1 .rlist .ri-l{min-width:48px}
+body.rzoom-1 .rlist .rpkg{min-width:42px;padding:4px 7px}
+body.rzoom-1 .rlist .rpkg-v{font-size:18px}
+body.rzoom-2 .rlist .ri{padding:22px 19px;gap:18px}
+body.rzoom-2 .rlist .ri-addr{font-size:24px;line-height:1.4;font-weight:600}
+body.rzoom-2 .rlist .rn{width:50px;height:50px;font-size:22px;font-weight:900}
+body.rzoom-2 .rlist .ri-l{min-width:56px}
+body.rzoom-2 .rlist .rpkg{min-width:48px;padding:5px 9px}
+body.rzoom-2 .rlist .rpkg-v{font-size:22px}
+body.rzoom-2 .rlist .ri{border-width:2px}
+body.rzoom-1 .rlist .ri,body.rzoom-2 .rlist .ri{border-color:var(--brd2)}
+.zoom-btn{background:var(--surf);border:1px solid var(--brd);border-radius:var(--rs);padding:0 12px;height:36px;font-size:14px;font-weight:700;color:var(--t2);cursor:pointer;font-family:var(--sans);display:flex;align-items:center;gap:4px;line-height:1}
+.zoom-btn.active{border-color:var(--acc);color:var(--acc)}
 .ri-l{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;min-width:42px}
-.rn{width:38px;height:38px;border-radius:50%;background:var(--acc);color:#000;font-size:17px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.rn{width:38px;height:38px;border-radius:50%;background:var(--acc);color:#000;font-size:17px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:var(--sans)}
 .rpkg{display:flex;flex-direction:column;align-items:center;background:var(--surf);border:1.5px solid var(--acc);border-radius:5px;padding:2px 5px;min-width:34px}
-.rpkg-l{font-size:9px;color:var(--t3);line-height:1}
-.rpkg-v{font-size:15px;font-weight:800;color:var(--acc);line-height:1.2}
+.rpkg-l{font-size:9px;color:var(--t3);line-height:1;font-family:var(--sans)}
+.rpkg-v{font-size:15px;font-weight:800;color:var(--acc);line-height:1.2;font-family:var(--sans)}
 .ri-addr{flex:1;font-size:16px;font-family:var(--body);color:var(--t1);line-height:1.45;word-break:break-word;padding-top:6px;font-weight:500}
-.ri-tag{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--ok);border:1px solid var(--ok);padding:2px 5px;border-radius:4px;flex-shrink:0;margin-top:6px}
+.ri-flag{font-size:10px;color:var(--warn);background:var(--warn-d);border:1px solid var(--warn);border-radius:4px;padding:2px 6px;flex-shrink:0;margin-top:6px;font-family:var(--sans);font-weight:700}
+.ri-tag{font-size:10px;font-weight:700;letter-spacing:2px;color:var(--ok);border:1px solid var(--ok);padding:2px 5px;border-radius:4px;flex-shrink:0;margin-top:6px;font-family:var(--sans)}
 .rlist{display:flex;flex-direction:column;gap:8px}
-.rmeta{display:flex;justify-content:space-between;align-items:center;margin-top:13px;margin-bottom:3px}
-.rcnt{font-size:13px;color:var(--t2)}
-.rcp{font-size:13px;color:var(--acc);background:transparent;border:1px solid var(--brd);border-radius:5px;padding:5px 11px;cursor:pointer;font-family:var(--sans)}
-.lgd{display:flex;gap:14px;margin-top:10px;padding:9px 11px;background:var(--surf);border-radius:var(--rs);border:1px solid var(--brd);flex-wrap:wrap}
-.li{display:flex;align-items:center;gap:7px;font-size:14px;color:var(--t2)}
-.cb{background:var(--acc);color:#000;font-size:10px;font-weight:800;padding:1px 6px;border-radius:10px;margin-left:5px}
+.rmeta{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.rcnt{font-size:13px;color:var(--t2);font-weight:500}
+.rcp{font-size:13px;color:var(--acc);background:transparent;border:1px solid var(--brd);border-radius:5px;padding:5px 11px;cursor:pointer;font-family:var(--sans);font-weight:700}
+.cb{background:var(--acc);color:#000;font-size:10px;font-weight:800;padding:1px 6px;border-radius:10px;margin-left:5px;font-family:var(--sans)}
 hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
-
-/* Setup — step cards */
-.setup-step{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--brd)}
-.setup-step:last-child{border-bottom:none}
-.setup-num{width:24px;height:24px;border-radius:50%;background:var(--acc);color:#000;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
-.setup-txt{font-size:14px;color:var(--t2);line-height:1.5}
-.setup-txt a{color:var(--acc);text-decoration:none;font-weight:700}
-.setup-txt strong{color:var(--t1)}
-.slbl{font-size:13px;color:var(--t3);letter-spacing:2px;margin-bottom:6px;text-transform:uppercase}
-.kh{font-size:13px;color:var(--t3);margin-top:5px;line-height:1.5}
-
-/* Cost table */
-.cost-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}
-.cost-table th{text-align:left;font-size:10px;letter-spacing:2px;color:var(--t3);text-transform:uppercase;padding:6px 8px;border-bottom:1px solid var(--brd)}
-.cost-table td{padding:8px 8px;border-bottom:1px solid var(--brd);color:var(--t2)}
-.cost-table tr:last-child td{border-bottom:none}
-.cost-table .free{color:var(--ok);font-weight:700}
-
-/* Toast */
 .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--ok);color:#000;font-family:var(--sans);font-weight:700;font-size:14px;padding:10px 20px;border-radius:20px;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:100}
 .toast.show{opacity:1}
-
-/* Failed stop row */
-.ri-failed{border-color:#FF4455 !important;background:rgba(255,68,85,.08) !important;animation:failPulse 2s ease-in-out 3;}
-@keyframes failPulse{0%,100%{border-color:#FF4455;box-shadow:none}50%{border-color:#FF4455;box-shadow:0 0 0 3px rgba(255,68,85,.25)}}
+.ri-failed{border-color:#FF4455 !important;background:rgba(255,68,85,.07) !important;animation:failPulse 2s ease-in-out 3}
+@keyframes failPulse{0%,100%{border-color:#FF4455;box-shadow:none}50%{border-color:#FF4455;box-shadow:0 0 0 3px rgba(255,68,85,.2)}}
 .ri-failed-badge{display:inline-flex;align-items:center;gap:5px;background:#FF4455;color:#fff;font-size:11px;font-weight:700;letter-spacing:.5px;padding:3px 8px;border-radius:4px;margin-bottom:8px;font-family:var(--sans)}
-.ri-edit-wrap{margin-top:10px;display:flex;flex-direction:column;gap:8px;}
-.ri-edit-input{width:100%;background:var(--surf);border:1.5px solid #FF4455;border-radius:var(--rs);color:var(--t1);padding:11px 13px;font-size:15px;font-family:var(--body);outline:none;}
-.ri-edit-input:focus{border-color:var(--acc);}
-.ri-edit-btns{display:flex;gap:8px;}
-.ri-edit-retry{flex:1;background:var(--acc);color:#000;border:none;border-radius:var(--rs);padding:10px;font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer;}
-.ri-edit-skip{background:var(--surf2);color:var(--t3);border:1px solid var(--brd);border-radius:var(--rs);padding:10px 14px;font-size:14px;font-family:var(--sans);cursor:pointer;}
-
-/* Floating failed alert */
-.failed-float{pointer-events:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
-  background:#FF4455;color:#fff;
-  font-family:var(--sans);font-size:15px;font-weight:700;letter-spacing:.5px;
-  padding:13px 22px;border-radius:30px;
-  box-shadow:0 4px 24px rgba(255,68,85,.5);
-  z-index:9999;white-space:nowrap;
-  animation:floatIn .4s ease, floatPulse 2s 1s ease-in-out infinite;}
+.ri-edit-retry{flex:1;background:var(--acc);color:#000;border:none;border-radius:var(--rs);padding:10px;font-size:14px;font-weight:700;font-family:var(--sans);cursor:pointer}
+.ri-edit-skip{background:var(--surf2);color:var(--t3);border:1px solid var(--brd);border-radius:var(--rs);padding:10px 14px;font-size:14px;font-family:var(--sans);cursor:pointer}
+.failed-float{pointer-events:auto;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#FF4455;color:#fff;font-family:var(--sans);font-size:15px;font-weight:700;letter-spacing:.5px;padding:13px 22px;border-radius:30px;z-index:9999;white-space:nowrap;animation:floatIn .4s ease}
 @keyframes floatIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-@keyframes floatPulse{0%,100%{box-shadow:0 4px 24px rgba(255,68,85,.5)}50%{box-shadow:0 4px 32px rgba(255,68,85,.8),0 0 0 6px rgba(255,68,85,.15)}}
-
-/* Shift Companion */
 .comp-wrap{display:flex;flex-direction:column;height:100vh;background:var(--bg);overflow:hidden}
 .comp-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--brd);flex-shrink:0;background:var(--surf)}
-.comp-prog{height:4px;background:var(--brd);flex-shrink:0}
-.comp-prog-fill{height:4px;background:var(--acc);transition:width .4s}
+.comp-prog{height:3px;background:var(--brd);flex-shrink:0}
+.comp-prog-fill{height:3px;background:var(--acc);transition:width .4s}
 .comp-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;text-align:center;overflow-y:auto}
-.comp-stopnum{font-family:var(--sans);font-size:15px;font-weight:700;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:10px}
+.comp-stopnum{font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:10px}
 .comp-addr{font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.1;margin-bottom:10px;letter-spacing:-.5px;animation:cSlide .3s ease}
 @keyframes cSlide{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-.comp-pkg{display:block;width:100%;background:rgba(255,153,0,.18);border:2px solid rgba(255,153,0,.55);border-radius:12px;padding:14px 20px;font-family:var(--sans);font-size:20px;font-weight:800;color:var(--acc);text-align:center;letter-spacing:0.3px;margin-bottom:20px}
+.comp-pkg{display:block;width:100%;background:rgba(255,153,0,.12);border:2px solid rgba(255,153,0,.4);border-radius:12px;padding:14px 20px;font-family:var(--sans);font-size:20px;font-weight:800;color:var(--acc);text-align:center;letter-spacing:0.3px;margin-bottom:20px}
 .comp-navbtns{display:flex;gap:12px;width:100%;max-width:380px;margin-bottom:14px}
 .comp-waze{flex:1;background:#06D6A0;color:#000;border:none;border-radius:12px;padding:17px;font-size:17px;font-weight:800;font-family:var(--sans);cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px}
 .comp-maps{flex:1;background:#4285F4;color:#fff;border:none;border-radius:12px;padding:17px;font-size:17px;font-weight:800;font-family:var(--sans);cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px}
@@ -487,55 +442,50 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
 .comp-sn{font-family:var(--sans);font-size:22px;font-weight:900;color:var(--acc);line-height:1}
 .comp-sl{font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;font-family:var(--sans)}
 .comp-mrow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;margin-bottom:6px;border:1px solid var(--brd);background:var(--surf)}
-.comp-mrow.cdone{opacity:.35;background:transparent}
-.comp-mrow.ccurr{border-color:var(--acc);background:rgba(255,153,0,.08)}
+.comp-mrow.cdone{opacity:.3;background:transparent}
+.comp-mrow.ccurr{border-color:var(--acc);background:rgba(255,153,0,.07)}
 .comp-mn{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;font-family:var(--sans);flex-shrink:0}
 .comp-ma{font-size:13px;color:var(--t2);flex:1;line-height:1.3}
-
-/* ── Unit pill (KM / MI toggle) ─────────────────────── */
-.unit-pill{display:inline-flex;align-items:center;background:var(--surf2);border:1.5px solid var(--brd);border-radius:20px;padding:3px;gap:2px;cursor:pointer;user-select:none;flex-shrink:0}
-.unit-pill span{font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:1px;padding:5px 13px;border-radius:16px;transition:background .15s,color .15s;line-height:1}
+.unit-pill{display:inline-flex;align-items:center;background:var(--surf2);border:1px solid var(--brd);border-radius:20px;padding:3px;gap:2px;cursor:pointer;user-select:none;flex-shrink:0}
+.unit-pill span{font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:1px;padding:5px 12px;border-radius:16px;transition:background .15s,color .15s;line-height:1}
 .unit-pill span.up-on{background:var(--acc);color:#000}
 .unit-pill span.up-off{color:var(--t3)}
-
-/* ── iOS / Android install toast ────────────────────────────────────── */
-.ios-toast{display:flex;align-items:center;gap:12px;background:var(--surf);border:1.5px solid var(--acc);border-radius:var(--r);padding:14px 16px;margin-top:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;touch-action:manipulation}
-.ios-toast:active{opacity:.8}
-.ios-toast-icon{font-size:26px;flex-shrink:0;line-height:1}
+.ios-toast{display:flex;align-items:center;gap:12px;background:var(--surf);border:1px solid rgba(255,153,0,.35);border-radius:var(--r);padding:13px 15px;margin-top:12px;cursor:pointer;user-select:none;touch-action:manipulation}
+.ios-toast-icon{font-size:24px;flex-shrink:0;line-height:1}
 .ios-toast-text{flex:1;min-width:0}
-.ios-toast-title{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:1.5px;color:var(--acc);margin-bottom:4px}
-.ios-toast-sub{font-size:13px;color:var(--t2);line-height:1.5}
+.ios-toast-title{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--acc);margin-bottom:3px}
+.ios-toast-sub{font-size:12px;color:var(--t2);line-height:1.5}
 .ios-toast-close{font-size:18px;color:var(--t3);flex-shrink:0;padding:4px}
-
-/* ── Autocomplete dropdown ───────────────────────────────────────────── */
-.autocomplete-list{position:absolute;top:100%;left:0;right:0;z-index:9999;background:var(--surf2);border:1.5px solid var(--acc);border-radius:0 0 var(--r) var(--r);box-shadow:0 8px 32px rgba(0,0,0,.6);max-height:220px;overflow-y:auto}
+.autocomplete-list{position:absolute;top:100%;left:0;right:0;z-index:9999;background:var(--surf2);border:1px solid var(--acc);border-radius:0 0 var(--r) var(--r);box-shadow:0 8px 32px rgba(0,0,0,.6);max-height:220px;overflow-y:auto}
 .ac-item{padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--brd);transition:background .1s;-webkit-tap-highlight-color:transparent}
 .ac-item:last-child{border-bottom:none}
 .ac-item:hover,.ac-item:active{background:var(--surf)}
 .ac-item-main{font-size:15px;color:var(--t1);font-weight:500;line-height:1.3}
 .ac-item-sub{font-size:12px;color:var(--t3);margin-top:2px;line-height:1.3}
-
-/* ── Setup section (State, Start, Home) ──────────────────────────────── */
-.setup-section{background:var(--surf);border:1.5px solid var(--brd);border-radius:var(--r);padding:18px 16px;margin-top:12px}
-.setup-label-main{font-size:17px;font-weight:700;color:var(--t1);font-family:var(--sans);margin-bottom:4px;line-height:1.2}
-.setup-badge{font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:5px;white-space:nowrap}
-.start-badge{background:rgba(91,168,255,.15);border:1px solid var(--inf);color:var(--inf)}
-.home-badge{background:rgba(30,217,136,.12);border:1px solid var(--ok);color:var(--ok)}
-.state-card-unset{border-color:var(--acc);animation:statePulse 3s ease-in-out infinite}
-@keyframes statePulse{0%,100%{border-color:var(--acc);box-shadow:0 0 0 0 rgba(255,153,0,0)}50%{border-color:var(--acc);box-shadow:0 0 0 4px rgba(255,153,0,.1)}}
-.setup-input{width:100%;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);color:var(--t1);padding:14px 16px;font-size:17px;font-family:var(--body);outline:none;-webkit-appearance:none;transition:border-color .15s}
-.setup-input:focus{border-color:var(--acc)}
-.setup-input::placeholder{color:var(--t3);font-size:15px}
-.state-select{width:100%;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);color:var(--t1);padding:14px 16px;font-size:16px;font-family:var(--body);outline:none;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
-.gps-btn-big{width:100%;background:rgba(91,168,255,.1);border:1.5px solid var(--inf);color:var(--inf);border-radius:var(--rs);padding:14px;font-size:16px;font-family:var(--sans);font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:background .15s;-webkit-tap-highlight-color:transparent}
-.gps-btn-big:active{background:rgba(91,168,255,.2)}
+.setup-input{width:100%;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);color:var(--t1);padding:12px 14px;font-size:15px;font-family:var(--body);outline:none;-webkit-appearance:none;transition:border-color .15s}
+.setup-input:focus{border-color:var(--brd2)}
+.setup-input::placeholder{color:var(--t3);font-size:14px}
+.state-select{width:100%;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);color:var(--t1);padding:12px 14px;font-size:15px;font-family:var(--body);outline:none;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+.gps-btn-big{width:100%;background:rgba(74,158,255,.08);border:1px solid rgba(74,158,255,.4);color:var(--inf);border-radius:var(--rs);padding:12px;font-size:15px;font-family:var(--sans);font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;transition:background .15s}
+.gps-btn-big:active{background:rgba(74,158,255,.15)}
 .field-saved{font-size:12px;color:var(--ok);margin-top:6px;display:flex;align-items:center;gap:5px}
-
-/* ── Language pill ───────────────────────────────────────── */
-.lang-pill{display:inline-flex;align-items:center;background:var(--surf2);border:1.5px solid var(--brd);border-radius:20px;padding:3px;gap:2px;cursor:pointer;user-select:none;flex-shrink:0}
+.lang-pill{display:inline-flex;align-items:center;background:var(--surf2);border:1px solid var(--brd);border-radius:20px;padding:3px;gap:2px;cursor:pointer;user-select:none;flex-shrink:0}
 .lang-pill span{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.5px;padding:5px 10px;border-radius:16px;transition:background .15s,color .15s;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .lang-pill span.up-on{background:var(--acc);color:#000}
 .lang-pill span.up-off{color:var(--t3)}
+.planCard{font-family:var(--sans);text-align:left}
+.setup-step{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--brd)}
+.setup-step:last-child{border-bottom:none}
+.setup-num{width:24px;height:24px;border-radius:50%;background:var(--acc);color:#000;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-family:var(--sans)}
+.setup-txt{font-size:14px;color:var(--t2);line-height:1.5}
+.setup-txt a{color:var(--acc);text-decoration:none;font-weight:700}
+.setup-txt strong{color:var(--t1)}
+.setup-section{background:var(--surf);border:1px solid var(--brd);border-radius:16px;padding:16px}
+.setup-label-main{font-family:var(--sans);font-size:17px;font-weight:700;color:var(--t1)}
+.setup-badge{font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:5px;white-space:nowrap;font-family:var(--sans)}
+.start-badge{background:rgba(74,158,255,.12);border:1px solid var(--inf);color:var(--inf)}
+.home-badge{background:rgba(34,217,138,.1);border:1px solid var(--ok);color:var(--ok)}
+.state-card-unset{border-color:var(--acc)}
 </style>
 <!-- Google Analytics 4 — FlexRoute G-ZCRY2Y3LP7 -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZCRY2Y3LP7"></script>
@@ -1483,8 +1433,22 @@ function bind() {
     }
   });
 
-}
+  // Hidden debug trigger: long-press (500ms) on the scanned count label
+  // reveals the raw OCR panel. Not visible to drivers — no button, no hint.
+  var scanLbl = document.getElementById('scanCountLbl');
+  if (scanLbl) {
+    var _dbgTimer = null;
+    scanLbl.addEventListener('pointerdown', function() {
+      _dbgTimer = setTimeout(function() {
+        var p = document.getElementById('dbgPanel');
+        if (p) { p.style.display = p.style.display === 'none' ? 'block' : 'none'; if (p.style.display === 'block') p.textContent = S._lastOCR || ''; }
+      }, 500);
+    });
+    scanLbl.addEventListener('pointerup', function() { clearTimeout(_dbgTimer); });
+    scanLbl.addEventListener('pointerleave', function() { clearTimeout(_dbgTimer); });
+  }
 
+}
   // Element bindings — re-added every render() since DOM is recreated
   on('saveKey',      'click', function(){ saveKey(); });
   on('clearKeyBtn',  'click', function(){ S.gmapsKey=''; localStorage.removeItem('fr_gk2'); toast('Key removed'); S.phase='input'; render(); });
@@ -2085,31 +2049,56 @@ function render() {
 // S.authStep: 'email' (enter address) -> 'code' (enter 6-digit code) -> done
 function vAuth() {
   const step = S.authStep || 'email';
-  const err = S._authErr ? `<div style="color:#e15c5c;font-size:14px;margin-top:10px">${S._authErr}</div>` : '';
+  const err = S._authErr ? `<div style="background:var(--err-d);border:1px solid var(--err);border-radius:var(--rs);padding:10px 13px;font-size:13px;color:var(--err);margin-top:10px">${S._authErr}</div>` : '';
   if (step === 'code') {
     return `
-<div class="hdr"><div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div></div>
-<div style="max-width:420px;margin:40px auto;padding:0 20px;text-align:center">
-  <div style="font-size:22px;font-weight:700;margin-bottom:8px">Enter your code</div>
-  <div style="color:var(--t2);font-size:15px;margin-bottom:24px">We sent a 6-digit code to ${S._authEmail || ''}</div>
-  <input id="authCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="••••••"
-    style="width:100%;font-size:28px;letter-spacing:8px;text-align:center;padding:16px;border-radius:var(--rs);border:1.5px solid var(--brd2);background:transparent;color:var(--t1)">
-  ${err}
-  <button id="authVerifyBtn" class="btn bp" style="margin-top:20px">Verify &amp; continue</button>
-  <button id="authResendBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;margin-top:14px;cursor:pointer;text-decoration:underline">Resend code</button>
+<div class="hdr">
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:44px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div>
+</div>
+<div class="scr" style="padding-top:32px">
+  <div style="padding:0 2px;margin-bottom:24px">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+      <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
+      <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">Verify your email</span>
+    </div>
+    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">Check your inbox.</div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.55">We sent a 6-digit code to <strong style="color:var(--t1)">${S._authEmail || ''}</strong></div>
+  </div>
+  <div style="background:var(--surf);border-radius:16px;padding:20px;margin-bottom:14px">
+    <div style="font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:10px">Enter 6-digit code</div>
+    <input id="authCodeInput" type="text" inputmode="numeric" maxlength="6" placeholder="••••••"
+      style="width:100%;font-family:var(--sans);font-size:32px;font-weight:800;letter-spacing:10px;text-align:center;padding:16px;border-radius:10px;border:1px solid var(--brd);background:var(--surf2);color:var(--t1);outline:none">
+    ${err}
+  </div>
+  <button id="authVerifyBtn" class="btn bp" style="height:54px;margin-bottom:10px">Verify &amp; continue</button>
+  <div style="text-align:center">
+    <button id="authResendBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline;padding:8px">Resend code</button>
+  </div>
 </div>`;
   }
   return `
-<div class="hdr"><div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div></div>
-<div style="max-width:420px;margin:40px auto;padding:0 20px;text-align:center">
-  <div style="font-size:22px;font-weight:700;margin-bottom:8px">Verify your email</div>
-  <div style="color:var(--t2);font-size:15px;margin-bottom:24px">No password needed — we'll send you a one-time code.</div>
-  <input id="authEmailInput" type="email" placeholder="you@example.com" autocomplete="email"
-    style="width:100%;font-size:17px;text-align:center;padding:14px;border-radius:var(--rs);border:1.5px solid var(--brd2);background:transparent;color:var(--t1)">
-  ${err}
-  <button id="authSendBtn" class="btn bp" style="margin-top:20px">Send code</button>
-</div>`;
-}
+<div class="hdr">
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:44px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div>
+</div>
+<div class="scr" style="padding-top:32px">
+  <div style="padding:0 2px;margin-bottom:24px">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+      <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
+      <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">One-time setup</span>
+    </div>
+    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">Enter your email.</div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.55">No password needed — we\'ll send a one-time code to verify it\'s you.</div>
+  </div>
+  <div style="background:var(--surf);border-radius:16px;padding:20px;margin-bottom:14px">
+    <div style="font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:10px">Your email address</div>
+    <input id="authEmailInput" type="email" placeholder="you@example.com" autocomplete="email"
+      style="width:100%;font-size:16px;padding:13px 14px;border-radius:10px;border:1px solid var(--brd);background:var(--surf2);color:var(--t1);outline:none;font-family:var(--body)">
+    ${err}
+  </div>
+  <button id="authSendBtn" class="btn bp" style="height:54px;margin-bottom:10px">Send code</button>
+  <div style="text-align:center;font-size:12px;color:var(--t3);letter-spacing:.3px">Used for billing only &nbsp;&middot;&nbsp; No spam</div>
+</div>`;}
+
 
 function bindAuth() {
   var sendBtn = document.getElementById('authSendBtn');
@@ -2207,30 +2196,77 @@ async function checkServerTrialStatus(email) {
 // ─── Paywall ────────────────────────────────────────────────────────────────
 function vPaywall() {
   return `
-<div class="hdr"><div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div></div>
-<div style="max-width:440px;margin:32px auto;padding:0 20px;text-align:center">
-  <div style="font-size:24px;font-weight:800;margin-bottom:6px">You've used your ${FREE_TRIAL_ROUTE_LIMIT} free routes</div>
-  <div style="color:var(--t2);font-size:15px;margin-bottom:28px">Keep optimizing every shift for less than a tank of gas.</div>
+<div class="hdr">
+  <div class="hbrand"><img src="${window._LOGO_}" style="height:44px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div>
+</div>
+<div class="scr" style="padding-top:24px">
 
-  <div style="display:flex;gap:10px;margin-bottom:20px">
-    <button id="planMonthlyBtn" class="planCard" data-plan="monthly" style="flex:1;padding:18px 10px;border-radius:var(--rs);border:1.5px solid var(--acc);background:var(--acc-d);cursor:pointer;text-align:left">
-      <div style="font-size:13px;color:var(--t2);font-weight:700;letter-spacing:1px">MONTHLY</div>
-      <div style="font-size:22px;font-weight:800;color:var(--acc);margin-top:4px">$9.99</div>
-      <div style="font-size:12px;color:var(--t3)">per month</div>
+  <div style="padding:0 2px;margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+      <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
+      <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">FlexRoute Premium</span>
+    </div>
+    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">Keep every shift shorter.</div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.55">You\'ve used your ${FREE_TRIAL_ROUTE_LIMIT} free routes. Unlock unlimited optimization for less than a tank of gas.</div>
+  </div>
+
+  <!-- Pricing cards -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+    <button id="planMonthlyBtn" class="planCard" data-plan="monthly"
+      style="padding:18px 14px;border-radius:16px;border:1.5px solid var(--acc);background:rgba(255,153,0,.1);cursor:pointer;text-align:left">
+      <div style="font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:8px">Monthly</div>
+      <div style="font-family:var(--sans);font-size:28px;font-weight:900;color:var(--acc);line-height:1">$9.99</div>
+      <div style="font-size:12px;color:var(--t3);margin-top:4px">per month</div>
     </button>
-    <button id="planYearlyBtn" class="planCard" data-plan="yearly" style="flex:1;padding:18px 10px;border-radius:var(--rs);border:1.5px solid var(--brd2);background:transparent;cursor:pointer;text-align:left;position:relative">
-      <div style="position:absolute;top:-9px;right:8px;background:var(--acc);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px">SAVE</div>
-      <div style="font-size:13px;color:var(--t2);font-weight:700;letter-spacing:1px">YEARLY</div>
-      <div style="font-size:22px;font-weight:800;margin-top:4px">$79</div>
-      <div style="font-size:12px;color:var(--t3)">per year ($6.58/mo)</div>
+    <button id="planYearlyBtn" class="planCard" data-plan="yearly"
+      style="padding:18px 14px;border-radius:16px;border:1.5px solid var(--brd);background:var(--surf);cursor:pointer;text-align:left;position:relative">
+      <div style="position:absolute;top:-9px;right:10px;background:var(--acc);color:#000;font-family:var(--sans);font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;letter-spacing:.5px">SAVE 34%</div>
+      <div style="font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:8px">Yearly</div>
+      <div style="font-family:var(--sans);font-size:28px;font-weight:900;color:var(--t1);line-height:1">$79</div>
+      <div style="font-size:12px;color:var(--t3);margin-top:4px">$6.58 / month</div>
     </button>
   </div>
 
-  <button id="checkoutBtn" class="btn bp" style="margin-bottom:10px">Continue to payment</button>
-  <button id="paywallBackBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline">Back</button>
-  <div style="margin-top:18px;font-size:12px;color:var(--t3)">Billing question? <a href="mailto:flexrouteapp@gmail.com" style="color:var(--t3);text-decoration:underline">flexrouteapp@gmail.com</a></div>
-</div>`;
-}
+  <!-- What you get -->
+  <div style="background:var(--surf);border-radius:16px;overflow:hidden;margin-bottom:16px">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--brd)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--acc);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#9889;</div>
+        <div>
+          <div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--t1)">Unlimited route optimization</div>
+          <div style="font-size:12px;color:var(--t3)">Every shift, every day</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--brd)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--ok);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#9654;</div>
+        <div>
+          <div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--t1)">Shift Mode — stop by stop</div>
+          <div style="font-size:12px;color:var(--t3)">Auto-nav, progress saved</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:10px 16px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--inf);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#127968;</div>
+        <div>
+          <div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--t1)">Always ends near home</div>
+          <div style="font-size:12px;color:var(--t3)">Real GPS road distances</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button id="checkoutBtn" class="btn bp" style="height:54px;margin-bottom:10px">Continue to payment</button>
+  <div style="text-align:center;margin-bottom:16px">
+    <button id="paywallBackBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline;padding:8px">Back to app</button>
+  </div>
+  <div style="text-align:center;font-size:12px;color:var(--t3)">Billing question? <a href="mailto:flexrouteapp@gmail.com" style="color:var(--t3);text-decoration:underline">flexrouteapp@gmail.com</a></div>
+  <div style="padding-bottom:16px"></div>
+
+</div>`;}
+
 
 function bindPaywall() {
   var selected = 'monthly';
@@ -2371,28 +2407,32 @@ function vInput() {
   const cnt = S.stops.length;
   const lastS = S.lastId ? S.stops.find(s => s.id === S.lastId) : null;
   const sc = S.sc;
+  const startOk = !!(S.startAddr || S.gpsCoords);
+  const homeOk  = !!S.home;
+  const regionOk = !!S.userState;
+  const setupDone = regionOk && startOk && homeOk;
+
   return `
 <div class="hdr">
   <div class="hbrand">
-    <img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
+    <img src="${window._LOGO_}" style="height:44px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
   </div>
   <div class="hbtns" style="gap:8px">
     ${langPill()}
     ${unitPill()}
-    <button class="ib" id="setBtn" title="Settings" style="${S.gmapsKey ? 'border-color:var(--ok);color:var(--ok)' : ''}">
-      ${S.gmapsKey ? '&#10003;' : '&#9881;'}
-    </button>
-    ${cnt ? `<button class="ib" id="clrBtn" style="color:var(--err)" title="Clear all stops">&#10005;</button>` : ''}
+    ${cnt ? `<button class="ib" id="clrBtn" style="color:var(--err);border-color:rgba(255,68,85,.25)" title="Clear all stops">&#10005;</button>` : ''}
   </div>
 </div>
-<div class="scr" style="padding-top:4px">
 
-  ${(S.tweakMode && S.optimized && S.optimized.length > 0 && S.stops.length > 0) ? `<div style="background:linear-gradient(135deg, #FF9900 0%, #D97000 100%);border-radius:var(--r);padding:14px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(217,112,0,.3)">
+<div class="scr" style="padding-top:16px">
+
+  ${(S.tweakMode && S.optimized && S.optimized.length > 0 && S.stops.length > 0) ? `
+  <div style="background:var(--acc);border-radius:10px;padding:13px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px">
     <div style="flex:1">
-      <div style="font-size:15px;font-weight:800;color:#000;margin-bottom:2px">${t("route_outdated")}</div>
-      <div style="font-size:12px;color:#000;opacity:.85">${t("route_outdated_sub")}</div>
+      <div style="font-family:var(--sans);font-size:15px;font-weight:800;color:#000;margin-bottom:2px">${t("route_outdated")}</div>
+      <div style="font-size:12px;color:rgba(0,0,0,.7)">${t("route_outdated_sub")}</div>
     </div>
-    <button id="reoptBtn" style="background:#000;color:#FF9900;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);white-space:nowrap">${t("re_optimize_short")}</button>
+    <button id="reoptBtn" style="background:#000;color:var(--acc);border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);white-space:nowrap">${t("re_optimize_short")}</button>
   </div>` : ''}
 
   ${!S.iosDismissed && (isIOSSafari() || isAndroidChrome()) ? `
@@ -2400,203 +2440,217 @@ function vInput() {
     <div class="ios-toast-icon">&#128241;</div>
     <div class="ios-toast-text">
       <div class="ios-toast-title">ADD TO HOME SCREEN</div>
-      <div class="ios-toast-sub">
-        ${isIOSSafari() ? 'Tap <strong>Share &#11023;</strong> then <strong>"Add to Home Screen"</strong>' : 'Tap <strong>&#8942; Menu</strong> then <strong>"Add to Home Screen"</strong>'}
-        &nbsp;&mdash;&nbsp;tap to dismiss
-      </div>
+      <div class="ios-toast-sub">${isIOSSafari() ? 'Tap <strong>Share &#11023;</strong> then <strong>"Add to Home Screen"</strong>' : 'Tap <strong>&#8942; Menu</strong> then <strong>"Add to Home Screen"</strong>'}&nbsp;&mdash;&nbsp;tap to dismiss</div>
     </div>
     <div class="ios-toast-close">&#10005;</div>
   </div>` : ''}
 
-  <!-- ── SECTION 1: UPLOAD ──────────────────────────────────────────── -->
-  <div class="card">
-    <div class="ct">&#128247; Scan Flex screenshots</div>
-    ${typeof Tesseract === 'undefined' ? `
-    <div style="background:rgba(255,153,0,.1);border:1.5px solid rgba(255,153,0,.4);border-radius:var(--rs);padding:12px 14px;margin-bottom:10px;font-size:13px;color:var(--t2);line-height:1.6;text-align:center">
-      &#9888; Screenshot scanning works at
-      <a href="https://flexrouteapp.com" target="_blank" style="color:var(--acc);font-weight:600">flexrouteapp.com</a>
-      &mdash; add stops manually below while in preview
-    </div>` : ''}
-    <label class="dz ${sc ? 'scanning' : ''}" id="dz"><input type="file" id="fi" accept="image/*,application/pdf" multiple style="position:absolute;width:0;height:0;opacity:0;pointer-events:none">
-      ${sc ? `
-        <div class="dz-t" style="color:var(--acc)">${sc.msg}</div>
-        ${sc.total > 1 ? `
-          <div class="pb"><div class="pf" style="width:${Math.round(sc.done / sc.total * 100)}%"></div></div>
-          <div class="pl">${sc.done} of ${sc.total} images scanned</div>` : ''}
-      ` : `
-        <div class="dz-t">${t('scan_tap')}</div>
-        <div class="dz-s">${t('scan_sub')}</div>
-        ${/Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent) ? `<div class="dz-tip" style="color:var(--warn,#FF9900)">⚠ Open in Safari or Chrome for scanning — in-app browsers block the scanner</div>` : `<div class="dz-tip">${t('scan_tip')}</div>`}
-      `}
-    </label>
+  <!-- ── HERO: tag + headline ── matches screenshot exactly ── -->
+  <div style="padding:0 2px;margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+      <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
+      <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">Amazon Flex Drivers</span>
+    </div>
+    <div style="font-family:var(--sans);font-size:34px;font-weight:800;color:var(--t1);line-height:1.0;margin-bottom:8px;letter-spacing:-.3px">Shorter route.<br>Home sooner.</div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.55">Screenshot your stop list. Get the shortest route in 60 seconds.</div>
   </div>
 
-  <!-- ── SECTION 2: STATE / PROVINCE ───────────────────────────────── -->
-  ${S.userState ? `
-  <div class="setup-section" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px">
-    <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-size:22px">&#127758;</span>
-      <div>
-        <div style="font-size:12px;color:var(--t3);font-family:var(--sans);letter-spacing:1px;text-transform:uppercase;font-weight:700">Region</div>
-        <div style="font-size:17px;font-weight:700;color:var(--t1);font-family:var(--sans)">${escH(S.userState)}</div>
-      </div>
-    </div>
-    <button id="changeStateBtn" style="background:transparent;border:1px solid var(--brd);border-radius:var(--rs);color:var(--t2);font-size:13px;cursor:pointer;padding:7px 14px;font-family:var(--sans)">Change</button>
-  </div>` : `
-  <div class="setup-section state-card-unset">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-      <span style="font-size:26px">&#127758;</span>
-      <div>
-        <div class="setup-label-main">Where are you delivering?</div>
-        <div style="font-size:13px;color:var(--t2)">Set once &mdash; saved for all future shifts</div>
-      </div>
-    </div>
-    <select id="stateSelectMain" class="state-select">
-      <option value="">${t("select_region_ph")}</option>
-      <optgroup label="Canada"><option value="ON">ON — Ontario</option><option value="BC">BC — British Columbia</option><option value="AB">AB — Alberta</option><option value="QC">QC — Quebec</option><option value="MB">MB — Manitoba</option><option value="SK">SK — Saskatchewan</option><option value="NS">NS — Nova Scotia</option><option value="NB">NB — New Brunswick</option></optgroup>
-      <optgroup label="United States"><option value="AL">AL — Alabama</option><option value="AK">AK — Alaska</option><option value="AZ">AZ — Arizona</option><option value="AR">AR — Arkansas</option><option value="CA">CA — California</option><option value="CO">CO — Colorado</option><option value="CT">CT — Connecticut</option><option value="DE">DE — Delaware</option><option value="FL">FL — Florida</option><option value="GA">GA — Georgia</option><option value="HI">HI — Hawaii</option><option value="ID">ID — Idaho</option><option value="IL">IL — Illinois</option><option value="IN">IN — Indiana</option><option value="IA">IA — Iowa</option><option value="KS">KS — Kansas</option><option value="KY">KY — Kentucky</option><option value="LA">LA — Louisiana</option><option value="ME">ME — Maine</option><option value="MD">MD — Maryland</option><option value="MA">MA — Massachusetts</option><option value="MI">MI — Michigan</option><option value="MN">MN — Minnesota</option><option value="MO">MO — Missouri</option><option value="MT">MT — Montana</option><option value="NE">NE — Nebraska</option><option value="NV">NV — Nevada</option><option value="NH">NH — New Hampshire</option><option value="NJ">NJ — New Jersey</option><option value="NM">NM — New Mexico</option><option value="NY">NY — New York</option><option value="NC">NC — North Carolina</option><option value="ND">ND — North Dakota</option><option value="OH">OH — Ohio</option><option value="OK">OK — Oklahoma</option><option value="OR">OR — Oregon</option><option value="PA">PA — Pennsylvania</option><option value="RI">RI — Rhode Island</option><option value="SC">SC — South Carolina</option><option value="SD">SD — South Dakota</option><option value="TN">TN — Tennessee</option><option value="TX">TX — Texas</option><option value="UT">UT — Utah</option><option value="VT">VT — Vermont</option><option value="VA">VA — Virginia</option><option value="WA">WA — Washington</option><option value="WV">WV — West Virginia</option><option value="WI">WI — Wisconsin</option><option value="WY">WY — Wyoming</option></optgroup>
-      <optgroup label="Europe &amp; Rest of World">
-        <option value="GB">🇬🇧 United Kingdom</option>
-        <option value="DE">🇩🇪 Germany</option>
-        <option value="FR">🇫🇷 France</option>
-        <option value="ES">🇪🇸 Spain</option>
-        <option value="IT">🇮🇹 Italy</option>
-        <option value="NL">🇳🇱 Netherlands</option>
-        <option value="BE">🇧🇪 Belgium</option>
-        <option value="SE">🇸🇪 Sweden</option>
-        <option value="PL">🇵🇱 Poland</option>
-        <option value="AU">🇦🇺 Australia</option>
-        <option value="JP">🇯🇵 Japan</option>
-        <option value="IND">🇮🇳 India</option>
-        <option value="MX">🇲🇽 Mexico</option>
-        <option value="BR">🇧🇷 Brazil</option>
-        <option value="SG">🇸🇬 Singapore</option>
-      </optgroup>
-    </select>
-  </div>`}
-
-  <!-- ── SECTION 3: STARTING LOCATION ──────────────────────────────── -->
-  <div class="setup-section">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <span style="font-size:26px">&#128204;</span>
-      <div style="flex:1">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
-          <div class="setup-label-main">Starting location</div>
-          <span class="setup-badge start-badge">START</span>
-        </div>
-        <div style="font-size:13px;color:var(--t2)">Your depot or warehouse address</div>
-      </div>
-    </div>
-    ${S.gpsCoords ? `
-      <div style="display:flex;align-items:center;gap:10px;background:rgba(30,217,136,.08);border:1px solid var(--ok);border-radius:var(--rs);padding:12px 14px;margin-bottom:4px">
-        <span style="font-size:20px">&#128204;</span>
-        <div style="flex:1">
-          <div style="font-size:14px;font-weight:700;color:var(--ok)">GPS locked</div>
-          <div style="font-size:13px;color:var(--t2);margin-top:2px">${escH(S.gpsAddr)}</div>
-        </div>
-        <button class="btn" id="gpsBtn" style="border-color:var(--ok);color:var(--ok);padding:6px 12px;font-size:13px">Change</button>
-      </div>
+  <!-- ── SCAN ── Full-width, prominent ── -->
+  ${typeof Tesseract === 'undefined' ? `
+  <div style="background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--t2);line-height:1.5;text-align:center">
+    &#9888; Scanning works at <a href="https://flexrouteapp.com" target="_blank" style="color:var(--acc);font-weight:600">flexrouteapp.com</a>
+  </div>` : ''}
+  <label class="dz ${sc ? 'scanning' : ''}" id="dz">
+    <input type="file" id="fi" accept="image/*,application/pdf" multiple style="position:absolute;width:0;height:0;opacity:0;pointer-events:none">
+    ${sc ? `
+      <div style="font-size:24px;margin-bottom:8px">&#8987;</div>
+      <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--acc)">${sc.msg}</div>
+      ${sc.total > 1 ? `<div class="pb" style="margin-top:12px"><div class="pf" style="width:${Math.round(sc.done / sc.total * 100)}%"></div></div><div class="pl" style="margin-top:5px">${sc.done} of ${sc.total} images scanned</div>` : ''}
     ` : `
-      <button class="gps-btn-big" id="gpsBtn">
-        &#128204; Use GPS (auto-detect my location)
-      </button>
-      <div style="font-size:12px;color:var(--t3);text-align:center;margin-bottom:10px">&mdash; or type the address below &mdash;</div>
-      <div style="position:relative">
-        <input type="text" id="startInput"
-          placeholder="e.g. your warehouse or depot address"
-          value="${escH(S.startAddr || '')}"
-          class="setup-input" style="padding-right:${S.startAddr ? '40px' : '16px'}"/>
-        ${S.startAddr ? `<button id="clearStartBtn" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--t3);font-size:18px;cursor:pointer;padding:4px 8px;line-height:1" title="Clear">&#10005;</button>` : ''}
-      </div>
-      ${S.startAddr ? `<div class="field-saved">&#10003; Saved &mdash; tap &#10005; to clear</div>` : `<div style="font-size:12px;color:var(--t3);margin-top:4px">Auto-saved</div>`}
+      <div style="font-size:28px;margin-bottom:8px">&#128247;</div>
+      <div style="font-family:var(--sans);font-size:17px;font-weight:700;color:var(--t1);letter-spacing:.2px">${t('scan_tap')}</div>
+      <div style="font-size:13px;color:var(--t3);margin-top:4px">${t('scan_sub')}</div>
+      ${/Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent) ? `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">&#9888; Open in Safari or Chrome — in-app browsers block scanning</div>` : `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">${t('scan_tip')}</div>`}
     `}
+  </label>
+
+  <!-- ── MAIN OPTIMIZE BUTTON — matches screenshot exactly ── -->
+  <div style="margin-top:14px">
+    ${S.geoFailed && S.geoFailed.length > 0 ? `
+    <div style="background:var(--err-d);border:1px solid var(--err);border-radius:var(--rs);padding:9px 13px;font-family:var(--sans);font-size:13px;color:var(--err);text-align:center;margin-bottom:10px;font-weight:700;letter-spacing:.5px">
+      &#9888; ${t('resolve_first').replace('{n}',S.geoFailed.length).replace('{es}',S.geoFailed.length>1?'es':'')}
+    </div>
+    <button class="btn bp" disabled style="height:54px">&#9889; Optimize my route</button>` : `
+    <button class="btn bp" id="optBtn" ${!cnt ? 'disabled' : ''} style="height:54px">
+      &#9889; ${cnt ? `${t('optimize_btn')} &mdash; ${cnt} stop${cnt > 1 ? 's' : ''}` : 'Optimize my route'}
+    </button>`}
+    <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px;letter-spacing:.3px">3 free routes &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>
   </div>
 
-  <!-- ── SECTION 4: HOME ADDRESS ────────────────────────────────────── -->
-  <div class="setup-section">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <span style="font-size:26px">&#127968;</span>
-      <div style="flex:1">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
-          <div class="setup-label-main">Home address</div>
-          <span class="setup-badge home-badge">END OF ROUTE</span>
+  ${S.errMsg ? `<div style="background:var(--err-d);border:1px solid var(--err);border-radius:10px;padding:12px 15px;margin-top:12px">
+    <div style="font-size:14px;color:var(--err);margin-bottom:10px">${escH(S.errMsg)}</div>
+    <button class="btn bp" id="retryOptBtn">${t("try_again")}</button>
+  </div>` : ''}
+
+  <!-- ── STEPS ── Exactly like screenshot: dark card, numbered circles, dividers ── -->
+  <div style="background:var(--surf);border-radius:16px;overflow:hidden;margin-top:20px">
+    <div style="padding:12px 18px;border-bottom:1px solid var(--brd);font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--t3);text-transform:uppercase">
+      3 steps, under 2 minutes
+    </div>
+
+    <!-- Step 1: Scan -->
+    <div onclick="document.getElementById('dz').click()" style="padding:16px 18px;border-bottom:1px solid var(--brd);display:flex;align-items:flex-start;gap:14px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--acc);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
+      <div>
+        <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--t1);margin-bottom:3px">${cnt ? `Screenshot scanned &mdash; ${cnt} stops` : 'Screenshot your stop list'}</div>
+        <div style="font-size:12px;color:var(--t3)">${cnt ? `${S.stops.filter(s=>s.flexNum!=null).length} from screenshot &middot; ${S.stops.filter(s=>s.flexNum==null).length} manual` : 'Upload from your phone gallery'}</div>
+      </div>
+      ${cnt ? `<span style="margin-left:auto;font-size:18px;color:var(--ok);flex-shrink:0">&#10003;</span>` : ''}
+    </div>
+
+    <!-- Step 2: Setup -->
+    <div style="border-bottom:1px solid var(--brd)">
+      <div style="padding:16px 18px;display:flex;align-items:flex-start;gap:14px">
+        <div style="width:28px;height:28px;border-radius:50%;background:${setupDone ? 'var(--ok)' : 'var(--acc)'};color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${setupDone ? '&#10003;' : '2'}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--t1);margin-bottom:3px">${setupDone ? 'Route setup complete' : 'Set up your route'}</div>
+          <div style="font-size:12px;color:var(--t3)">${setupDone ? `${escH(S.userState)} &middot; ${escH(S.startAddr||S.gpsAddr||'')} &rarr; Home` : 'Region, depot address, home endpoint'}</div>
         </div>
-        <div style="font-size:13px;color:var(--t2)">Your route always ends as close to home as possible</div>
+      </div>
+      <!-- Setup fields — always visible, compact row layout -->
+      <div style="padding:0 18px 16px">
+        <div style="background:var(--surf2);border-radius:10px;overflow:hidden">
+
+          <!-- Region -->
+          <div style="padding:10px 14px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:10px">
+            <span style="font-size:16px;flex-shrink:0">&#127758;</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Region</div>
+              ${S.userState ? `<div style="font-family:var(--sans);font-size:14px;font-weight:700;color:var(--t1)">${escH(S.userState)}</div>` : `
+              <select id="stateSelectMain" class="state-select" style="padding:4px 8px;font-size:13px;margin-top:0;border-color:var(--acc)">
+                <option value="">${t("select_region_ph")}</option>
+                <optgroup label="Canada"><option value="ON">ON — Ontario</option><option value="BC">BC — British Columbia</option><option value="AB">AB — Alberta</option><option value="QC">QC — Quebec</option><option value="MB">MB — Manitoba</option><option value="SK">SK — Saskatchewan</option><option value="NS">NS — Nova Scotia</option><option value="NB">NB — New Brunswick</option></optgroup>
+                <optgroup label="United States"><option value="AL">AL — Alabama</option><option value="AK">AK — Alaska</option><option value="AZ">AZ — Arizona</option><option value="AR">AR — Arkansas</option><option value="CA">CA — California</option><option value="CO">CO — Colorado</option><option value="CT">CT — Connecticut</option><option value="DE">DE — Delaware</option><option value="FL">FL — Florida</option><option value="GA">GA — Georgia</option><option value="HI">HI — Hawaii</option><option value="ID">ID — Idaho</option><option value="IL">IL — Illinois</option><option value="IN">IN — Indiana</option><option value="IA">IA — Iowa</option><option value="KS">KS — Kansas</option><option value="KY">KY — Kentucky</option><option value="LA">LA — Louisiana</option><option value="ME">ME — Maine</option><option value="MD">MD — Maryland</option><option value="MA">MA — Massachusetts</option><option value="MI">MI — Michigan</option><option value="MN">MN — Minnesota</option><option value="MO">MO — Missouri</option><option value="MT">MT — Montana</option><option value="NE">NE — Nebraska</option><option value="NV">NV — Nevada</option><option value="NH">NH — New Hampshire</option><option value="NJ">NJ — New Jersey</option><option value="NM">NM — New Mexico</option><option value="NY">NY — New York</option><option value="NC">NC — North Carolina</option><option value="ND">ND — North Dakota</option><option value="OH">OH — Ohio</option><option value="OK">OK — Oklahoma</option><option value="OR">OR — Oregon</option><option value="PA">PA — Pennsylvania</option><option value="RI">RI — Rhode Island</option><option value="SC">SC — South Carolina</option><option value="SD">SD — South Dakota</option><option value="TN">TN — Tennessee</option><option value="TX">TX — Texas</option><option value="UT">UT — Utah</option><option value="VT">VT — Vermont</option><option value="VA">VA — Virginia</option><option value="WA">WA — Washington</option><option value="WV">WV — West Virginia</option><option value="WI">WI — Wisconsin</option><option value="WY">WY — Wyoming</option></optgroup>
+                <optgroup label="Europe &amp; Rest of World"><option value="GB">🇬🇧 United Kingdom</option><option value="DE">🇩🇪 Germany</option><option value="FR">🇫🇷 France</option><option value="ES">🇪🇸 Spain</option><option value="IT">🇮🇹 Italy</option><option value="NL">🇳🇱 Netherlands</option><option value="BE">🇧🇪 Belgium</option><option value="SE">🇸🇪 Sweden</option><option value="PL">🇵🇱 Poland</option><option value="AU">🇦🇺 Australia</option><option value="JP">🇯🇵 Japan</option><option value="IND">🇮🇳 India</option><option value="MX">🇲🇽 Mexico</option><option value="BR">🇧🇷 Brazil</option><option value="SG">🇸🇬 Singapore</option></optgroup>
+              </select>`}
+            </div>
+            ${S.userState ? `<button id="changeStateBtn" style="background:transparent;border:1px solid var(--brd);border-radius:6px;color:var(--t3);font-size:11px;cursor:pointer;padding:4px 10px;font-family:var(--sans);white-space:nowrap;flex-shrink:0">Change</button>` : ''}
+          </div>
+
+          <!-- Start -->
+          <div style="padding:10px 14px;border-bottom:1px solid var(--brd)">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:${S.gpsCoords || S.startAddr ? '0' : '8px'}">
+              <span style="font-size:16px;flex-shrink:0">&#128204;</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Start — warehouse</div>
+                ${S.gpsCoords
+                  ? `<div style="font-size:13px;font-weight:500;color:var(--ok)">&#10003; GPS: ${escH(S.gpsAddr)}</div>`
+                  : S.startAddr
+                    ? `<div style="font-size:13px;font-weight:500;color:var(--t1)">${escH(S.startAddr)}</div>`
+                    : `<div style="font-size:12px;color:var(--t3)">Not set — tap to add</div>`}
+              </div>
+              ${S.gpsCoords ? `<button class="btn" id="gpsBtn" style="border:1px solid var(--ok);color:var(--ok);padding:4px 10px;font-size:11px;background:transparent;white-space:nowrap;flex-shrink:0;border-radius:6px">Change</button>` : S.startAddr ? `<button id="clearStartBtn" style="background:transparent;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>` : ''}
+            </div>
+            ${!S.gpsCoords && !S.startAddr ? `
+              <button class="gps-btn-big" id="gpsBtn" style="margin-top:6px;margin-bottom:6px;padding:10px;font-size:13px">&#128204; Use GPS to detect location</button>
+              <div style="position:relative"><input type="text" id="startInput" placeholder="or type depot/warehouse address" value="" class="setup-input" style="font-size:13px;padding:9px 12px"/></div>
+            ` : !S.gpsCoords ? `
+              <div style="position:relative;margin-top:6px"><input type="text" id="startInput" placeholder="Depot/warehouse address" value="${escH(S.startAddr || '')}" class="setup-input" style="font-size:13px;padding:9px 12px"/></div>
+              <div style="font-size:11px;color:var(--ok);margin-top:4px">&#10003; Saved &mdash; edit above or tap &#10005; to clear</div>
+            ` : ''}
+          </div>
+
+          <!-- Home -->
+          <div style="padding:10px 14px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:${S.home ? '0' : '8px'}">
+              <span style="font-size:16px;flex-shrink:0">&#127968;</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Home — end of route</div>
+                ${S.home
+                  ? `<div style="font-size:13px;font-weight:500;color:var(--t1)">${escH(S.home)}</div>`
+                  : `<div style="font-size:12px;color:var(--t3)">Not set — route won't end near home</div>`}
+              </div>
+              ${S.home ? `<button id="clearHomeBtn" style="background:transparent;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>` : ''}
+            </div>
+            ${!S.home ? `
+              <div style="position:relative"><input type="text" id="hi" placeholder="Your home address" value="" class="setup-input" style="font-size:13px;padding:9px 12px"/></div>
+              <div style="font-size:11px;color:var(--t3);margin-top:4px">Auto-saved for all future shifts</div>
+            ` : `
+              <div style="position:relative;margin-top:6px"><input type="text" id="hi" placeholder="Your home address" value="${escH(S.home)}" class="setup-input" style="font-size:13px;padding:9px 12px"/></div>
+              <div style="font-size:11px;color:var(--ok);margin-top:4px">&#10003; Saved &mdash; edit above or tap &#10005; to clear</div>
+            `}
+          </div>
+
+        </div>
       </div>
     </div>
-    <div style="position:relative">
-      <input type="text" id="hi"
-        placeholder="e.g. 3 Fermoy Rd, Scarborough"
-        value="${escH(S.home)}"
-        class="setup-input" style="padding-right:${S.home ? '40px' : '16px'}"/>
-      ${S.home ? `<button id="clearHomeBtn" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:var(--t3);font-size:18px;cursor:pointer;padding:4px 8px;line-height:1" title="Clear">&#10005;</button>` : ''}
+
+    <!-- Step 3: Shift Mode -->
+    <div style="padding:16px 18px;display:flex;align-items:flex-start;gap:14px">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--ok);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</div>
+      <div>
+        <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--t1);margin-bottom:3px">Start Shift Mode</div>
+        <div style="font-size:12px;color:var(--t3)">One stop at a time, auto-nav</div>
+      </div>
     </div>
-    ${S.home ? `<div class="field-saved">&#10003; Saved &mdash; tap &#10005; to clear</div>` : `<div style="font-size:12px;color:var(--t3);margin-top:4px">Auto-saved</div>`}
   </div>
+
+  <!-- ── STOPS LIST (when stops exist) ── -->
+  ${cnt ? `
+  <div style="margin-top:20px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 2px">
+      <div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--acc);text-transform:uppercase;display:flex;align-items:center;gap:8px">
+        Stops <span style="background:var(--acc);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px">${cnt}</span>
+      </div>
+      <span id="scanCountLbl" style="font-size:11px;color:var(--t3);user-select:none;-webkit-user-select:none">
+        ${S.stops.filter(s=>s.flexNum!=null).length} scanned &middot; ${S.stops.filter(s=>s.flexNum==null).length} manual
+      </span>
+    </div>
+    <div style="background:var(--surf);border-radius:16px;overflow:hidden;padding:12px 14px">
+      <div class="ir" style="margin-bottom:10px">
+        <div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Add address manually" value="${escH(S.manVal)}" style="font-size:14px"/></div>
+        <button class="badd" id="addBtn" style="height:42px;font-size:20px;padding:0 14px">+</button>
+      </div>
+      <div id="dbgPanel" style="display:none;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:10px;margin-bottom:8px;font-size:10px;font-family:var(--mono);color:var(--t3);white-space:pre-wrap;max-height:220px;overflow-y:auto;word-break:break-all"></div>
+      <div class="sscr"><div class="slist">${(function(){
+  var failed = S.stops.filter(function(s){ return s.geoFailed; });
+  var normal = S.stops.filter(function(s){ return !s.geoFailed; });
+  return failed.concat(normal).map(function(s, i){ return sRow(s, i); }).join('');
+})()}</div></div>
+      ${lastS ? `<div class="al ai" style="margin-top:8px;font-size:12px">Last stop: <strong style="font-family:var(--mono)">${escH(lastS.address)}</strong>${lastS.flexNum != null ? ` &mdash; pkg <strong>#${lastS.flexNum}</strong>` : ''}</div>` : ''}
+    </div>
+  </div>
+  ` : `
+  <!-- Manual add when no stops yet -->
+  <div style="margin-top:16px;background:var(--surf);border-radius:16px;padding:12px 14px">
+    <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Or add stops manually</div>
+    <div class="ir">
+      <div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Type an address" value="${escH(S.manVal)}" style="font-size:14px"/></div>
+      <button class="badd" id="addBtn" style="height:42px;font-size:20px;padding:0 14px">+</button>
+    </div>
+    ${S._lastOCR ? `<div id="dbgPanel" style="display:none;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:10px;margin-top:8px;font-size:10px;font-family:var(--mono);color:var(--t3);white-space:pre-wrap;max-height:220px;overflow-y:auto;word-break:break-all"></div>` : ''}
+  </div>
+  `}
 
   ${S.geoFailed && S.geoFailed.length > 0 && S.stops.length > 0 ? `
   <div class="failed-float" id="failedFloat" onclick="document.getElementById('failedFloat').style.display='none'">
     &#9888; ${S.geoFailed.length} stop${S.geoFailed.length > 1 ? 's' : ''} not found &mdash; tap to dismiss
   </div>` : ''}
 
-  <!-- ── SECTION 5: STOPS ───────────────────────────────────────────── -->
-  <div class="card" style="margin-top:16px">
-    <div class="ct">
-      Stops ${cnt ? `<span class="cb">${cnt}</span>` : ''}
-      ${cnt ? `<span style="font-size:10px;color:var(--t3);font-weight:400;letter-spacing:0;text-transform:none;margin-left:6px">
-        ${S.stops.filter(s=>s.flexNum!=null).length} scanned &middot; ${S.stops.filter(s=>s.flexNum==null).length} manual
-      </span>` : ''}
+  <!-- ── STATS BAR ── Exactly like screenshot: two orange numbers ── -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;background:var(--surf);border-radius:16px;overflow:hidden;margin-top:20px">
+    <div style="padding:18px 16px;text-align:center;border-right:1px solid var(--brd)">
+      <div style="font-family:var(--sans);font-size:32px;font-weight:900;color:var(--acc);line-height:1">11 km</div>
+      <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:5px">avg saved per shift</div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
-      <div class="ir">
-        <div class="si-wrap" style="flex:1"><input type="text" id="si" placeholder="Type an address and tap +" value="${escH(S.manVal)}"/></div>
-        <button class="badd" id="addBtn">+</button>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:12px;color:var(--t3);white-space:nowrap">Total packages:</span>
-        <span id="manNumDisplay" style="min-width:36px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);color:var(--acc);padding:9px 12px;font-size:15px;font-weight:800;text-align:center">${S.stops.reduce(function(t,s){return t+(s.pkgCount||1);},0)}</span>
-        <span style="font-size:12px;color:var(--t3);line-height:1.4">packages to deliver</span>
-      </div>
+    <div style="padding:18px 16px;text-align:center">
+      <div style="font-family:var(--sans);font-size:32px;font-weight:900;color:var(--acc);line-height:1">18 min</div>
+      <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:5px">avg saved per shift</div>
     </div>
-
-    ${cnt ? `
-      <div class="sscr"><div class="slist">${(function(){
-  var failed = S.stops.filter(function(s){ return s.geoFailed; });
-  var normal = S.stops.filter(function(s){ return !s.geoFailed; });
-  var sorted = failed.concat(normal);
-  return sorted.map(function(s, i){ return sRow(s, i); }).join('');
-})()}</div></div>
-      ${lastS ? `<div class="al ai" style="margin-top:9px;font-size:13px">
-        Last stop: <strong style="font-family:var(--mono)">${escH(lastS.address)}</strong>
-        ${lastS.flexNum != null ? ` &mdash; pkg <strong>#${lastS.flexNum}</strong>` : ''}
-      </div>` : ''}
-    ` : `<div class="empty">No stops yet &mdash; upload a screenshot or add manually above</div>`}
   </div>
 
-  ${S.errMsg ? `<div style="background:rgba(255,68,85,.08);border:1.5px solid var(--err);border-radius:var(--r);padding:14px 16px;margin-bottom:12px">
-    <div style="font-size:14px;color:var(--err);margin-bottom:10px">${escH(S.errMsg)}</div>
-    <button class="btn bp" id="retryOptBtn" style="background:var(--acc);border-color:var(--acc);color:#000;width:100%;font-size:16px;padding:14px">${t("try_again")}</button>
-  </div>` : ''}
-  ${S._lastOCR ? `
-  <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
-    <button class="btn bg" id="dbgBtn" style="flex:1;font-size:12px;padding:8px">
-      &#128269; Show raw OCR text (${(S._lastOCR.split('\n').filter(l=>l.trim()).length)} lines read)
-    </button>
-  </div>
-  <div id="dbgPanel" style="display:none;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:10px;margin-top:6px;font-size:10px;font-family:var(--mono);color:var(--t3);white-space:pre-wrap;max-height:300px;overflow-y:auto;word-break:break-all"></div>
-  ` : ''}
+  <div style="padding-bottom:16px"></div>
 
-  <!-- ── OPTIMIZE BUTTON ────────────────────────────────────────────── -->
-  <div style="margin-top:16px;padding-bottom:8px">
-    ${S.geoFailed && S.geoFailed.length > 0 ? `
-    <div style="background:rgba(255,68,85,.1);border:1.5px solid #FF4455;border-radius:var(--rs);padding:12px 14px;font-size:14px;color:#FF8899;text-align:center;margin-bottom:10px;font-weight:600">
-      &#9888; ${t('resolve_first').replace('{n}',S.geoFailed.length).replace('{es}',S.geoFailed.length>1?'es':'')}
-    </div>
-    <button class="btn bp" disabled style="opacity:.4;cursor:not-allowed;font-size:17px;padding:17px">
-      &#9889; Optimize route &mdash; resolve addresses first</button>` : `
-    <button class="btn bp" id="optBtn" ${!cnt ? 'disabled' : ''} style="font-size:17px;padding:17px">
-      ${t('optimize_btn')}${cnt ? ' &mdash; ' + cnt + ' stop' + (cnt > 1 ? 's' : '') : ''}</button>`}
-  </div>
 </div>`;}
 
 function sRow(s, i) {
@@ -2741,49 +2795,71 @@ function vResult() {
   const sv = S.savings;
   return `
 <div class="hdr">
-  <div class="hbrand"><img src="${window._LOGO_}" style="height:50px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"><div style="font-size:9px;letter-spacing:3px;color:var(--t3);text-transform:uppercase;font-family:sans-serif;margin-left:8px;align-self:center">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.5">v2026.06.09k</span></div>
+  <div class="hbrand">
+    <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.06.09k</span></div>
   </div>
-  <div class="hbtns" style="gap:8px"><button class="zoom-btn ${S.routeZoom > 0 ? 'active' : ''}" id="zoomBtn" title="${t('zoom_title')||'Increase text size'}" aria-label="${t('zoom_title')||'Increase text size'}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg><span style="margin-left:4px;font-size:13px;font-weight:700;line-height:1">${S.routeZoom === 0 ? '' : S.routeZoom === 1 ? '+' : '++'}</span></button><button style="background:var(--surf);border:2px solid var(--t2);border-radius:10px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;background:var(--surf)" id="bkBtn">&#8592; ${t('edit_btn')||'Edit'}</button></div>
+  <div class="hbtns" style="gap:8px">
+    <button class="zoom-btn ${S.routeZoom > 0 ? 'active' : ''}" id="zoomBtn" title="${t('zoom_title')||'Increase text size'}" aria-label="${t('zoom_title')||'Increase text size'}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+      ${S.routeZoom > 0 ? `<span style="margin-left:3px;font-size:12px;font-weight:700">${S.routeZoom === 1 ? '+' : '++'}</span>` : ''}
+    </button>
+    <button id="bkBtn" style="background:transparent;border:1px solid var(--brd);border-radius:var(--rs);padding:0 12px;height:36px;font-size:14px;font-weight:700;color:var(--t2);cursor:pointer;font-family:var(--sans);display:flex;align-items:center;gap:5px">&#8592; ${t('edit_btn')||'Edit'}</button>
+  </div>
 </div>
-<div class="scr" style="padding-top:6px">
 
-  ${S.tweakMode ? `<div style="background:linear-gradient(135deg, #FF9900 0%, #D97000 100%);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px;box-shadow:0 4px 12px rgba(217,112,0,.3)">
+<div class="scr" style="padding-top:8px">
+
+  ${S.tweakMode ? `
+  <div style="background:var(--acc);border-radius:var(--r);padding:12px 15px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px">
     <div style="flex:1">
-      <div style="font-size:15px;font-weight:800;color:#000;margin-bottom:2px">${t("route_outdated")}</div>
-      <div style="font-size:12px;color:#000;opacity:.85">${t("route_outdated_sub")}</div>
+      <div style="font-size:14px;font-weight:800;color:#000;margin-bottom:2px">${t("route_outdated")}</div>
+      <div style="font-size:12px;color:rgba(0,0,0,.7)">${t("route_outdated_sub")}</div>
     </div>
-    <button id="reoptBtn" style="background:#000;color:#FF9900;border:none;border-radius:8px;padding:11px 18px;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);white-space:nowrap">${t("re_optimize_short")}</button>
+    <button id="reoptBtn" style="background:#000;color:var(--acc);border:none;border-radius:var(--rs);padding:10px 16px;font-size:13px;font-weight:800;cursor:pointer;font-family:var(--sans);white-space:nowrap">${t("re_optimize_short")}</button>
   </div>` : ''}
 
   ${sv ? (S.savingsOpen
-    ? `<div id="savingsBanner">${vSavings(sv)}<button onclick="S.savingsOpen=false;render()" style="display:block;width:100%;margin-top:6px;background:transparent;border:none;color:var(--t3);font-size:12px;cursor:pointer;padding:4px">&#8963; collapse</button></div>`
-    : `<div id="savingsBanner" onclick="S.savingsOpen=true;render()" style="background:var(--surf);border:1.5px solid var(--ok);border-radius:var(--r);padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer">
-        <span style="font-size:14px;font-weight:700;color:var(--ok)">&#10003; Saved ${sv.savedKm}&#8239;${distUnit()} &amp; ~${sv.savedMin}&#8239;min</span>
-        <span style="font-size:11px;color:var(--t3);background:var(--surf2);padding:3px 8px;border-radius:5px">details &#8964;</span>
+    ? `<div id="savingsBanner" style="background:var(--surf);border:1px solid var(--ok);border-radius:16px;padding:16px;margin-bottom:14px">
+        ${vSavings(sv)}
+        <button onclick="S.savingsOpen=false;render()" style="display:block;width:100%;margin-top:8px;background:transparent;border:none;color:var(--t3);font-size:12px;cursor:pointer;padding:4px">&#8963; collapse</button>
+      </div>`
+    : `<div id="savingsBanner" onclick="S.savingsOpen=true;render()" style="display:grid;grid-template-columns:1fr 1fr;background:var(--surf);border-radius:16px;overflow:hidden;margin-bottom:14px;cursor:pointer">
+        <div style="padding:16px;text-align:center;border-right:1px solid var(--brd)">
+          <div style="font-family:var(--sans);font-size:30px;font-weight:900;color:var(--acc);line-height:1">${sv.savedKm} ${distUnit()}</div>
+          <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:5px">distance saved</div>
+        </div>
+        <div style="padding:16px;text-align:center">
+          <div style="font-family:var(--sans);font-size:30px;font-weight:900;color:var(--acc);line-height:1">${sv.savedMin} min</div>
+          <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:5px">time saved &nbsp;&#8964;</div>
+        </div>
       </div>`)
-    : ''}
+  : ''}
 
-  ${S.geoFailed.length ? `<div class="geo-warn">
-    &#9888; ${S.geoFailed.length} address${S.geoFailed.length > 1 ? 'es' : ''} could not be located on the map and ${S.geoFailed.length > 1 ? 'were' : 'was'} placed at the end of the route. Check spelling.
+  ${S.geoFailed.length ? `
+  <div class="geo-warn" style="margin-bottom:10px">
+    &#9888; ${S.geoFailed.length} address${S.geoFailed.length > 1 ? 'es' : ''} could not be located and ${S.geoFailed.length > 1 ? 'were' : 'was'} placed at the end. Check spelling.
   </div>` : ''}
 
+  <button class="btn bp" id="startShiftBtn" style="height:54px;margin-bottom:8px">
+    &#9654; ${t("start_shift_btn")}
+  </button>
+  <div style="text-align:center;font-size:12px;color:var(--t3);margin-bottom:14px;letter-spacing:.3px">One stop at a time &nbsp;&middot;&nbsp; Auto-nav &nbsp;&middot;&nbsp; Progress saved</div>
 
-
-  <div class="rmeta">
-    <div class="rcnt">${S.optimized.length} stops &mdash; shortest order</div>
-    <div style="display:flex;gap:7px">
-      <button class="rcp" id="cpBtn">Copy all</button>' +
-      '<button class="rcp" id="shareBtn" style="background:rgba(91,168,255,.15);border-color:var(--inf);color:var(--inf)">&#8679; Share</button>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:0 2px">
+    <div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--acc);text-transform:uppercase">${S.optimized.length} stops &mdash; shortest order</div>
+    <div style="display:flex;gap:6px">
+      <button class="rcp" id="cpBtn">Copy</button>
+      <button class="rcp" id="shareBtn" style="color:var(--inf);border-color:rgba(74,158,255,.3)">&#8679; Share</button>
     </div>
   </div>
 
-
-  <div class="card" style="padding:10px 11px">
+  <div style="background:var(--surf);border-radius:16px;padding:10px 11px;margin-bottom:10px">
     <div class="rlist">
       ${S.startAddr ? `<div class="ri" style="border-color:var(--inf);background:var(--inf-d)">
         <div class="ri-l">
           <div class="rn" style="background:var(--inf);font-size:14px">&#9654;</div>
-          <div style="font-size:9px;color:var(--inf);font-weight:700">START</div>
+          <div style="font-size:9px;color:var(--inf);font-weight:700;letter-spacing:1px;font-family:var(--sans)">START</div>
         </div>
         <div class="ri-addr" style="color:var(--inf)">${escH(S.startAddr)}</div>
       </div>` : ''}
@@ -2791,59 +2867,74 @@ function vResult() {
       ${S.home ? `<div class="ri rh">
         <div class="ri-l">
           <div class="rn" style="background:var(--ok);font-size:14px">&#8962;</div>
-          <div style="font-size:9px;color:var(--ok);font-weight:700">HOME</div>
+          <div style="font-size:9px;color:var(--ok);font-weight:700;letter-spacing:1px;font-family:var(--sans)">HOME</div>
         </div>
         <div class="ri-addr">${escH(S.home)}</div>
       </div>` : ''}
     </div>
   </div>
 
-  ${S.errMsg ? `<div style="background:rgba(255,68,85,.08);border:1.5px solid var(--err);border-radius:var(--r);padding:14px 16px;margin-top:8px;margin-bottom:12px">
+  ${S.errMsg ? `<div style="background:var(--err-d);border:1px solid var(--err);border-radius:16px;padding:12px 15px;margin-bottom:10px">
     <div style="font-size:14px;color:var(--err);margin-bottom:10px">${escH(S.errMsg)}</div>
-    <button class="btn bp" id="retryOptBtn" style="background:var(--acc);border-color:var(--acc);color:#000;width:100%;font-size:16px;padding:14px">${t("try_again")}</button>
+    <button class="btn bp" id="retryOptBtn">${t("try_again")}</button>
   </div>` : ''}
 
+  <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+    <div style="background:var(--surf);border-radius:16px;overflow:hidden">
+      <div onclick="var p=document.getElementById('mapsC');var a=document.getElementById('mapsA');p.style.display=p.style.display==='none'?'block':'none';a.textContent=p.style.display==='none'?'+':'-';"
+        style="cursor:pointer;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">&#128506;</span>
+          <span style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--t1)">Google Maps</span>
+        </div>
+        <span id="mapsA" style="font-family:var(--sans);font-size:20px;color:var(--acc);font-weight:700">+</span>
+      </div>
+      <div id="mapsC" style="display:none;padding:0 16px 14px">
+        ${(function(){
+          var chunks = totalChunks();
+          var CHUNK = 5;
+          var out = '';
+          if (chunks > 1) {
+            out += '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;line-height:1.5">Split into ' + chunks + ' parts to prevent crashes on low-RAM phones.</div>';
+            for (var ci = 0; ci < chunks; ci++) {
+              var start = ci * CHUNK + 1;
+              var end = Math.min((ci+1)*CHUNK, S.optimized.length);
+              var isLast = (ci+1)*CHUNK >= S.optimized.length;
+              out += '<a class="bmaps" href="' + gMapsURL(ci) + '" target="_blank" rel="noreferrer" data-chunk="'+ci+'" style="display:block;margin-bottom:6px;font-size:14px;padding:12px 16px;border-radius:10px">Part '+(ci+1)+': stops '+start+'\u2013'+end+(isLast&&S.home?' \u2192 Home':'') + '</a>';
+            }
+          } else {
+            out += '<a class="bmaps" href="' + gMapsURL(0) + '" target="_blank" rel="noreferrer" data-chunk="0" style="border-radius:10px">${t("open_google_maps")}</a>';
+          }
+          return out;
+        })()}
+      </div>
+    </div>
 
-  <div style="margin-top:13px;display:flex;flex-direction:column;gap:8px;padding-bottom:8px">
-    <button class="btn bp" id="startShiftBtn" style="font-size:18px;padding:18px;background:#FFFFFF;color:#0a7a3e;border:2px solid #22CC88;letter-spacing:0.5px">${t("start_shift_btn")}</button>
-    ${(function(){
-      var chunks = totalChunks();
-      var CHUNK = 5; // smaller chunks = less RAM usage on older phones
-      var out = '';
-      out += '<div style="background:var(--surf);border:1.5px solid var(--brd);border-radius:var(--r)">';
-      out += '<div class="ct" onclick="var p=document.getElementById(\'mapsC\');var a=document.getElementById(\'mapsA\');p.style.display=p.style.display===\'none\'?\'block\':\'none\';a.textContent=p.style.display===\'none\'?\'+\':\'-\';" style="cursor:pointer;padding:13px 15px;display:flex;justify-content:space-between;align-items:center">Google Maps <span id="mapsA" style="font-size:18px;color:var(--acc);font-weight:700">+</span></div>';
-      out += '<div id="mapsC" style="display:none;padding:0 15px 13px">';
-      if (chunks > 1) {
-        out += '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;line-height:1.5">Split into ' + chunks + ' parts (~5 stops each) to prevent crashes on low-RAM phones.</div>';
-        for (var ci = 0; ci < chunks; ci++) {
-          var start = ci * CHUNK + 1;
-          var end = Math.min((ci+1)*CHUNK, S.optimized.length);
-          var isLast = (ci+1)*CHUNK >= S.optimized.length;
-          out += '<a class="bmaps" href="' + gMapsURL(ci) + '" target="_blank" rel="noreferrer" data-chunk="'+ci+'" style="display:block;margin-bottom:6px;font-size:14px;padding:12px 16px">Part '+(ci+1)+': stops '+start+'-'+end+(isLast&&S.home?' &rarr; Home':'')+'</a>';
-        }
-      } else {
-        out += '<a class="bmaps" href="' + gMapsURL(0) + '" target="_blank" rel="noreferrer" data-chunk="0">${t("open_google_maps")}</a>';
-      }
-      out += '</div>'; // inner content
-      out += '</div>'; // outer card
-      out += '<div style="background:var(--surf);border:1.5px solid var(--brd);border-radius:var(--r)">';
-      out += '<div class="ct" onclick="var p=document.getElementById(\'wazeC\');var a=document.getElementById(\'wazeA\');p.style.display=p.style.display===\'none\'?\'block\':\'none\';a.textContent=p.style.display===\'none\'?\'+\':\'-\';" style="cursor:pointer;padding:13px 15px;display:flex;justify-content:space-between;align-items:center">' + t('waze_stop_by_stop') + ' <span id="wazeA" style="font-size:18px;color:var(--acc);font-weight:700">+</span></div>';
-      out += '<div id="wazeC" style="display:none;padding:0 15px 13px">';
-      out += '<div style="font-size:12px;color:var(--t3);margin-bottom:10px;line-height:1.5">' + t('one_stop_low_mem') + '</div>';
-      out += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
-      S.optimized.forEach(function(s,i) {
-        var wu = 'https://waze.com/ul?q=' + encodeURIComponent(s.address) + '&navigate=yes';
-        out += '<a href="'+wu+'" target="_blank" rel="noreferrer" data-stop="'+(i+1)+'" style="display:inline-flex;align-items:center;gap:5px;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:6px;padding:7px 12px;font-size:14px;font-family:var(--sans);font-weight:700;color:var(--t1);text-decoration:none"><span style=\"color:var(--acc)\">'+(i+1)+'</span>&nbsp;Waze</a>';
-      });
-      out += '</div>'; // inner content
-      out += '</div>'; // outer card
-      return out;
-    })()}
+    <div style="background:var(--surf);border-radius:16px;overflow:hidden">
+      <div onclick="var p=document.getElementById('wazeC');var a=document.getElementById('wazeA');p.style.display=p.style.display==='none'?'block':'none';a.textContent=p.style.display==='none'?'+':'-';"
+        style="cursor:pointer;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:18px">&#9664;</span>
+          <span style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--t1)">${t('waze_stop_by_stop')}</span>
+        </div>
+        <span id="wazeA" style="font-family:var(--sans);font-size:20px;color:var(--acc);font-weight:700">+</span>
+      </div>
+      <div id="wazeC" style="display:none;padding:0 16px 14px">
+        <div style="font-size:12px;color:var(--t3);margin-bottom:10px;line-height:1.5">${t('one_stop_low_mem')}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          ${S.optimized.map(function(s,i){
+            var wu2 = 'https://waze.com/ul?q=' + encodeURIComponent(s.address) + '&navigate=yes';
+            return '<a href="'+wu2+'" target="_blank" rel="noreferrer" data-stop="'+(i+1)+'" style="display:inline-flex;align-items:center;gap:5px;background:var(--surf2);border:1px solid var(--brd2);border-radius:8px;padding:8px 12px;font-size:13px;font-family:var(--sans);font-weight:700;color:var(--t1);text-decoration:none"><span style=\'color:var(--acc)\'>' + (i+1) + '</span> Waze</a>';
+          }).join('')}
+        </div>
+      </div>
+    </div>
+
     <hr class="dv">
-    <button class="btn bg" id="newShiftBtn" style="background:#FFFFFF;border:1.5px solid #FF4455;color:#CC0000;font-size:15px;padding:13px 16px">${t("new_shift_clear")}</button>
+    <button class="btn bg" id="newShiftBtn" style="font-size:14px;padding:12px 16px;color:var(--err);border-color:rgba(255,68,85,.25);border-radius:10px">${t("new_shift_clear")}</button>
   </div>
-</div>`;
-}
+
+</div>`;}
 
 function vCompanion() {
   var stops = S.optimized.filter(function(s){ return !s.geoFailed; });
