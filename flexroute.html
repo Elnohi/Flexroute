@@ -646,10 +646,6 @@ if ('serviceWorker' in navigator) {
       </div>
     </div>
 
-    <div class="fr-tip">
-      <strong>💡 Tip:</strong> Set your home/start address in Settings (⚙️) for the most accurate routes. Your data never leaves your device.
-    </div>
-
     <div class="fr-cta">
       <button class="fr-btn fr-btn-primary" id="fr-start">Got it — let's go</button>
       <label class="fr-check"><input type="checkbox" id="fr-dont-show"> Don't show this again</label>
@@ -2713,6 +2709,53 @@ function vInput() {
   <div style="padding-bottom:16px"></div>
 
 </div>`;}
+
+function sRow(s, i) {
+  const isL = S.lastId === s.id;
+  const hn  = s.flexNum != null;
+  const pc  = s.pkgCount || 1;
+
+  // Failed stop on INPUT screen — show prominently with inline edit
+  if (s.geoFailed) {
+    return `<div class="si" style="border-color:#FF4455;background:rgba(255,68,85,.07);animation:failPulse 2s ease-in-out 3">
+  <div class="fn" style="background:#FF4455;color:#fff;font-size:14px">&#9888;</div>
+  <div class="sb" style="flex:1">
+    <div class="ri-failed-badge" style="margin-bottom:6px">&#9888; ADDRESS NOT FOUND</div>
+    <div class="sa" style="color:#FF8899;text-decoration:line-through;font-size:14px;margin-bottom:8px">${escH(s.address)}</div>
+    <div class="si-wrap" style="position:relative;margin-bottom:7px">
+      <input class="si-fix-input" id="fix-${s.id}"
+        placeholder="Type corrected address..."
+        value="${escH(normalizeAddress(s.address))}"
+        autocomplete="off" spellcheck="false"
+        style="width:100%;background:var(--surf);border:1.5px solid #FF4455;border-radius:var(--rs);color:var(--t1);padding:10px 12px;font-size:15px;font-family:var(--body);outline:none"/>
+    </div>
+    <div style="display:flex;gap:7px">
+      <button class="ri-edit-retry" data-fix="${s.id}">&#9889; Apply correction</button>
+      <button class="ri-edit-skip" data-del="${s.id}">&#10005; Remove</button>
+    </div>
+  </div>
+</div>`;
+  }
+
+  // Normal stop
+  return `<div class="si ${isL ? 'islast' : ''}" style="${!hn ? 'border-style:dashed;' : ''}">
+  <div class="fn ${hn ? '' : 'nnum'}" title="${hn ? 'Flex pkg #' + s.flexNum : 'Manually added'}">${hn ? s.flexNum : '+'}</div>
+  <div class="sb">
+    <div class="sa">${escH(s.address)}</div>
+    <div class="sm">
+      ${hn ? `Flex stop #${s.flexNum}` : 'Manually added'}
+      ${pc > 1 ? `&nbsp;<span style="background:rgba(255,153,0,.18);border:1px solid var(--acc);color:var(--acc);font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;font-family:var(--sans)">&#128230; ${pc} pkgs</span>` : ''}
+    </div>
+  </div>
+  <div class="sbtns">
+    ${i > 0 ? `<button class="sbtn" data-up="${s.id}">&#8593;</button>` : ''}
+    ${i < S.stops.length - 1 ? `<button class="sbtn" data-dn="${s.id}">&#8595;</button>` : ''}
+    <button class="sbtn ${isL ? 'lon' : ''}" data-last="${s.id}" title="Mark as last stop">&#9873;</button>
+    <button class="sbtn del" data-del="${s.id}" title="Remove">&#10005;</button>
+  </div>
+  ${isL ? `<div class="lbdg">LAST</div>` : ''}
+</div>`;
+}
 
 function vOptimizing() {
   const steps = [
