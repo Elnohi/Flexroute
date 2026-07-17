@@ -2603,13 +2603,14 @@ function vInput() {
       </div>
     </div>
 
-    <!-- Step 1: Scan — shown here when setup done, greyed when not -->
-    <div ${setupDone ? `onclick="document.getElementById('dz').click()"` : ''} style="padding:16px 18px;border-bottom:1px solid var(--brd);display:flex;align-items:flex-start;gap:14px;${setupDone ? 'cursor:pointer;' : 'opacity:.45;'}">
-      <div style="width:28px;height:28px;border-radius:50%;background:${setupDone && cnt ? 'var(--ok)' : setupDone ? 'var(--acc)' : 'var(--surf2)'};${!setupDone ? 'border:2px solid var(--brd2);' : ''}color:${setupDone ? '#000' : 'var(--t3)'};font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${setupDone && cnt ? '&#10003;' : '1'}</div>
+    <!-- Step 1: Scan — always tappable -->
+    <div onclick="document.getElementById('dz').click()" style="padding:16px 18px;border-bottom:1px solid var(--brd);display:flex;align-items:flex-start;gap:14px;cursor:pointer;-webkit-tap-highlight-color:transparent">
+      <div style="width:28px;height:28px;border-radius:50%;background:${cnt ? 'var(--ok)' : 'var(--acc)'};color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${cnt ? '&#10003;' : '1'}</div>
       <div>
-        <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:${setupDone ? 'var(--t1)' : 'var(--t3)'};margin-bottom:3px">${cnt ? `Screenshot scanned &mdash; ${cnt} stops` : 'Screenshot your stop list'}</div>
-        <div style="font-size:12px;color:var(--t3)">${cnt ? `${S.stops.filter(s=>s.flexNum!=null).length} from screenshot &middot; ${S.stops.filter(s=>s.flexNum==null).length} manual` : setupDone ? 'Upload from your phone gallery' : 'Complete setup above first'}</div>
+        <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--t1);margin-bottom:3px">${cnt ? `Screenshot scanned &mdash; ${cnt} stops` : 'Screenshot your stop list'}</div>
+        <div style="font-size:12px;color:var(--t3)">${cnt ? `${S.stops.filter(s=>s.flexNum!=null).length} from screenshot &middot; ${S.stops.filter(s=>s.flexNum==null).length} manual` : 'Upload from your phone gallery'}</div>
       </div>
+      ${cnt ? `<span style="margin-left:auto;font-size:18px;color:var(--ok);flex-shrink:0">&#10003;</span>` : ''}
     </div>
 
     <!-- Step 3: Shift Mode -->
@@ -2622,10 +2623,9 @@ function vInput() {
     </div>
   </div>
 
-  <!-- ── SCAN drop zone — shown below steps when setup done ── -->
-  ${setupDone ? `
+  <!-- ── SCAN drop zone — always visible ── -->
   ${typeof Tesseract === 'undefined' ? `<div style="background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--t2);line-height:1.5;text-align:center">&#9888; Scanning works at <a href="https://flexrouteapp.com" target="_blank" style="color:var(--acc);font-weight:600">flexrouteapp.com</a></div>` : ''}
-  <label class="dz ${sc ? 'scanning' : ''}" id="dz" style="margin-bottom:14px">
+  <label class="dz ${sc ? 'scanning' : ''}" id="dz" style="margin-bottom:14px;${!setupDone ? 'opacity:.55;' : ''}">
     <input type="file" id="fi" accept="image/*,application/pdf" multiple style="position:absolute;width:0;height:0;opacity:0;pointer-events:none">
     ${sc ? `
       <div style="font-size:24px;margin-bottom:8px">&#8987;</div>
@@ -2634,10 +2634,10 @@ function vInput() {
     ` : `
       <div style="font-size:28px;margin-bottom:8px">&#128247;</div>
       <div style="font-family:var(--sans);font-size:17px;font-weight:700;color:var(--t1);letter-spacing:.2px">${t('scan_tap')}</div>
-      <div style="font-size:13px;color:var(--t3);margin-top:4px">${t('scan_sub')}</div>
-      ${/Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent) ? `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">&#9888; Open in Safari or Chrome</div>` : `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">${t('scan_tip')}</div>`}
+      <div style="font-size:13px;color:var(--t3);margin-top:4px">${!setupDone ? 'Complete setup above first, then scan' : t('scan_sub')}</div>
+      ${!setupDone ? '' : /Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent) ? `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">&#9888; Open in Safari or Chrome</div>` : `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">${t('scan_tip')}</div>`}
     `}
-  </label>` : ''}
+  </label>
 
   <!-- ── STOPS LIST (when stops exist) ── -->
   ${cnt ? `
