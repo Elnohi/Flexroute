@@ -20,6 +20,19 @@
 //   if (!isAuthorizedOrigin(event)) {
 //     return { statusCode: 403, headers: cors, body: JSON.stringify({ error: 'Forbidden', code: 'BAD_ORIGIN' }) };
 //   }
+//
+// ── Developer bypass ─────────────────────────────────────────────────────────
+// To review/test the app on melodious-strudel without touching the origin
+// whitelist, set the Netlify env var DEV_BYPASS_KEY to any secret string.
+// The app reads ?devkey=<value> from the URL, stores it in sessionStorage,
+// and sends it as X-Dev-Key on every fetch call to Netlify functions.
+// _originCheck.js then allows the request if the header matches DEV_BYPASS_KEY.
+//
+// To permanently remove the bypass after production:
+//   1. Delete DEV_BYPASS_KEY from Netlify env vars
+//   2. Delete the <!-- DEV BYPASS --> block from flexroute.html (marked below)
+// The check below is completely inert if DEV_BYPASS_KEY is not set.
+// ─────────────────────────────────────────────────────────────────────────────
 
 const AUTHORIZED_ORIGINS = [
   'flexrouteapp.com',
@@ -27,8 +40,6 @@ const AUTHORIZED_ORIGINS = [
 ];
 
 // Allow localhost / 127.0.0.1 so local development isn't broken.
-// These never appear on the public internet, so allowing them here doesn't
-// weaken protection against a deployed clone on a different real domain.
 const DEV_HOSTS = ['localhost', '127.0.0.1'];
 
 function hostFromHeader(raw) {
@@ -36,7 +47,7 @@ function hostFromHeader(raw) {
   return raw
     .replace(/^https?:\/\//i, '')
     .split('/')[0]
-    .split(':')[0] // strip port, e.g. localhost:8888
+    .split(':')[0]
     .toLowerCase();
 }
 
@@ -46,27 +57,31 @@ function isAuthorizedHost(host) {
   return AUTHORIZED_ORIGINS.some(a => host === a || host.endsWith('.' + a));
 }
 
-// Checks the Origin header first (sent by browsers on fetch/XHR cross-origin
-// and same-origin POSTs), falling back to Referer (some browser/proxy
-// configurations omit Origin on same-origin requests but keep Referer).
-// Headers can be spoofed by a non-browser client (curl, server-to-server),
-// so this is a deterrent against casual clone reuse and direct hot-linking
-// from a browser — not a cryptographic guarantee. Combined with verify.js
-// and normal API-key/quota limits, it raises the cost of abuse meaningfully
-// without adding user-facing friction (no key, no login, no extra request).
-function isAuthorizedOrigin(event) {
+// Dev bypass — checks X-Dev-Key header against DEV_BYPASS_KEY env var.
+// Returns true only if both sides are non-empty and match exactly.
+// Completely inert when DEV_BYPASS_KEY env var is not set.
+function isDevBypass(event) {
+  const envKey = process.env.DEV_BYPASS_KEY;
+  if (!envKey) return false;
   const headers = event.headers || {};
-  const origin = hostFromHeader(headers.origin || headers.Origin);
-  const referer = hostFromHeader(headers.referer || headers.Referer);
+  const sentKey = headers['x-dev-key'] || headers['X-Dev-Key'] || '';
+  return sentKey.length > 0 && sentKey === envKey;
+}
+
+function isAuthorizedOrigin(event) {
+  if (isDevBypass(event)) return true;
+  const headers = event.headers || {};
+  const origin  = hostFromHeader(headers.origin  || headers.Origin);
+  const referer  = hostFromHeader(headers.referer || headers.Referer);
   return isAuthorizedHost(origin) || isAuthorizedHost(referer);
 }
 
 function logRejected(fnName, event) {
   console.warn('[FlexRoute] Rejected origin for ' + fnName + ':', {
-    origin: event.headers && (event.headers.origin || event.headers.Origin) || '',
+    origin:  event.headers && (event.headers.origin  || event.headers.Origin)  || '',
     referer: event.headers && (event.headers.referer || event.headers.Referer) || '',
-    ip: event.headers && event.headers['x-forwarded-for'] || 'unknown',
-    time: new Date().toISOString()
+    ip:      event.headers && event.headers['x-forwarded-for'] || 'unknown',
+    time:    new Date().toISOString()
   });
 }
 
