@@ -542,6 +542,21 @@ if ('serviceWorker' in navigator) {
 <style>
 .offline-bar{display:none;position:fixed;bottom:0;left:0;right:0;background:#FF4455;color:#fff;text-align:center;padding:9px;font-size:13px;font-weight:600;z-index:9999;letter-spacing:.5px}
 .offline-bar.show{display:block}
+/* Map preview */
+#routeMap{width:100%;height:280px;border-radius:16px;overflow:hidden;position:relative;background:var(--surf2);z-index:0}
+.map-nav-popup{position:absolute;z-index:1000;background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 12px;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:auto}
+.map-nav-popup-title{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--acc);text-transform:uppercase;margin-bottom:6px}
+.map-nav-popup-addr{font-size:13px;color:var(--t1);margin-bottom:10px;line-height:1.4;word-break:break-word}
+.map-nav-popup-btns{display:flex;gap:6px}
+.map-nav-btn-waze{flex:1;background:#06D6A0;color:#000;border:none;border-radius:8px;padding:9px;font-family:var(--sans);font-size:13px;font-weight:800;cursor:pointer;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:4px}
+.map-nav-btn-maps{flex:1;background:#4285F4;color:#fff;border:none;border-radius:8px;padding:9px;font-family:var(--sans);font-size:13px;font-weight:800;cursor:pointer;text-align:center;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:4px}
+.map-nav-popup-close{position:absolute;top:8px;right:10px;background:transparent;border:none;color:var(--t3);font-size:16px;cursor:pointer;line-height:1;padding:2px}
+.map-toggle-btn{width:100%;display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:var(--surf);border-radius:16px;border:none;cursor:pointer;font-family:var(--sans);font-size:15px;font-weight:700;color:var(--t1);margin-bottom:8px}
+/* Override Leaflet popup to match dark theme */
+.leaflet-popup-content-wrapper{background:var(--surf,#13131E);border:1px solid var(--brd,#2A2A40);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.6);padding:0;color:var(--t1,#fff)}
+.leaflet-popup-content{margin:0;padding:0}
+.leaflet-popup-tip-container{display:none}
+.leaflet-container{font-family:inherit}
 </style>
 </head>
 <body>
@@ -733,7 +748,8 @@ const S = {
   legacyFree:   localStorage.getItem('fr_legacy_free') === '1',
   // Number of free optimized routes used so far (trial = 3 routes, per
   // updated plan — was 1, increased to 3).
-  trialRoutesUsed: parseInt(localStorage.getItem('fr_trial_routes_used') || '0', 10)
+  trialRoutesUsed: parseInt(localStorage.getItem('fr_trial_routes_used') || '0', 10),
+  _mapOpen: false  // map preview collapsed by default
 };
 const mkId = () => `s${++S.uid}`;
 
@@ -2035,6 +2051,7 @@ function render() {
   if (S.phase === 'auth') bindAuth();
   if (S.phase === 'paywall') bindPaywall();
   if (S.phase === 'result') bindGestures();
+  if (S.phase === 'result') bindMap();
   // Apply route view zoom class only on result phase
   document.body.classList.remove('rzoom-1', 'rzoom-2');
   if (S.phase === 'result' && S.routeZoom > 0) {
@@ -2841,6 +2858,19 @@ function vResult() {
     &#9888; ${S.geoFailed.length} address${S.geoFailed.length > 1 ? 'es' : ''} could not be located and ${S.geoFailed.length > 1 ? 'were' : 'was'} placed at the end. Check spelling.
   </div>` : ''}
 
+  <!-- ── MAP PREVIEW ── Collapsible, Leaflet/OpenStreetMap, no API key ── -->
+  <button class="map-toggle-btn" id="mapToggleBtn" onclick="toggleRouteMap()">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:18px">&#128506;</span>
+      <span>Route map preview</span>
+    </div>
+    <span id="mapToggleIcon" style="font-size:18px;color:var(--acc);font-weight:700">${S._mapOpen ? '&#8963;' : '+'}</span>
+  </button>
+  <div id="mapWrap" style="margin-bottom:10px;display:${S._mapOpen ? 'block' : 'none'}">
+    <div id="routeMap"></div>
+    <div style="font-size:11px;color:var(--t3);text-align:center;margin-top:6px;font-family:var(--sans);letter-spacing:.5px">TAP A STOP MARKER TO NAVIGATE</div>
+  </div>
+
   <button class="btn bp" id="startShiftBtn" style="height:54px;margin-bottom:8px">
     &#9654; ${t("start_shift_btn")}
   </button>
@@ -3070,6 +3100,205 @@ function markDelivered() {
         : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(nextStop.address);
       window.open(url, '_blank');
       trackEvent('maps_opened', { map_type: 'companion_autonav_' + S.cNavApp });
+    }
+  }
+}
+
+// ─── Route Map Preview (Leaflet / OpenStreetMap) ─────────────────────────────
+// Loaded lazily — Leaflet CSS+JS are injected on first open, not on page load,
+// so drivers who never open the map don't pay the ~42kb download cost.
+
+var _leafletLoaded = false;
+var _mapInstance   = null;  // the current Leaflet map instance
+var _mapPopupEl    = null;  // the custom nav popup DOM element
+
+function toggleRouteMap() {
+  S._mapOpen = !S._mapOpen;
+  var wrap = document.getElementById('mapWrap');
+  var icon = document.getElementById('mapToggleIcon');
+  if (!wrap) return;
+  wrap.style.display = S._mapOpen ? 'block' : 'none';
+  if (icon) icon.innerHTML = S._mapOpen ? '&#8963;' : '+';
+  if (S._mapOpen) {
+    // Destroy any stale map instance left from a previous render
+    if (_mapInstance) { try { _mapInstance.remove(); } catch(e){} _mapInstance = null; }
+    loadLeafletThenInit();
+  }
+}
+
+function loadLeafletThenInit() {
+  if (_leafletLoaded && window.L) { initRouteMap(); return; }
+  // Inject Leaflet CSS
+  if (!document.getElementById('leaflet-css')) {
+    var lc = document.createElement('link');
+    lc.id   = 'leaflet-css';
+    lc.rel  = 'stylesheet';
+    lc.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+    document.head.appendChild(lc);
+  }
+  // Inject Leaflet JS
+  if (!document.getElementById('leaflet-js')) {
+    var ls = document.createElement('script');
+    ls.id  = 'leaflet-js';
+    ls.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    ls.onload = function() { _leafletLoaded = true; initRouteMap(); };
+    ls.onerror = function() {
+      var wrap = document.getElementById('mapWrap');
+      if (wrap) wrap.innerHTML = '<div style="padding:20px;text-align:center;color:var(--t3);font-size:13px">Map unavailable offline</div>';
+    };
+    document.head.appendChild(ls);
+  } else {
+    // Script tag exists but may still be loading — wait
+    document.getElementById('leaflet-js').addEventListener('load', function() {
+      _leafletLoaded = true; initRouteMap();
+    });
+  }
+}
+
+function initRouteMap() {
+  var container = document.getElementById('routeMap');
+  if (!container || !window.L) return;
+
+  // Collect geocoded stops in optimized order (skip failed ones)
+  var stops = S.optimized.filter(function(s) { return s.coords && !s.geoFailed; });
+  if (!stops.length) {
+    container.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--t3);font-size:13px">No geocoded stops to display</div>';
+    return;
+  }
+
+  // Build coordinate arrays
+  var latlngs = stops.map(function(s) { return [s.coords.lat, s.coords.lon]; });
+
+  // Add start point if GPS coords available
+  var startLL = null;
+  if (S.gpsCoords) {
+    startLL = [S.gpsCoords.lat, S.gpsCoords.lon];
+    latlngs = [startLL].concat(latlngs);
+  }
+
+  // Init map — dark tile layer matching app theme
+  _mapInstance = L.map(container, {
+    zoomControl: true,
+    attributionControl: false,
+    tap: true
+  });
+
+  // Dark OSM tile layer — CartoDB Dark Matter, no API key needed
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    subdomains: 'abcd'
+  }).addTo(_mapInstance);
+
+  // Fit map to all stop bounds with padding
+  var bounds = L.latLngBounds(latlngs);
+  _mapInstance.fitBounds(bounds, { padding: [24, 24] });
+
+  // Draw route polyline in orange
+  L.polyline(latlngs, {
+    color: '#FF9900',
+    weight: 3,
+    opacity: 0.85,
+    lineJoin: 'round',
+    dashArray: null
+  }).addTo(_mapInstance);
+
+  // Start marker (if GPS available)
+  if (startLL) {
+    L.marker(startLL, {
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="width:28px;height:28px;border-radius:50%;background:#4A9EFF;border:2px solid #fff;color:#fff;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.5)">&#9654;</div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      })
+    }).addTo(_mapInstance).bindPopup('<b>Start</b><br>' + escH(S.startAddr || 'GPS location'));
+  }
+
+  // Numbered stop markers
+  stops.forEach(function(s, idx) {
+    var dispNum = idx + 1;  // 1-based display number
+    var marker = L.marker([s.coords.lat, s.coords.lon], {
+      icon: L.divIcon({
+        className: '',
+        html: '<div style="width:28px;height:28px;border-radius:50%;background:#FF9900;border:2px solid #fff;color:#000;font-family:\'Barlow Condensed\',sans-serif;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.5)">' + dispNum + '</div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      }),
+      zIndexOffset: 1000 - idx  // earlier stops render on top
+    });
+
+    marker.on('click', function(e) {
+      L.DomEvent.stopPropagation(e);
+      showMapNavPopup(s, dispNum, e.latlng);
+      // Scroll the stop list row into view
+      var row = document.querySelector('[data-ridx="' + idx + '"]');
+      if (row) {
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        row.style.outline = '2px solid #FF9900';
+        setTimeout(function() { row.style.outline = ''; }, 1500);
+      }
+    });
+
+    marker.addTo(_mapInstance);
+  });
+
+  // Home marker (text-geocoded — approximate position from last stop cluster)
+  // We don't have home coords directly, so show a subtle indicator if available
+  // from a previously geocoded home address in the stops (rare but possible)
+
+  // Dismiss popup when tapping the map background
+  _mapInstance.on('click', function() { hideMapNavPopup(); });
+}
+
+function showMapNavPopup(s, num, latlng) {
+  hideMapNavPopup();
+
+  var wazeURL = 'https://waze.com/ul?q=' + encodeURIComponent(s.address) + '&navigate=yes';
+  var mapsURL = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(s.address);
+
+  var el = document.createElement('div');
+  el.className = 'map-nav-popup';
+  el.id = 'mapNavPopup';
+  el.innerHTML =
+    '<button class="map-nav-popup-close" onclick="hideMapNavPopup()">&#10005;</button>' +
+    '<div class="map-nav-popup-title">Stop ' + num + '</div>' +
+    '<div class="map-nav-popup-addr">' + escH(s.address) + '</div>' +
+    '<div class="map-nav-popup-btns">' +
+      '<a href="' + wazeURL + '" target="_blank" class="map-nav-btn-waze" onclick="trackEvent(\'maps_opened\',{map_type:\'map_preview_waze\'})">&#9664; Waze</a>' +
+      '<a href="' + mapsURL + '" target="_blank" class="map-nav-btn-maps" onclick="trackEvent(\'maps_opened\',{map_type:\'map_preview_maps\'})">&#128506; Maps</a>' +
+    '</div>';
+
+  // Position popup as a Leaflet overlay
+  if (_mapInstance) {
+    var popup = L.popup({
+      closeButton: false,
+      className: 'fr-map-popup',
+      offset: [0, -14],
+      autoPan: true,
+      autoPanPadding: [20, 20]
+    })
+    .setLatLng(latlng)
+    .setContent(el)
+    .openOn(_mapInstance);
+    _mapPopupEl = popup;
+  }
+}
+
+function hideMapNavPopup() {
+  if (_mapPopupEl && _mapInstance) {
+    try { _mapInstance.closePopup(_mapPopupEl); } catch(e) {}
+    _mapPopupEl = null;
+  }
+}
+
+function bindMap() {
+  // If map was open before a re-render, reinitialize it
+  if (S._mapOpen && S.phase === 'result') {
+    if (_mapInstance) { try { _mapInstance.remove(); } catch(e){} _mapInstance = null; }
+    if (_leafletLoaded && window.L) {
+      setTimeout(initRouteMap, 50);  // small delay to let DOM settle after render
+    } else {
+      loadLeafletThenInit();
     }
   }
 }
