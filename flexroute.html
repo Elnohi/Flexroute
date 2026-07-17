@@ -487,6 +487,36 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
 .home-badge{background:rgba(34,217,138,.1);border:1px solid var(--ok);color:var(--ok)}
 .state-card-unset{border-color:var(--acc)}
 </style>
+<!-- ── DEV BYPASS ── Remove this block after production is confirmed ──────────
+     Open the app as: https://melodious-strudel-3bff01.netlify.app/flexroute.html?devkey=YOUR_SECRET
+     where YOUR_SECRET matches the DEV_BYPASS_KEY env var set in Netlify.
+     The key is stored in sessionStorage — closing the tab clears it automatically.
+     To permanently remove: delete this entire block AND the DEV_BYPASS_KEY env var.
+────────────────────────────────────────────────────────────────────────────── -->
+<script>
+(function() {
+  var qs = new URLSearchParams(window.location.search);
+  var dk = qs.get('devkey');
+  if (dk) {
+    sessionStorage.setItem('_fr_devkey', dk);
+    // Clean the key from the URL so it doesn't appear in browser history
+    var clean = window.location.pathname;
+    window.history.replaceState({}, '', clean);
+  }
+  var key = sessionStorage.getItem('_fr_devkey');
+  if (!key) return;
+  // Patch window.fetch to inject X-Dev-Key on all /.netlify/functions/ calls
+  var _origFetch = window.fetch;
+  window.fetch = function(url, opts) {
+    if (typeof url === 'string' && url.indexOf('/.netlify/functions/') !== -1) {
+      opts = opts || {};
+      opts.headers = Object.assign({}, opts.headers || {}, { 'X-Dev-Key': key });
+    }
+    return _origFetch.apply(this, arguments);
+  };
+})();
+</script>
+<!-- ── END DEV BYPASS ───────────────────────────────────────────────────────── -->
 <!-- Google Analytics 4 — FlexRoute G-ZCRY2Y3LP7 -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-ZCRY2Y3LP7"></script>
 <script>
@@ -743,9 +773,37 @@ const S = {
   // entitlement: 'unknown' | 'trial_available' | 'trial_used' | 'paid' | 'legacy_free'
   entitlement:      localStorage.getItem('fr_entitlement') || 'unknown',
   entitlementCheckedAt: parseInt(localStorage.getItem('fr_entitlement_checked_at') || '0', 10),
-  // legacyFree: true if this device already had real route history BEFORE
-  // the paywall shipped — grandfathered free.
-  legacyFree:   localStorage.getItem('fr_legacy_free') === '1',
+  // legacyFree: true if this device had real route history BEFORE the paywall
+  // shipped AND the 30-day grandfathering window hasn't expired yet.
+  // fr_legacy_free stores the Unix timestamp (ms) when grandfathering was granted.
+  //
+  // ── LAUNCH DATE ──────────────────────────────────────────────────────────────
+  // Set this to the Unix ms timestamp of the domain swap day before deploying.
+  // e.g. new Date('2026-07-25T00:00:00Z').getTime() → 1753401600000
+  // Leave as 0 until the domain swap — grandfathering won't activate until set.
+  // ─────────────────────────────────────────────────────────────────────────────
+  legacyFree: (function() {
+    var LAUNCH_DATE_MS = 0; // ← SET THIS TO DOMAIN SWAP DATE BEFORE DEPLOYING
+    var THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+    var granted = parseInt(localStorage.getItem('fr_legacy_free') || '0', 10);
+    if (!granted) return false;
+    // Use launch date as the expiry anchor if set, otherwise fall back to
+    // the individual grant timestamp — ensures all legacy users expire at
+    // the same time (30 days after launch) not 30 days after their first visit.
+    var anchor = LAUNCH_DATE_MS > 0 ? LAUNCH_DATE_MS : granted;
+    var expired = (Date.now() - anchor) > THIRTY_DAYS_MS;
+    if (expired) {
+      // Grace period over — downgrade to trial_available so they get the
+      // standard 3 free routes rather than hitting the paywall immediately.
+      // Keeps the fr_legacy_free key intact for analytics / future offers.
+      if (localStorage.getItem('fr_entitlement') === 'legacy_free') {
+        localStorage.setItem('fr_entitlement', 'trial_available');
+        localStorage.setItem('fr_trial_routes_used', '0');
+      }
+      return false;
+    }
+    return true;
+  })(),
   // Number of free optimized routes used so far (trial = 3 routes, per
   // updated plan — was 1, increased to 3).
   trialRoutesUsed: parseInt(localStorage.getItem('fr_trial_routes_used') || '0', 10),
@@ -983,17 +1041,18 @@ window.addEventListener('unhandledrejection', function(e) {
 window.addEventListener('load', () => {
   // ── Grandfathering check (runs once, before paywall logic) ─────────────
   // Anyone who already has evidence of using FlexRoute pre-paywall gets
-  // permanently marked free. Checks several independent, long-lived
-  // localStorage keys (not just the current session, which could have been
-  // cleared) so a returning user doesn't lose grandfathered status just
-  // because they cleared one piece of data. Only ever WRITES the flag once.
-  if (localStorage.getItem('fr_legacy_free') !== '1') {
+  // grandfathered free for 30 days from launch. After that they receive the
+  // standard 3-route trial like any new user. Stores a Unix timestamp (ms)
+  // so the expiry check in S initialization above can enforce the window.
+  // Only ever WRITES the timestamp once — subsequent loads just read it.
+  if (!parseInt(localStorage.getItem('fr_legacy_free') || '0', 10)) {
     var priorUsageSignals = [
       'fr_session', 'fr_nav_app', 'fr_route_zoom', 'fr_imperial', 'fr_sa', 'fr_hm',
     ];
     var hasPriorUsage = priorUsageSignals.some(function(k) { return localStorage.getItem(k) != null; });
     if (hasPriorUsage) {
-      localStorage.setItem('fr_legacy_free', '1');
+      var grantedAt = Date.now();
+      localStorage.setItem('fr_legacy_free', String(grantedAt));
       S.legacyFree = true;
       S.entitlement = 'legacy_free';
       localStorage.setItem('fr_entitlement', 'legacy_free');
