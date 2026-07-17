@@ -2521,7 +2521,7 @@ function vInput() {
     <div class="ios-toast-close">&#10005;</div>
   </div>` : ''}
 
-  <!-- ── HERO: tag + headline ── matches screenshot exactly ── -->
+  <!-- ── HERO: tag + headline ── -->
   <div style="padding:0 2px;margin-bottom:20px">
     <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
       <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
@@ -2531,72 +2531,23 @@ function vInput() {
     <div style="font-size:14px;color:var(--t2);line-height:1.55">Screenshot your stop list. Get the shortest route in 60 seconds.</div>
   </div>
 
-  <!-- ── SCAN ── Full-width, prominent ── -->
-  ${typeof Tesseract === 'undefined' ? `
-  <div style="background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--t2);line-height:1.5;text-align:center">
-    &#9888; Scanning works at <a href="https://flexrouteapp.com" target="_blank" style="color:var(--acc);font-weight:600">flexrouteapp.com</a>
-  </div>` : ''}
-  <label class="dz ${sc ? 'scanning' : ''}" id="dz">
-    <input type="file" id="fi" accept="image/*,application/pdf" multiple style="position:absolute;width:0;height:0;opacity:0;pointer-events:none">
-    ${sc ? `
-      <div style="font-size:24px;margin-bottom:8px">&#8987;</div>
-      <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--acc)">${sc.msg}</div>
-      ${sc.total > 1 ? `<div class="pb" style="margin-top:12px"><div class="pf" style="width:${Math.round(sc.done / sc.total * 100)}%"></div></div><div class="pl" style="margin-top:5px">${sc.done} of ${sc.total} images scanned</div>` : ''}
-    ` : `
-      <div style="font-size:28px;margin-bottom:8px">&#128247;</div>
-      <div style="font-family:var(--sans);font-size:17px;font-weight:700;color:var(--t1);letter-spacing:.2px">${t('scan_tap')}</div>
-      <div style="font-size:13px;color:var(--t3);margin-top:4px">${t('scan_sub')}</div>
-      ${/Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent) ? `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">&#9888; Open in Safari or Chrome — in-app browsers block scanning</div>` : `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">${t('scan_tip')}</div>`}
-    `}
-  </label>
-
-  <!-- ── MAIN OPTIMIZE BUTTON — matches screenshot exactly ── -->
-  <div style="margin-top:14px">
-    ${S.geoFailed && S.geoFailed.length > 0 ? `
-    <div style="background:var(--err-d);border:1px solid var(--err);border-radius:var(--rs);padding:9px 13px;font-family:var(--sans);font-size:13px;color:var(--err);text-align:center;margin-bottom:10px;font-weight:700;letter-spacing:.5px">
-      &#9888; ${t('resolve_first').replace('{n}',S.geoFailed.length).replace('{es}',S.geoFailed.length>1?'es':'')}
-    </div>
-    <button class="btn bp" disabled style="height:54px">&#9889; Optimize my route</button>` : `
-    <button class="btn bp" id="optBtn" ${!cnt ? 'disabled' : ''} style="height:54px">
-      &#9889; ${cnt ? `${t('optimize_btn')} &mdash; ${cnt} stop${cnt > 1 ? 's' : ''}` : 'Optimize my route'}
-    </button>`}
-    <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px;letter-spacing:.3px">3 free routes &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>
-  </div>
-
-  ${S.errMsg ? `<div style="background:var(--err-d);border:1px solid var(--err);border-radius:10px;padding:12px 15px;margin-top:12px">
-    <div style="font-size:14px;color:var(--err);margin-bottom:10px">${escH(S.errMsg)}</div>
-    <button class="btn bp" id="retryOptBtn">${t("try_again")}</button>
-  </div>` : ''}
-
-  <!-- ── STEPS ── Exactly like screenshot: dark card, numbered circles, dividers ── -->
-  <div style="background:var(--surf);border-radius:16px;overflow:hidden;margin-top:20px">
+  <!-- ── STEPS CARD ── -->
+  <div style="background:var(--surf);border-radius:16px;overflow:hidden;margin-bottom:16px">
     <div style="padding:12px 18px;border-bottom:1px solid var(--brd);font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--t3);text-transform:uppercase">
       3 steps, under 2 minutes
     </div>
 
-    <!-- Step 1: Scan -->
-    <div onclick="document.getElementById('dz').click()" style="padding:16px 18px;border-bottom:1px solid var(--brd);display:flex;align-items:flex-start;gap:14px;cursor:pointer;-webkit-tap-highlight-color:transparent">
-      <div style="width:28px;height:28px;border-radius:50%;background:var(--acc);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</div>
-      <div>
-        <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--t1);margin-bottom:3px">${cnt ? `Screenshot scanned &mdash; ${cnt} stops` : 'Screenshot your stop list'}</div>
-        <div style="font-size:12px;color:var(--t3)">${cnt ? `${S.stops.filter(s=>s.flexNum!=null).length} from screenshot &middot; ${S.stops.filter(s=>s.flexNum==null).length} manual` : 'Upload from your phone gallery'}</div>
-      </div>
-      ${cnt ? `<span style="margin-left:auto;font-size:18px;color:var(--ok);flex-shrink:0">&#10003;</span>` : ''}
-    </div>
-
-    <!-- Step 2: Setup -->
-    <div style="border-bottom:1px solid var(--brd)">
+    <!-- Step 2: Setup — FIRST when not complete, drivers can't miss it -->
+    <div style="border-bottom:1px solid var(--brd);${!setupDone ? 'border-left:3px solid var(--acc);' : ''}">
       <div style="padding:16px 18px;display:flex;align-items:flex-start;gap:14px">
         <div style="width:28px;height:28px;border-radius:50%;background:${setupDone ? 'var(--ok)' : 'var(--acc)'};color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${setupDone ? '&#10003;' : '2'}</div>
         <div style="flex:1;min-width:0">
-          <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--t1);margin-bottom:3px">${setupDone ? 'Route setup complete' : 'Set up your route'}</div>
-          <div style="font-size:12px;color:var(--t3)">${setupDone ? `${escH(S.userState)} &middot; ${escH(S.startAddr||S.gpsAddr||'')} &rarr; Home` : 'Region, depot address, home endpoint'}</div>
+          <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:${setupDone ? 'var(--t1)' : 'var(--acc)'};margin-bottom:3px">${setupDone ? 'Route setup complete' : 'Set up your route first'}</div>
+          <div style="font-size:12px;color:var(--t3)">${setupDone ? `${escH(S.userState)} &middot; ${escH(S.startAddr||S.gpsAddr||'')} &rarr; Home` : 'Required — depot address and home endpoint'}</div>
         </div>
       </div>
-      <!-- Setup fields — always visible, compact row layout -->
       <div style="padding:0 18px 16px">
         <div style="background:var(--surf2);border-radius:10px;overflow:hidden">
-
           <!-- Region -->
           <div style="padding:10px 14px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:10px">
             <span style="font-size:16px;flex-shrink:0">&#127758;</span>
@@ -2607,44 +2558,36 @@ function vInput() {
                 <option value="">${t("select_region_ph")}</option>
                 <optgroup label="Canada"><option value="ON">ON — Ontario</option><option value="BC">BC — British Columbia</option><option value="AB">AB — Alberta</option><option value="QC">QC — Quebec</option><option value="MB">MB — Manitoba</option><option value="SK">SK — Saskatchewan</option><option value="NS">NS — Nova Scotia</option><option value="NB">NB — New Brunswick</option></optgroup>
                 <optgroup label="United States"><option value="AL">AL — Alabama</option><option value="AK">AK — Alaska</option><option value="AZ">AZ — Arizona</option><option value="AR">AR — Arkansas</option><option value="CA">CA — California</option><option value="CO">CO — Colorado</option><option value="CT">CT — Connecticut</option><option value="DE">DE — Delaware</option><option value="FL">FL — Florida</option><option value="GA">GA — Georgia</option><option value="HI">HI — Hawaii</option><option value="ID">ID — Idaho</option><option value="IL">IL — Illinois</option><option value="IN">IN — Indiana</option><option value="IA">IA — Iowa</option><option value="KS">KS — Kansas</option><option value="KY">KY — Kentucky</option><option value="LA">LA — Louisiana</option><option value="ME">ME — Maine</option><option value="MD">MD — Maryland</option><option value="MA">MA — Massachusetts</option><option value="MI">MI — Michigan</option><option value="MN">MN — Minnesota</option><option value="MO">MO — Missouri</option><option value="MT">MT — Montana</option><option value="NE">NE — Nebraska</option><option value="NV">NV — Nevada</option><option value="NH">NH — New Hampshire</option><option value="NJ">NJ — New Jersey</option><option value="NM">NM — New Mexico</option><option value="NY">NY — New York</option><option value="NC">NC — North Carolina</option><option value="ND">ND — North Dakota</option><option value="OH">OH — Ohio</option><option value="OK">OK — Oklahoma</option><option value="OR">OR — Oregon</option><option value="PA">PA — Pennsylvania</option><option value="RI">RI — Rhode Island</option><option value="SC">SC — South Carolina</option><option value="SD">SD — South Dakota</option><option value="TN">TN — Tennessee</option><option value="TX">TX — Texas</option><option value="UT">UT — Utah</option><option value="VT">VT — Vermont</option><option value="VA">VA — Virginia</option><option value="WA">WA — Washington</option><option value="WV">WV — West Virginia</option><option value="WI">WI — Wisconsin</option><option value="WY">WY — Wyoming</option></optgroup>
-                <optgroup label="Europe &amp; Rest of World"><option value="GB">🇬🇧 United Kingdom</option><option value="DE">🇩🇪 Germany</option><option value="FR">🇫🇷 France</option><option value="ES">🇪🇸 Spain</option><option value="IT">🇮🇹 Italy</option><option value="NL">🇳🇱 Netherlands</option><option value="BE">🇧🇪 Belgium</option><option value="SE">🇸🇪 Sweden</option><option value="PL">🇵🇱 Poland</option><option value="AU">🇦🇺 Australia</option><option value="JP">🇯🇵 Japan</option><option value="IND">🇮🇳 India</option><option value="MX">🇲🇽 Mexico</option><option value="BR">🇧🇷 Brazil</option><option value="SG">🇸🇬 Singapore</option></optgroup>
+                <optgroup label="Europe &amp; Rest of World"><option value="GB">&#127468;&#127463; United Kingdom</option><option value="DE">&#127465;&#127466; Germany</option><option value="FR">&#127467;&#127479; France</option><option value="ES">&#127466;&#127480; Spain</option><option value="IT">&#127470;&#127481; Italy</option><option value="NL">&#127475;&#127473; Netherlands</option><option value="BE">&#127463;&#127466; Belgium</option><option value="SE">&#127480;&#127466; Sweden</option><option value="PL">&#127477;&#127473; Poland</option><option value="AU">&#127462;&#127482; Australia</option><option value="JP">&#127471;&#127477; Japan</option><option value="IND">&#127470;&#127475; India</option><option value="MX">&#127474;&#127485; Mexico</option><option value="BR">&#127463;&#127479; Brazil</option><option value="SG">&#127480;&#127468; Singapore</option></optgroup>
               </select>`}
             </div>
             ${S.userState ? `<button id="changeStateBtn" style="background:transparent;border:1px solid var(--brd);border-radius:6px;color:var(--t3);font-size:11px;cursor:pointer;padding:4px 10px;font-family:var(--sans);white-space:nowrap;flex-shrink:0">Change</button>` : ''}
           </div>
-
           <!-- Start -->
           <div style="padding:10px 14px;border-bottom:1px solid var(--brd)">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:${S.gpsCoords || S.startAddr ? '0' : '8px'}">
               <span style="font-size:16px;flex-shrink:0">&#128204;</span>
               <div style="flex:1;min-width:0">
-                <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Start — warehouse</div>
-                ${S.gpsCoords
-                  ? `<div style="font-size:13px;font-weight:500;color:var(--ok)">&#10003; GPS: ${escH(S.gpsAddr)}</div>`
-                  : S.startAddr
-                    ? `<div style="font-size:13px;font-weight:500;color:var(--t1)">${escH(S.startAddr)}</div>`
-                    : `<div style="font-size:12px;color:var(--t3)">Not set — tap to add</div>`}
+                <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Start — warehouse / depot</div>
+                ${S.gpsCoords ? `<div style="font-size:13px;font-weight:500;color:var(--ok)">&#10003; GPS: ${escH(S.gpsAddr)}</div>` : S.startAddr ? `<div style="font-size:13px;font-weight:500;color:var(--t1)">${escH(S.startAddr)}</div>` : `<div style="font-size:13px;color:var(--acc);font-weight:600">Not set — enter below</div>`}
               </div>
               ${S.gpsCoords ? `<button class="btn" id="gpsBtn" style="border:1px solid var(--ok);color:var(--ok);padding:4px 10px;font-size:11px;background:transparent;white-space:nowrap;flex-shrink:0;border-radius:6px">Change</button>` : S.startAddr ? `<button id="clearStartBtn" style="background:transparent;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>` : ''}
             </div>
             ${!S.gpsCoords && !S.startAddr ? `
-              <button class="gps-btn-big" id="gpsBtn" style="margin-top:6px;margin-bottom:6px;padding:10px;font-size:13px">&#128204; Use GPS to detect location</button>
+              <button class="gps-btn-big" id="gpsBtn" style="margin-bottom:6px;padding:10px;font-size:13px">&#128204; Use GPS to detect location</button>
               <div style="position:relative"><input type="text" id="startInput" placeholder="or type depot/warehouse address" value="" class="setup-input" style="font-size:13px;padding:9px 12px"/></div>
             ` : !S.gpsCoords ? `
               <div style="position:relative;margin-top:6px"><input type="text" id="startInput" placeholder="Depot/warehouse address" value="${escH(S.startAddr || '')}" class="setup-input" style="font-size:13px;padding:9px 12px"/></div>
               <div style="font-size:11px;color:var(--ok);margin-top:4px">&#10003; Saved &mdash; edit above or tap &#10005; to clear</div>
             ` : ''}
           </div>
-
           <!-- Home -->
           <div style="padding:10px 14px">
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:${S.home ? '0' : '8px'}">
               <span style="font-size:16px;flex-shrink:0">&#127968;</span>
               <div style="flex:1;min-width:0">
                 <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Home — end of route</div>
-                ${S.home
-                  ? `<div style="font-size:13px;font-weight:500;color:var(--t1)">${escH(S.home)}</div>`
-                  : `<div style="font-size:12px;color:var(--t3)">Not set — route won't end near home</div>`}
+                ${S.home ? `<div style="font-size:13px;font-weight:500;color:var(--t1)">${escH(S.home)}</div>` : `<div style="font-size:13px;color:var(--acc);font-weight:600">Not set — enter below</div>`}
               </div>
               ${S.home ? `<button id="clearHomeBtn" style="background:transparent;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>` : ''}
             </div>
@@ -2656,8 +2599,16 @@ function vInput() {
               <div style="font-size:11px;color:var(--ok);margin-top:4px">&#10003; Saved &mdash; edit above or tap &#10005; to clear</div>
             `}
           </div>
-
         </div>
+      </div>
+    </div>
+
+    <!-- Step 1: Scan — shown here when setup done, greyed when not -->
+    <div ${setupDone ? `onclick="document.getElementById('dz').click()"` : ''} style="padding:16px 18px;border-bottom:1px solid var(--brd);display:flex;align-items:flex-start;gap:14px;${setupDone ? 'cursor:pointer;' : 'opacity:.45;'}">
+      <div style="width:28px;height:28px;border-radius:50%;background:${setupDone && cnt ? 'var(--ok)' : setupDone ? 'var(--acc)' : 'var(--surf2)'};${!setupDone ? 'border:2px solid var(--brd2);' : ''}color:${setupDone ? '#000' : 'var(--t3)'};font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${setupDone && cnt ? '&#10003;' : '1'}</div>
+      <div>
+        <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:${setupDone ? 'var(--t1)' : 'var(--t3)'};margin-bottom:3px">${cnt ? `Screenshot scanned &mdash; ${cnt} stops` : 'Screenshot your stop list'}</div>
+        <div style="font-size:12px;color:var(--t3)">${cnt ? `${S.stops.filter(s=>s.flexNum!=null).length} from screenshot &middot; ${S.stops.filter(s=>s.flexNum==null).length} manual` : setupDone ? 'Upload from your phone gallery' : 'Complete setup above first'}</div>
       </div>
     </div>
 
@@ -2671,9 +2622,26 @@ function vInput() {
     </div>
   </div>
 
+  <!-- ── SCAN drop zone — shown below steps when setup done ── -->
+  ${setupDone ? `
+  ${typeof Tesseract === 'undefined' ? `<div style="background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--t2);line-height:1.5;text-align:center">&#9888; Scanning works at <a href="https://flexrouteapp.com" target="_blank" style="color:var(--acc);font-weight:600">flexrouteapp.com</a></div>` : ''}
+  <label class="dz ${sc ? 'scanning' : ''}" id="dz" style="margin-bottom:14px">
+    <input type="file" id="fi" accept="image/*,application/pdf" multiple style="position:absolute;width:0;height:0;opacity:0;pointer-events:none">
+    ${sc ? `
+      <div style="font-size:24px;margin-bottom:8px">&#8987;</div>
+      <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--acc)">${sc.msg}</div>
+      ${sc.total > 1 ? `<div class="pb" style="margin-top:12px"><div class="pf" style="width:${Math.round(sc.done / sc.total * 100)}%"></div></div><div class="pl" style="margin-top:5px">${sc.done} of ${sc.total} images scanned</div>` : ''}
+    ` : `
+      <div style="font-size:28px;margin-bottom:8px">&#128247;</div>
+      <div style="font-family:var(--sans);font-size:17px;font-weight:700;color:var(--t1);letter-spacing:.2px">${t('scan_tap')}</div>
+      <div style="font-size:13px;color:var(--t3);margin-top:4px">${t('scan_sub')}</div>
+      ${/Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent) ? `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">&#9888; Open in Safari or Chrome</div>` : `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">${t('scan_tip')}</div>`}
+    `}
+  </label>` : ''}
+
   <!-- ── STOPS LIST (when stops exist) ── -->
   ${cnt ? `
-  <div style="margin-top:20px">
+  <div style="margin-top:16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding:0 2px">
       <div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--acc);text-transform:uppercase;display:flex;align-items:center;gap:8px">
         Stops <span style="background:var(--acc);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px">${cnt}</span>
@@ -2697,7 +2665,6 @@ function vInput() {
     </div>
   </div>
   ` : `
-  <!-- Manual add when no stops yet -->
   <div style="margin-top:16px;background:var(--surf);border-radius:16px;padding:12px 14px">
     <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Or add stops manually</div>
     <div class="ir">
@@ -2713,7 +2680,25 @@ function vInput() {
     &#9888; ${S.geoFailed.length} stop${S.geoFailed.length > 1 ? 's' : ''} not found &mdash; tap to dismiss
   </div>` : ''}
 
-  <!-- ── STATS BAR ── Exactly like screenshot: two orange numbers ── -->
+  ${S.errMsg ? `<div style="background:var(--err-d);border:1px solid var(--err);border-radius:10px;padding:12px 15px;margin-top:12px">
+    <div style="font-size:14px;color:var(--err);margin-bottom:10px">${escH(S.errMsg)}</div>
+    <button class="btn bp" id="retryOptBtn">${t("try_again")}</button>
+  </div>` : ''}
+
+  <!-- ── OPTIMIZE BUTTON ── -->
+  <div style="margin-top:20px">
+    ${S.geoFailed && S.geoFailed.length > 0 ? `
+    <div style="background:var(--err-d);border:1px solid var(--err);border-radius:var(--rs);padding:9px 13px;font-family:var(--sans);font-size:13px;color:var(--err);text-align:center;margin-bottom:10px;font-weight:700;letter-spacing:.5px">
+      &#9888; ${t('resolve_first').replace('{n}',S.geoFailed.length).replace('{es}',S.geoFailed.length>1?'es':'')}
+    </div>
+    <button class="btn bp" disabled style="height:54px">&#9889; Optimize my route</button>` : `
+    <button class="btn bp" id="optBtn" ${!cnt ? 'disabled' : ''} style="height:54px">
+      &#9889; ${cnt ? `${t('optimize_btn')} &mdash; ${cnt} stop${cnt > 1 ? 's' : ''}` : 'Optimize my route'}
+    </button>`}
+    <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px;letter-spacing:.3px">3 free routes &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>
+  </div>
+
+  <!-- ── STATS BAR ── -->
   <div style="display:grid;grid-template-columns:1fr 1fr;background:var(--surf);border-radius:16px;overflow:hidden;margin-top:20px">
     <div style="padding:18px 16px;text-align:center;border-right:1px solid var(--brd)">
       <div style="font-family:var(--sans);font-size:32px;font-weight:900;color:var(--acc);line-height:1">11 km</div>
@@ -2729,54 +2714,6 @@ function vInput() {
 
 </div>`;}
 
-function sRow(s, i) {
-  const isL = S.lastId === s.id;
-  const hn  = s.flexNum != null;
-  const pc  = s.pkgCount || 1;
-
-  // Failed stop on INPUT screen — show prominently with inline edit
-  if (s.geoFailed) {
-    return `<div class="si" style="border-color:#FF4455;background:rgba(255,68,85,.07);animation:failPulse 2s ease-in-out 3">
-  <div class="fn" style="background:#FF4455;color:#fff;font-size:14px">&#9888;</div>
-  <div class="sb" style="flex:1">
-    <div class="ri-failed-badge" style="margin-bottom:6px">&#9888; ADDRESS NOT FOUND</div>
-    <div class="sa" style="color:#FF8899;text-decoration:line-through;font-size:14px;margin-bottom:8px">${escH(s.address)}</div>
-    <div class="si-wrap" style="position:relative;margin-bottom:7px">
-      <input class="si-fix-input" id="fix-${s.id}"
-        placeholder="Type corrected address..."
-        value="${escH(normalizeAddress(s.address))}"
-        autocomplete="off" spellcheck="false"
-        style="width:100%;background:var(--surf);border:1.5px solid #FF4455;border-radius:var(--rs);color:var(--t1);padding:10px 12px;font-size:15px;font-family:var(--body);outline:none"/>
-    </div>
-    <div style="display:flex;gap:7px">
-      <button class="ri-edit-retry" data-fix="${s.id}">&#9889; Apply correction</button>
-      <button class="ri-edit-skip" data-del="${s.id}">&#10005; Remove</button>
-    </div>
-  </div>
-</div>`;
-  }
-
-  // Normal stop
-  return `<div class="si ${isL ? 'islast' : ''}" style="${!hn ? 'border-style:dashed;' : ''}">
-  <div class="fn ${hn ? '' : 'nnum'}" title="${hn ? 'Flex pkg #' + s.flexNum : 'Manually added'}">${hn ? s.flexNum : '+'}</div>
-  <div class="sb">
-    <div class="sa">${escH(s.address)}</div>
-    <div class="sm">
-      ${hn ? `Flex stop #${s.flexNum}` : 'Manually added'}
-      ${pc > 1 ? `&nbsp;<span style="background:rgba(255,153,0,.18);border:1px solid var(--acc);color:var(--acc);font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;font-family:var(--sans)">&#128230; ${pc} pkgs</span>` : ''}
-    </div>
-  </div>
-  <div class="sbtns">
-    ${i > 0 ? `<button class="sbtn" data-up="${s.id}">&#8593;</button>` : ''}
-    ${i < S.stops.length - 1 ? `<button class="sbtn" data-dn="${s.id}">&#8595;</button>` : ''}
-    <button class="sbtn ${isL ? 'lon' : ''}" data-last="${s.id}" title="Mark as last stop">&#9873;</button>
-    <button class="sbtn del" data-del="${s.id}" title="Remove">&#10005;</button>
-  </div>
-  ${isL ? `<div class="lbdg">LAST</div>` : ''}
-</div>`;
-}
-
-// ─── Optimizing ───────────────────────────────────────────────────────────────
 function vOptimizing() {
   const steps = [
     { label: 'Locating stops on map',       sub: 'Converting addresses to GPS', idx: 0 },
