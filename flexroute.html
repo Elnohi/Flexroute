@@ -2518,66 +2518,93 @@ function vInput() {
   </div>
 
   <!-- SETUP CARD — always first, orange border until complete -->
-  <div style="background:#13131E;border-radius:16px;overflow:hidden;margin-bottom:14px;border:1.5px solid ${setupDone ? '#22D98A' : '#FF9900'}">
-    <div style="padding:11px 16px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;justify-content:space-between">
-      <div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:${setupDone ? '#22D98A' : '#FF9900'};text-transform:uppercase">
-        ${setupDone ? '&#10003; Route setup complete' : '&#9432; Set depot &amp; home address'}
-      </div>
-      ${setupDone ? `<span style="font-size:11px;color:var(--t3)">${escH(S.userState||'')} &middot; ready</span>` : ''}
-    </div>
-    <div style="background:#1A1A28">
+  ${(function(){
+    var html = '';
+    var borderCol = setupDone ? '#22D98A' : '#FF9900';
+    var headerCol = setupDone ? '#22D98A' : '#FF9900';
+    html += '<div style="background:#13131E;border-radius:16px;overflow:hidden;margin-bottom:14px;border:1.5px solid ' + borderCol + '">';
+    html += '<div style="padding:11px 16px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;justify-content:space-between">';
+    html += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:' + headerCol + ';text-transform:uppercase">';
+    html += setupDone ? '&#10003; Route setup complete' : '&#9432; Set depot &amp; home address';
+    html += '</div>';
+    if (setupDone) html += '<span style="font-size:11px;color:#7878A0">' + escH(S.userState||'') + ' &middot; ready</span>';
+    html += '</div>';
+    html += '<div style="background:#1A1A28">';
 
-      <!-- Region -->
-      <div style="padding:10px 14px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;gap:10px">
-        <span style="font-size:16px;flex-shrink:0">&#127758;</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Region</div>
-          ${S.userState ? `<div style="font-family:var(--sans);font-size:14px;font-weight:700;color:var(--t1)">${escH(S.userState)}</div>` : `
-          <select id="stateSelectMain" class="state-select" style="padding:4px 8px;font-size:13px;margin-top:0;border-color:var(--acc)">
-            <option value="">${t("select_region_ph")}</option>
-            <optgroup label="Canada"><option value="ON">ON — Ontario</option><option value="BC">BC — British Columbia</option><option value="AB">AB — Alberta</option><option value="QC">QC — Quebec</option><option value="MB">MB — Manitoba</option><option value="SK">SK — Saskatchewan</option><option value="NS">NS — Nova Scotia</option><option value="NB">NB — New Brunswick</option></optgroup>
-            <optgroup label="United States"><option value="AL">AL — Alabama</option><option value="AK">AK — Alaska</option><option value="AZ">AZ — Arizona</option><option value="AR">AR — Arkansas</option><option value="CA">CA — California</option><option value="CO">CO — Colorado</option><option value="CT">CT — Connecticut</option><option value="DE">DE — Delaware</option><option value="FL">FL — Florida</option><option value="GA">GA — Georgia</option><option value="HI">HI — Hawaii</option><option value="ID">ID — Idaho</option><option value="IL">IL — Illinois</option><option value="IN">IN — Indiana</option><option value="IA">IA — Iowa</option><option value="KS">KS — Kansas</option><option value="KY">KY — Kentucky</option><option value="LA">LA — Louisiana</option><option value="ME">ME — Maine</option><option value="MD">MD — Maryland</option><option value="MA">MA — Massachusetts</option><option value="MI">MI — Michigan</option><option value="MN">MN — Minnesota</option><option value="MO">MO — Missouri</option><option value="MT">MT — Montana</option><option value="NE">NE — Nebraska</option><option value="NV">NV — Nevada</option><option value="NH">NH — New Hampshire</option><option value="NJ">NJ — New Jersey</option><option value="NM">NM — New Mexico</option><option value="NY">NY — New York</option><option value="NC">NC — North Carolina</option><option value="ND">ND — North Dakota</option><option value="OH">OH — Ohio</option><option value="OK">OK — Oklahoma</option><option value="OR">OR — Oregon</option><option value="PA">PA — Pennsylvania</option><option value="RI">RI — Rhode Island</option><option value="SC">SC — South Carolina</option><option value="SD">SD — South Dakota</option><option value="TN">TN — Tennessee</option><option value="TX">TX — Texas</option><option value="UT">UT — Utah</option><option value="VT">VT — Vermont</option><option value="VA">VA — Virginia</option><option value="WA">WA — Washington</option><option value="WV">WV — West Virginia</option><option value="WI">WI — Wisconsin</option><option value="WY">WY — Wyoming</option></optgroup>
-            <optgroup label="Europe &amp; Rest of World"><option value="GB">&#127468;&#127463; United Kingdom</option><option value="DE">&#127465;&#127466; Germany</option><option value="FR">&#127467;&#127479; France</option><option value="ES">&#127466;&#127480; Spain</option><option value="IT">&#127470;&#127481; Italy</option><option value="NL">&#127475;&#127473; Netherlands</option><option value="BE">&#127463;&#127466; Belgium</option><option value="SE">&#127480;&#127466; Sweden</option><option value="PL">&#127477;&#127473; Poland</option><option value="AU">&#127462;&#127482; Australia</option><option value="JP">&#127471;&#127477; Japan</option><option value="IND">&#127470;&#127475; India</option><option value="MX">&#127474;&#127485; Mexico</option><option value="BR">&#127463;&#127479; Brazil</option><option value="SG">&#127480;&#127468; Singapore</option></optgroup>
-          </select>`}
-        </div>
-        ${S.userState ? `<button id="changeStateBtn" style="background:transparent;border:1px solid var(--brd);border-radius:6px;color:var(--t3);font-size:11px;cursor:pointer;padding:4px 10px;font-family:var(--sans);white-space:nowrap;flex-shrink:0">Change</button>` : ''}
-      </div>
+    // Region row
+    html += '<div style="padding:10px 14px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;gap:10px">';
+    html += '<span style="font-size:16px;flex-shrink:0">&#127758;</span>';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Region</div>';
+    if (S.userState) {
+      html += '<div style="font-family:var(--sans);font-size:14px;font-weight:700;color:#FFFFFF">' + escH(S.userState) + '</div>';
+    } else {
+      html += '<select id="stateSelectMain" class="state-select">';
+      html += '<option value="">' + t('select_region_ph') + '</option>';
+      html += '<optgroup label="Canada"><option value="ON">ON — Ontario</option><option value="BC">BC — British Columbia</option><option value="AB">AB — Alberta</option><option value="QC">QC — Quebec</option><option value="MB">MB — Manitoba</option><option value="SK">SK — Saskatchewan</option><option value="NS">NS — Nova Scotia</option><option value="NB">NB — New Brunswick</option></optgroup>';
+      html += '<optgroup label="United States"><option value="AL">AL — Alabama</option><option value="AK">AK — Alaska</option><option value="AZ">AZ — Arizona</option><option value="AR">AR — Arkansas</option><option value="CA">CA — California</option><option value="CO">CO — Colorado</option><option value="CT">CT — Connecticut</option><option value="DE">DE — Delaware</option><option value="FL">FL — Florida</option><option value="GA">GA — Georgia</option><option value="HI">HI — Hawaii</option><option value="ID">ID — Idaho</option><option value="IL">IL — Illinois</option><option value="IN">IN — Indiana</option><option value="IA">IA — Iowa</option><option value="KS">KS — Kansas</option><option value="KY">KY — Kentucky</option><option value="LA">LA — Louisiana</option><option value="ME">ME — Maine</option><option value="MD">MD — Maryland</option><option value="MA">MA — Massachusetts</option><option value="MI">MI — Michigan</option><option value="MN">MN — Minnesota</option><option value="MO">MO — Missouri</option><option value="MT">MT — Montana</option><option value="NE">NE — Nebraska</option><option value="NV">NV — Nevada</option><option value="NH">NH — New Hampshire</option><option value="NJ">NJ — New Jersey</option><option value="NM">NM — New Mexico</option><option value="NY">NY — New York</option><option value="NC">NC — North Carolina</option><option value="ND">ND — North Dakota</option><option value="OH">OH — Ohio</option><option value="OK">OK — Oklahoma</option><option value="OR">OR — Oregon</option><option value="PA">PA — Pennsylvania</option><option value="RI">RI — Rhode Island</option><option value="SC">SC — South Carolina</option><option value="SD">SD — South Dakota</option><option value="TN">TN — Tennessee</option><option value="TX">TX — Texas</option><option value="UT">UT — Utah</option><option value="VT">VT — Vermont</option><option value="VA">VA — Virginia</option><option value="WA">WA — Washington</option><option value="WV">WV — West Virginia</option><option value="WI">WI — Wisconsin</option><option value="WY">WY — Wyoming</option></optgroup>';
+      html += '<optgroup label="Europe &amp; Rest of World"><option value="GB">&#127468;&#127463; United Kingdom</option><option value="DE">&#127465;&#127466; Germany</option><option value="FR">&#127467;&#127479; France</option><option value="ES">&#127466;&#127480; Spain</option><option value="IT">&#127470;&#127481; Italy</option><option value="NL">&#127475;&#127473; Netherlands</option><option value="BE">&#127463;&#127466; Belgium</option><option value="SE">&#127480;&#127466; Sweden</option><option value="PL">&#127477;&#127473; Poland</option><option value="AU">&#127462;&#127482; Australia</option><option value="JP">&#127471;&#127477; Japan</option><option value="IND">&#127470;&#127475; India</option><option value="MX">&#127474;&#127485; Mexico</option><option value="BR">&#127463;&#127479; Brazil</option><option value="SG">&#127480;&#127468; Singapore</option></optgroup>';
+      html += '</select>';
+    }
+    html += '</div>';
+    if (S.userState) html += '<button id="changeStateBtn" style="background:transparent;border:1px solid #2A2A40;border-radius:6px;color:#7878A0;font-size:11px;cursor:pointer;padding:4px 10px;font-family:var(--sans);white-space:nowrap;flex-shrink:0">Change</button>';
+    html += '</div>';
 
-      <!-- Start -->
-      <div style="padding:10px 14px;border-bottom:1px solid #2A2A40">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:${S.gpsCoords || S.startAddr ? '0' : '8px'}">
-          <span style="font-size:16px;flex-shrink:0">&#128204;</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Start — warehouse / depot</div>
-            ${S.gpsCoords ? `<div style="font-size:13px;font-weight:500;color:var(--ok)">&#10003; GPS: ${escH(S.gpsAddr)}</div>` : S.startAddr ? `<div style="font-size:13px;font-weight:500;color:var(--t1)">${escH(S.startAddr)}</div>` : `<div style="font-size:12px;color:var(--acc);font-weight:600">Not set — enter below &#8595;</div>`}
-          </div>
-          ${S.gpsCoords ? `<button class="btn" id="gpsBtn" style="border:1px solid var(--ok);color:var(--ok);padding:4px 10px;font-size:11px;background:transparent;white-space:nowrap;flex-shrink:0;border-radius:6px">Change</button>` : S.startAddr ? `<button id="clearStartBtn" style="background:transparent;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>` : ''}
-        </div>
-        ${!S.gpsCoords ? `
-          ${!S.startAddr ? `<button class="gps-btn-big" id="gpsBtn" style="margin-bottom:6px;padding:10px;font-size:13px">&#128204; Use GPS to detect location</button>` : ''}
-          <div style="position:relative"><input type="text" id="startInput" placeholder="or type depot/warehouse address" value="${escH(S.startAddr || '')}" class="setup-input" style="font-size:13px;padding:9px 12px"/></div>
-          ${S.startAddr ? `<div style="font-size:11px;color:var(--ok);margin-top:4px">&#10003; Saved &mdash; edit above or tap &#10005; to clear</div>` : ''}
-        ` : ''}
-      </div>
+    // Start / depot row
+    html += '<div style="padding:10px 14px;border-bottom:1px solid #2A2A40">';
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (S.gpsCoords || S.startAddr ? '0' : '8px') + '">';
+    html += '<span style="font-size:16px;flex-shrink:0">&#128204;</span>';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Start — warehouse / depot</div>';
+    if (S.gpsCoords) {
+      html += '<div style="font-size:13px;font-weight:500;color:#22D98A">&#10003; GPS: ' + escH(S.gpsAddr) + '</div>';
+    } else if (S.startAddr) {
+      html += '<div style="font-size:13px;font-weight:500;color:#FFFFFF">' + escH(S.startAddr) + '</div>';
+    } else {
+      html += '<div style="font-size:12px;color:#FF9900;font-weight:600">Not set — enter below &#8595;</div>';
+    }
+    html += '</div>';
+    if (S.gpsCoords) {
+      html += '<button class="btn" id="gpsBtn" style="border:1px solid #22D98A;color:#22D98A;padding:4px 10px;font-size:11px;background:transparent;white-space:nowrap;flex-shrink:0;border-radius:6px">Change</button>';
+    } else if (S.startAddr) {
+      html += '<button id="clearStartBtn" style="background:transparent;border:none;color:#7878A0;font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>';
+    }
+    html += '</div>';
+    if (!S.gpsCoords) {
+      if (!S.startAddr) html += '<button class="gps-btn-big" id="gpsBtn" style="margin-bottom:6px;padding:10px;font-size:13px">&#128204; Use GPS to detect location</button>';
+      html += '<div style="position:relative"><input type="text" id="startInput" placeholder="or type depot/warehouse address" value="' + escH(S.startAddr || '') + '" class="setup-input" style="font-size:13px;padding:9px 12px"/></div>';
+      if (S.startAddr) html += '<div style="font-size:11px;color:#22D98A;margin-top:4px">&#10003; Saved &mdash; edit above or tap &#10005; to clear</div>';
+    }
+    html += '</div>';
 
-      <!-- Home -->
-      <div style="padding:10px 14px">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:${S.home ? '0' : '8px'}">
-          <span style="font-size:16px;flex-shrink:0">&#127968;</span>
-          <div style="flex:1;min-width:0">
-            <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Home — end of route</div>
-            ${S.home ? `<div style="font-size:13px;font-weight:500;color:var(--t1)">${escH(S.home)}</div>` : `<div style="font-size:12px;color:var(--acc);font-weight:600">Not set — enter below &#8595;</div>`}
-          </div>
-          ${S.home ? `<button id="clearHomeBtn" style="background:transparent;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>` : ''}
-        </div>
-        <div style="position:relative"><input type="text" id="hi" placeholder="Your home address" value="${escH(S.home)}" class="setup-input" style="font-size:13px;padding:9px 12px"/></div>
-        ${S.home ? `<div style="font-size:11px;color:var(--ok);margin-top:4px">&#10003; Saved &mdash; edit above or tap &#10005; to clear</div>` : `<div style="font-size:11px;color:var(--t3);margin-top:4px">Auto-saved for all future shifts</div>`}
-      </div>
+    // Home row
+    html += '<div style="padding:10px 14px">';
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (S.home ? '0' : '8px') + '">';
+    html += '<span style="font-size:16px;flex-shrink:0">&#127968;</span>';
+    html += '<div style="flex:1;min-width:0">';
+    html += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Home — end of route</div>';
+    if (S.home) {
+      html += '<div style="font-size:13px;font-weight:500;color:#FFFFFF">' + escH(S.home) + '</div>';
+    } else {
+      html += '<div style="font-size:12px;color:#FF9900;font-weight:600">Not set — enter below &#8595;</div>';
+    }
+    html += '</div>';
+    if (S.home) html += '<button id="clearHomeBtn" style="background:transparent;border:none;color:#7878A0;font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>';
+    html += '</div>';
+    html += '<input type="text" id="hi" placeholder="Your home address" value="' + escH(S.home) + '" class="setup-input" style="font-size:13px;padding:9px 12px;width:100%;box-sizing:border-box"/>';
+    if (S.home) {
+      html += '<div style="font-size:11px;color:#22D98A;margin-top:4px">&#10003; Saved &mdash; edit above or tap &#10005; to clear</div>';
+    } else {
+      html += '<div style="font-size:11px;color:#7878A0;margin-top:4px">Auto-saved for all future shifts</div>';
+    }
+    html += '</div>';
 
-    </div>
-  </div>
+    html += '</div></div>';
+    return html;
+  })()}
 
   <!-- SCAN — always visible, slightly dimmed until setup done -->
+
   ${typeof Tesseract === 'undefined' ? `<div style="background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--t2);line-height:1.5;text-align:center">&#9888; Scanning works at <a href="https://flexrouteapp.com" target="_blank" style="color:var(--acc);font-weight:600">flexrouteapp.com</a></div>` : ''}
   <label class="dz ${sc ? 'scanning' : ''}" id="dz" style="margin-bottom:14px${!setupDone ? ';opacity:.6' : ''}">
     <input type="file" id="fi" accept="image/*,application/pdf" multiple style="position:absolute;width:0;height:0;opacity:0;pointer-events:none">
