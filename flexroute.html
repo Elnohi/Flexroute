@@ -5696,5 +5696,42 @@ function normalizeAddress(addr) {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function escH(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 </script>
+<script>
+/* ── ON-SCREEN DIAGNOSTICS — remove after debugging ── */
+(function(){
+  function banner(msg, color) {
+    var b = document.createElement('div');
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;background:' + color + ';color:#fff;font:12px/1.5 monospace;padding:8px 12px;z-index:2147483647;white-space:pre-wrap;word-break:break-all;max-height:45vh;overflow:auto';
+    b.textContent = msg;
+    document.body.appendChild(b);
+  }
+  // Catch ALL JS errors and show them on screen
+  window.addEventListener('error', function(e) {
+    banner('JS ERROR: ' + e.message + '\nFile: ' + (e.filename||'') + '\nLine: ' + e.lineno + ':' + e.colno, '#CC0000');
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    banner('PROMISE ERROR: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason)), '#CC0000');
+  });
+  // 2s after load: report whether the setup card actually exists in the DOM
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      var s = [];
+      s.push('DIAG @ ' + location.hostname);
+      s.push('phase=' + (window.S ? S.phase : 'S undefined'));
+      s.push('viewport=' + window.innerWidth + 'x' + window.innerHeight);
+      s.push('startInput=' + (document.getElementById('startInput') ? 'EXISTS' : 'MISSING'));
+      s.push('homeInput=' + (document.getElementById('hi') ? 'EXISTS' : 'MISSING'));
+      s.push('regionSel=' + (document.getElementById('stateSelectMain') ? 'EXISTS' : 'MISSING'));
+      s.push('scanZone=' + (document.getElementById('dz') ? 'EXISTS' : 'MISSING'));
+      s.push('app.children=' + (document.getElementById('app') ? document.getElementById('app').children.length : 'NO APP'));
+      s.push('appHTMLlen=' + (document.getElementById('app') ? document.getElementById('app').innerHTML.length : 0));
+      s.push('SW=' + (navigator.serviceWorker && navigator.serviceWorker.controller ? 'CONTROLLING' : 'none'));
+      s.push('vInputHasSetup=' + (typeof vInput === 'function' ? (vInput.toString().indexOf('Set depot') !== -1 ? 'YES' : 'NO — OLD vInput!') : 'vInput missing'));
+      var missing = !document.getElementById('startInput');
+      banner(s.join('\n'), missing ? '#B36B00' : '#1A7A4A');
+    }, 2000);
+  });
+})();
+</script>
 </body>
 </html>
