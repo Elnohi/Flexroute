@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FlexRoute Setup Test</title>
+<style>
+body { background: #0A0A12; font-family: sans-serif; padding: 16px; margin: 0; }
+.card { background: #13131E; border-radius: 16px; border: 1.5px solid #FF9900; overflow: hidden; margin-bottom: 16px; }
+.card-header { padding: 11px 16px; border-bottom: 1px solid #2A2A40; font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #FF9900; text-transform: uppercase; }
+.card-body { background: #1A1A28; }
+.row { padding: 10px 14px; border-bottom: 1px solid #2A2A40; }
+.row:last-child { border-bottom: none; }
+.label { font-size: 10px; color: #7878A0; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 6px; }
+.not-set { font-size: 12px; color: #FF9900; font-weight: 600; margin-bottom: 8px; }
+input, select { width: 100%; background: #1A1A28; border: 1px solid #2A2A40; border-radius: 8px; color: #FFFFFF; padding: 10px 12px; font-size: 14px; box-sizing: border-box; margin-bottom: 4px; }
+.gps-btn { width: 100%; background: rgba(74,158,255,.1); border: 1px solid rgba(74,158,255,.4); color: #4A9EFF; border-radius: 8px; padding: 10px; font-size: 14px; font-weight: 700; cursor: pointer; margin-bottom: 8px; }
+.hint { font-size: 11px; color: #7878A0; margin-top: 4px; }
+.icon { font-size: 18px; margin-right: 8px; }
+</style>
+</head>
+<body>
+
+<div style="color:#FF9900;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:16px;">
+  ● AMAZON FLEX DRIVERS
+</div>
+<div style="font-size:28px;font-weight:800;color:#FFFFFF;margin-bottom:16px;">
+  Shorter route.<br>Home sooner.
+</div>
+
+<div class="card">
+  <div class="card-header">&#9432; Set depot &amp; home address</div>
+  <div class="card-body">
+
+    <div class="row">
+      <div class="label"><span class="icon">🌍</span>Region</div>
+      <select id="region">
+        <option value="">Select your region...</option>
+        <optgroup label="Canada">
+          <option value="ON">ON — Ontario</option>
+          <option value="BC">BC — British Columbia</option>
+          <option value="AB">AB — Alberta</option>
+          <option value="QC">QC — Quebec</option>
+        </optgroup>
+        <optgroup label="United States">
+          <option value="CA">CA — California</option>
+          <option value="TX">TX — Texas</option>
+          <option value="FL">FL — Florida</option>
+          <option value="NY">NY — New York</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="row">
+      <div class="label"><span class="icon">📍</span>Start — warehouse / depot</div>
+      <div class="not-set">Not set — enter below ↓</div>
+      <button class="gps-btn" onclick="alert('GPS clicked')">📍 Use GPS to detect location</button>
+      <input type="text" id="depot" placeholder="or type depot/warehouse address">
+      <div class="hint">Your starting point for the route</div>
+    </div>
+
+    <div class="row">
+      <div class="label"><span class="icon">🏠</span>Home — end of route</div>
+      <div class="not-set">Not set — enter below ↓</div>
+      <input type="text" id="home" placeholder="Your home address">
+      <div class="hint">Auto-saved for all future shifts</div>
+    </div>
+
+  </div>
+</div>
+
+<div style="color:#22D98A;font-size:13px;text-align:center;margin-top:8px;">
+  ✓ This is a static test page — if you see this, the setup card works
+</div>
+
+</body>
+</html>
