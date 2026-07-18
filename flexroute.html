@@ -2466,232 +2466,209 @@ function vSetup() {
 }
 
 function vInput() {
-  const cnt = S.stops.length;
-  const lastS = S.lastId ? S.stops.find(s => s.id === S.lastId) : null;
-  const sc = S.sc;
-  const startOk = !!(S.startAddr || S.gpsCoords);
-  const homeOk  = !!S.home;
-  const regionOk = !!S.userState;
-  const setupDone = regionOk && startOk && homeOk;
+  var cnt = S.stops.length;
+  var lastS = S.lastId ? S.stops.find(function(s){ return s.id === S.lastId; }) : null;
+  var sc = S.sc;
+  var startOk = !!(S.startAddr || S.gpsCoords);
+  var homeOk  = !!S.home;
+  var regionOk = !!S.userState;
+  var setupDone = regionOk && startOk && homeOk;
+  var h = '';
 
-  return `
-<div class="hdr">
-  <div class="hbrand">
-    <img src="${window._LOGO_}" style="height:44px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-  </div>
-  <div class="hbtns" style="gap:8px">
-    ${langPill()}
-    ${unitPill()}
-    ${cnt ? `<button class="ib" id="clrBtn" style="color:var(--err);border-color:rgba(255,68,85,.25)" title="Clear all stops">&#10005;</button>` : ''}
-  </div>
-</div>
+  // ── HEADER ──
+  h += '<div class="hdr">';
+  h += '<div class="hbrand"><img src="' + window._LOGO_ + '" style="height:44px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div>';
+  h += '<div class="hbtns" style="gap:8px">' + langPill() + unitPill();
+  if (cnt) h += '<button class="ib" id="clrBtn" style="color:var(--err);border-color:rgba(255,68,85,.25)" title="Clear all stops">&#10005;</button>';
+  h += '</div></div>';
 
-<div class="scr" style="padding-top:16px">
+  h += '<div class="scr" style="padding-top:16px">';
 
-  ${(S.tweakMode && S.optimized && S.optimized.length > 0) ? `
-  <div style="background:var(--acc);border-radius:10px;padding:13px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px">
-    <div style="flex:1">
-      <div style="font-family:var(--sans);font-size:15px;font-weight:800;color:#000;margin-bottom:2px">${t("route_outdated")}</div>
-      <div style="font-size:12px;color:rgba(0,0,0,.7)">${t("route_outdated_sub")}</div>
-    </div>
-    <button id="reoptBtn" style="background:#000;color:var(--acc);border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);white-space:nowrap">${t("re_optimize_short")}</button>
-  </div>` : ''}
+  // Tweak mode banner
+  if (S.tweakMode && S.optimized && S.optimized.length > 0) {
+    h += '<div style="background:var(--acc);border-radius:10px;padding:13px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:10px">';
+    h += '<div style="flex:1"><div style="font-family:var(--sans);font-size:15px;font-weight:800;color:#000;margin-bottom:2px">' + t('route_outdated') + '</div>';
+    h += '<div style="font-size:12px;color:rgba(0,0,0,.7)">' + t('route_outdated_sub') + '</div></div>';
+    h += '<button id="reoptBtn" style="background:#000;color:var(--acc);border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--sans);white-space:nowrap">' + t('re_optimize_short') + '</button>';
+    h += '</div>';
+  }
 
-  ${!S.iosDismissed && (isIOSSafari() || isAndroidChrome()) ? `
-  <div class="ios-toast" id="iosDismissBtn" role="button" tabindex="0" onclick="(function(){var el=document.getElementById('iosDismissBtn');if(el)el.style.display='none';localStorage.setItem('fr_ios_dismissed','1');})()">
-    <div class="ios-toast-icon">&#128241;</div>
-    <div class="ios-toast-text">
-      <div class="ios-toast-title">ADD TO HOME SCREEN</div>
-      <div class="ios-toast-sub">${isIOSSafari() ? 'Tap <strong>Share &#11023;</strong> then <strong>"Add to Home Screen"</strong>' : 'Tap <strong>&#8942; Menu</strong> then <strong>"Add to Home Screen"</strong>'}&nbsp;&mdash;&nbsp;tap to dismiss</div>
-    </div>
-    <div class="ios-toast-close">&#10005;</div>
-  </div>` : ''}
+  // iOS/Android install toast
+  if (!S.iosDismissed && (isIOSSafari() || isAndroidChrome())) {
+    h += '<div class="ios-toast" id="iosDismissBtn" role="button" tabindex="0" onclick="(function(){var el=document.getElementById(\'iosDismissBtn\');if(el)el.style.display=\'none\';localStorage.setItem(\'fr_ios_dismissed\',\'1\');})()">';
+    h += '<div class="ios-toast-icon">&#128241;</div>';
+    h += '<div class="ios-toast-text"><div class="ios-toast-title">ADD TO HOME SCREEN</div>';
+    h += '<div class="ios-toast-sub">' + (isIOSSafari() ? 'Tap <strong>Share &#11023;</strong> then <strong>"Add to Home Screen"</strong>' : 'Tap <strong>&#8942; Menu</strong> then <strong>"Add to Home Screen"</strong>') + '&nbsp;&mdash;&nbsp;tap to dismiss</div></div>';
+    h += '<div class="ios-toast-close">&#10005;</div></div>';
+  }
 
-  <!-- HERO -->
-  <div style="padding:0 2px;margin-bottom:16px">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-      <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
-      <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">Amazon Flex Drivers</span>
-    </div>
-    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.0;margin-bottom:6px;letter-spacing:-.3px">Shorter route.<br>Home sooner.</div>
-    <div style="font-size:13px;color:var(--t2);line-height:1.5">Screenshot your stop list. Get the shortest route in seconds.</div>
-  </div>
+  // ── HERO ──
+  h += '<div style="padding:0 2px;margin-bottom:16px">';
+  h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">';
+  h += '<span style="width:7px;height:7px;background:#FF9900;border-radius:50%;display:inline-block;flex-shrink:0"></span>';
+  h += '<span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:#FF9900;text-transform:uppercase">Amazon Flex Drivers</span>';
+  h += '</div>';
+  h += '<div style="font-family:var(--sans);font-size:30px;font-weight:800;color:#FFFFFF;line-height:1.0;margin-bottom:6px;letter-spacing:-.3px">Shorter route.<br>Home sooner.</div>';
+  h += '<div style="font-size:13px;color:#C8C8E8;line-height:1.5">Screenshot your stop list. Get the shortest route in seconds.</div>';
+  h += '</div>';
 
-  <!-- SETUP CARD — always first, orange border until complete -->
-  ${(function(){
-    var html = '';
-    var borderCol = setupDone ? '#22D98A' : '#FF9900';
-    var headerCol = setupDone ? '#22D98A' : '#FF9900';
-    html += '<div style="background:#13131E;border-radius:16px;overflow:hidden;margin-bottom:14px;border:1.5px solid ' + borderCol + '">';
-    html += '<div style="padding:11px 16px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;justify-content:space-between">';
-    html += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:' + headerCol + ';text-transform:uppercase">';
-    html += setupDone ? '&#10003; Route setup complete' : '&#9432; Set depot &amp; home address';
-    html += '</div>';
-    if (setupDone) html += '<span style="font-size:11px;color:#7878A0">' + escH(S.userState||'') + ' &middot; ready</span>';
-    html += '</div>';
-    html += '<div style="background:#1A1A28">';
+  // ── SETUP CARD ──
+  var borderCol = setupDone ? '#22D98A' : '#FF9900';
+  h += '<div style="background:#13131E;border-radius:16px;overflow:hidden;margin-bottom:14px;border:1.5px solid ' + borderCol + '">';
+  h += '<div style="padding:11px 16px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;justify-content:space-between">';
+  h += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:' + borderCol + ';text-transform:uppercase">';
+  h += setupDone ? '&#10003; Route setup complete' : '&#9432; Set depot &amp; home address';
+  h += '</div>';
+  if (setupDone) h += '<span style="font-size:11px;color:#7878A0">' + escH(S.userState||'') + ' &middot; ready</span>';
+  h += '</div>';
+  h += '<div style="background:#1A1A28">';
 
-    // Region row
-    html += '<div style="padding:10px 14px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;gap:10px">';
-    html += '<span style="font-size:16px;flex-shrink:0">&#127758;</span>';
-    html += '<div style="flex:1;min-width:0">';
-    html += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Region</div>';
-    if (S.userState) {
-      html += '<div style="font-family:var(--sans);font-size:14px;font-weight:700;color:#FFFFFF">' + escH(S.userState) + '</div>';
+  // Region row
+  h += '<div style="padding:10px 14px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;gap:10px">';
+  h += '<span style="font-size:16px;flex-shrink:0">&#127758;</span>';
+  h += '<div style="flex:1;min-width:0">';
+  h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Region</div>';
+  if (S.userState) {
+    h += '<div style="font-family:var(--sans);font-size:14px;font-weight:700;color:#FFFFFF">' + escH(S.userState) + '</div>';
+  } else {
+    h += '<select id="stateSelectMain" class="state-select">';
+    h += '<option value="">' + t('select_region_ph') + '</option>';
+    h += '<optgroup label="Canada"><option value="ON">ON \u2014 Ontario</option><option value="BC">BC \u2014 British Columbia</option><option value="AB">AB \u2014 Alberta</option><option value="QC">QC \u2014 Quebec</option><option value="MB">MB \u2014 Manitoba</option><option value="SK">SK \u2014 Saskatchewan</option><option value="NS">NS \u2014 Nova Scotia</option><option value="NB">NB \u2014 New Brunswick</option></optgroup>';
+    h += '<optgroup label="United States"><option value="AL">AL \u2014 Alabama</option><option value="AK">AK \u2014 Alaska</option><option value="AZ">AZ \u2014 Arizona</option><option value="AR">AR \u2014 Arkansas</option><option value="CA">CA \u2014 California</option><option value="CO">CO \u2014 Colorado</option><option value="CT">CT \u2014 Connecticut</option><option value="DE">DE \u2014 Delaware</option><option value="FL">FL \u2014 Florida</option><option value="GA">GA \u2014 Georgia</option><option value="HI">HI \u2014 Hawaii</option><option value="ID">ID \u2014 Idaho</option><option value="IL">IL \u2014 Illinois</option><option value="IN">IN \u2014 Indiana</option><option value="IA">IA \u2014 Iowa</option><option value="KS">KS \u2014 Kansas</option><option value="KY">KY \u2014 Kentucky</option><option value="LA">LA \u2014 Louisiana</option><option value="ME">ME \u2014 Maine</option><option value="MD">MD \u2014 Maryland</option><option value="MA">MA \u2014 Massachusetts</option><option value="MI">MI \u2014 Michigan</option><option value="MN">MN \u2014 Minnesota</option><option value="MO">MO \u2014 Missouri</option><option value="MT">MT \u2014 Montana</option><option value="NE">NE \u2014 Nebraska</option><option value="NV">NV \u2014 Nevada</option><option value="NH">NH \u2014 New Hampshire</option><option value="NJ">NJ \u2014 New Jersey</option><option value="NM">NM \u2014 New Mexico</option><option value="NY">NY \u2014 New York</option><option value="NC">NC \u2014 North Carolina</option><option value="ND">ND \u2014 North Dakota</option><option value="OH">OH \u2014 Ohio</option><option value="OK">OK \u2014 Oklahoma</option><option value="OR">OR \u2014 Oregon</option><option value="PA">PA \u2014 Pennsylvania</option><option value="RI">RI \u2014 Rhode Island</option><option value="SC">SC \u2014 South Carolina</option><option value="SD">SD \u2014 South Dakota</option><option value="TN">TN \u2014 Tennessee</option><option value="TX">TX \u2014 Texas</option><option value="UT">UT \u2014 Utah</option><option value="VT">VT \u2014 Vermont</option><option value="VA">VA \u2014 Virginia</option><option value="WA">WA \u2014 Washington</option><option value="WV">WV \u2014 West Virginia</option><option value="WI">WI \u2014 Wisconsin</option><option value="WY">WY \u2014 Wyoming</option></optgroup>';
+    h += '<optgroup label="Europe &amp; Rest of World"><option value="GB">&#127468;&#127463; United Kingdom</option><option value="DE">&#127465;&#127466; Germany</option><option value="FR">&#127467;&#127479; France</option><option value="ES">&#127466;&#127480; Spain</option><option value="IT">&#127470;&#127481; Italy</option><option value="NL">&#127475;&#127473; Netherlands</option><option value="BE">&#127463;&#127466; Belgium</option><option value="SE">&#127480;&#127466; Sweden</option><option value="PL">&#127477;&#127473; Poland</option><option value="AU">&#127462;&#127482; Australia</option><option value="JP">&#127471;&#127477; Japan</option><option value="IND">&#127470;&#127475; India</option><option value="MX">&#127474;&#127485; Mexico</option><option value="BR">&#127463;&#127479; Brazil</option><option value="SG">&#127480;&#127468; Singapore</option></optgroup>';
+    h += '</select>';
+  }
+  h += '</div>';
+  if (S.userState) h += '<button id="changeStateBtn" style="background:transparent;border:1px solid #2A2A40;border-radius:6px;color:#7878A0;font-size:11px;cursor:pointer;padding:4px 10px;font-family:var(--sans);white-space:nowrap;flex-shrink:0">Change</button>';
+  h += '</div>';
+
+  // Start / depot row
+  h += '<div style="padding:10px 14px;border-bottom:1px solid #2A2A40">';
+  h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (S.gpsCoords || S.startAddr ? '0' : '8px') + '">';
+  h += '<span style="font-size:16px;flex-shrink:0">&#128204;</span>';
+  h += '<div style="flex:1;min-width:0">';
+  h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Start \u2014 warehouse / depot</div>';
+  if (S.gpsCoords) {
+    h += '<div style="font-size:13px;font-weight:500;color:#22D98A">&#10003; GPS: ' + escH(S.gpsAddr) + '</div>';
+  } else if (S.startAddr) {
+    h += '<div style="font-size:13px;font-weight:500;color:#FFFFFF">' + escH(S.startAddr) + '</div>';
+  } else {
+    h += '<div style="font-size:12px;color:#FF9900;font-weight:600">Not set \u2014 enter below &#8595;</div>';
+  }
+  h += '</div>';
+  if (S.gpsCoords) {
+    h += '<button class="btn" id="gpsBtn" style="border:1px solid #22D98A;color:#22D98A;padding:4px 10px;font-size:11px;background:transparent;white-space:nowrap;flex-shrink:0;border-radius:6px">Change</button>';
+  } else if (S.startAddr) {
+    h += '<button id="clearStartBtn" style="background:transparent;border:none;color:#7878A0;font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>';
+  }
+  h += '</div>';
+  if (!S.gpsCoords) {
+    if (!S.startAddr) h += '<button class="gps-btn-big" id="gpsBtn" style="margin-bottom:6px;padding:10px;font-size:13px">&#128204; Use GPS to detect location</button>';
+    h += '<input type="text" id="startInput" placeholder="or type depot/warehouse address" value="' + escH(S.startAddr || '') + '" class="setup-input" style="font-size:13px;padding:9px 12px;width:100%;box-sizing:border-box"/>';
+    if (S.startAddr) h += '<div style="font-size:11px;color:#22D98A;margin-top:4px">&#10003; Saved</div>';
+  }
+  h += '</div>';
+
+  // Home row
+  h += '<div style="padding:10px 14px">';
+  h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (S.home ? '0' : '8px') + '">';
+  h += '<span style="font-size:16px;flex-shrink:0">&#127968;</span>';
+  h += '<div style="flex:1;min-width:0">';
+  h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Home \u2014 end of route</div>';
+  if (S.home) {
+    h += '<div style="font-size:13px;font-weight:500;color:#FFFFFF">' + escH(S.home) + '</div>';
+  } else {
+    h += '<div style="font-size:12px;color:#FF9900;font-weight:600">Not set \u2014 enter below &#8595;</div>';
+  }
+  h += '</div>';
+  if (S.home) h += '<button id="clearHomeBtn" style="background:transparent;border:none;color:#7878A0;font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>';
+  h += '</div>';
+  h += '<input type="text" id="hi" placeholder="Your home address" value="' + escH(S.home) + '" class="setup-input" style="font-size:13px;padding:9px 12px;width:100%;box-sizing:border-box"/>';
+  h += '<div style="font-size:11px;color:' + (S.home ? '#22D98A' : '#7878A0') + ';margin-top:4px">' + (S.home ? '&#10003; Saved \u2014 edit above or tap &#10005; to clear' : 'Auto-saved for all future shifts') + '</div>';
+  h += '</div>';
+
+  h += '</div></div>'; // close inner bg div + outer card div
+
+  // ── SCAN ──
+  if (typeof Tesseract === 'undefined') {
+    h += '<div style="background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#C8C8E8;line-height:1.5;text-align:center">&#9888; Scanning works at <a href="https://flexrouteapp.com" target="_blank" style="color:#FF9900;font-weight:600">flexrouteapp.com</a></div>';
+  }
+  h += '<label class="dz' + (sc ? ' scanning' : '') + '" id="dz" style="margin-bottom:14px' + (!setupDone ? ';opacity:.6' : '') + '">';
+  h += '<input type="file" id="fi" accept="image/*,application/pdf" multiple style="position:absolute;width:0;height:0;opacity:0;pointer-events:none">';
+  if (sc) {
+    h += '<div style="font-size:24px;margin-bottom:8px">&#8987;</div>';
+    h += '<div style="font-family:var(--sans);font-size:16px;font-weight:700;color:#FF9900">' + sc.msg + '</div>';
+    if (sc.total > 1) {
+      h += '<div class="pb" style="margin-top:12px"><div class="pf" style="width:' + Math.round(sc.done / sc.total * 100) + '%"></div></div>';
+      h += '<div class="pl" style="margin-top:5px">' + sc.done + ' of ' + sc.total + ' images scanned</div>';
+    }
+  } else {
+    h += '<div style="font-size:28px;margin-bottom:8px">&#128247;</div>';
+    h += '<div style="font-family:var(--sans);font-size:17px;font-weight:700;color:#FFFFFF;letter-spacing:.2px">' + t('scan_tap') + '</div>';
+    h += '<div style="font-size:13px;color:#7878A0;margin-top:4px">' + t('scan_sub') + '</div>';
+    if (/Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent)) {
+      h += '<div style="font-size:11px;color:#FF9900;margin-top:8px;font-weight:600">&#9888; Open in Safari or Chrome</div>';
     } else {
-      html += '<select id="stateSelectMain" class="state-select">';
-      html += '<option value="">' + t('select_region_ph') + '</option>';
-      html += '<optgroup label="Canada"><option value="ON">ON — Ontario</option><option value="BC">BC — British Columbia</option><option value="AB">AB — Alberta</option><option value="QC">QC — Quebec</option><option value="MB">MB — Manitoba</option><option value="SK">SK — Saskatchewan</option><option value="NS">NS — Nova Scotia</option><option value="NB">NB — New Brunswick</option></optgroup>';
-      html += '<optgroup label="United States"><option value="AL">AL — Alabama</option><option value="AK">AK — Alaska</option><option value="AZ">AZ — Arizona</option><option value="AR">AR — Arkansas</option><option value="CA">CA — California</option><option value="CO">CO — Colorado</option><option value="CT">CT — Connecticut</option><option value="DE">DE — Delaware</option><option value="FL">FL — Florida</option><option value="GA">GA — Georgia</option><option value="HI">HI — Hawaii</option><option value="ID">ID — Idaho</option><option value="IL">IL — Illinois</option><option value="IN">IN — Indiana</option><option value="IA">IA — Iowa</option><option value="KS">KS — Kansas</option><option value="KY">KY — Kentucky</option><option value="LA">LA — Louisiana</option><option value="ME">ME — Maine</option><option value="MD">MD — Maryland</option><option value="MA">MA — Massachusetts</option><option value="MI">MI — Michigan</option><option value="MN">MN — Minnesota</option><option value="MO">MO — Missouri</option><option value="MT">MT — Montana</option><option value="NE">NE — Nebraska</option><option value="NV">NV — Nevada</option><option value="NH">NH — New Hampshire</option><option value="NJ">NJ — New Jersey</option><option value="NM">NM — New Mexico</option><option value="NY">NY — New York</option><option value="NC">NC — North Carolina</option><option value="ND">ND — North Dakota</option><option value="OH">OH — Ohio</option><option value="OK">OK — Oklahoma</option><option value="OR">OR — Oregon</option><option value="PA">PA — Pennsylvania</option><option value="RI">RI — Rhode Island</option><option value="SC">SC — South Carolina</option><option value="SD">SD — South Dakota</option><option value="TN">TN — Tennessee</option><option value="TX">TX — Texas</option><option value="UT">UT — Utah</option><option value="VT">VT — Vermont</option><option value="VA">VA — Virginia</option><option value="WA">WA — Washington</option><option value="WV">WV — West Virginia</option><option value="WI">WI — Wisconsin</option><option value="WY">WY — Wyoming</option></optgroup>';
-      html += '<optgroup label="Europe &amp; Rest of World"><option value="GB">&#127468;&#127463; United Kingdom</option><option value="DE">&#127465;&#127466; Germany</option><option value="FR">&#127467;&#127479; France</option><option value="ES">&#127466;&#127480; Spain</option><option value="IT">&#127470;&#127481; Italy</option><option value="NL">&#127475;&#127473; Netherlands</option><option value="BE">&#127463;&#127466; Belgium</option><option value="SE">&#127480;&#127466; Sweden</option><option value="PL">&#127477;&#127473; Poland</option><option value="AU">&#127462;&#127482; Australia</option><option value="JP">&#127471;&#127477; Japan</option><option value="IND">&#127470;&#127475; India</option><option value="MX">&#127474;&#127485; Mexico</option><option value="BR">&#127463;&#127479; Brazil</option><option value="SG">&#127480;&#127468; Singapore</option></optgroup>';
-      html += '</select>';
+      h += '<div style="font-size:11px;color:#FF9900;margin-top:8px;font-weight:600">' + t('scan_tip') + '</div>';
     }
-    html += '</div>';
-    if (S.userState) html += '<button id="changeStateBtn" style="background:transparent;border:1px solid #2A2A40;border-radius:6px;color:#7878A0;font-size:11px;cursor:pointer;padding:4px 10px;font-family:var(--sans);white-space:nowrap;flex-shrink:0">Change</button>';
-    html += '</div>';
+  }
+  h += '</label>';
 
-    // Start / depot row
-    html += '<div style="padding:10px 14px;border-bottom:1px solid #2A2A40">';
-    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (S.gpsCoords || S.startAddr ? '0' : '8px') + '">';
-    html += '<span style="font-size:16px;flex-shrink:0">&#128204;</span>';
-    html += '<div style="flex:1;min-width:0">';
-    html += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Start — warehouse / depot</div>';
-    if (S.gpsCoords) {
-      html += '<div style="font-size:13px;font-weight:500;color:#22D98A">&#10003; GPS: ' + escH(S.gpsAddr) + '</div>';
-    } else if (S.startAddr) {
-      html += '<div style="font-size:13px;font-weight:500;color:#FFFFFF">' + escH(S.startAddr) + '</div>';
-    } else {
-      html += '<div style="font-size:12px;color:#FF9900;font-weight:600">Not set — enter below &#8595;</div>';
-    }
-    html += '</div>';
-    if (S.gpsCoords) {
-      html += '<button class="btn" id="gpsBtn" style="border:1px solid #22D98A;color:#22D98A;padding:4px 10px;font-size:11px;background:transparent;white-space:nowrap;flex-shrink:0;border-radius:6px">Change</button>';
-    } else if (S.startAddr) {
-      html += '<button id="clearStartBtn" style="background:transparent;border:none;color:#7878A0;font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>';
-    }
-    html += '</div>';
-    if (!S.gpsCoords) {
-      if (!S.startAddr) html += '<button class="gps-btn-big" id="gpsBtn" style="margin-bottom:6px;padding:10px;font-size:13px">&#128204; Use GPS to detect location</button>';
-      html += '<div style="position:relative"><input type="text" id="startInput" placeholder="or type depot/warehouse address" value="' + escH(S.startAddr || '') + '" class="setup-input" style="font-size:13px;padding:9px 12px"/></div>';
-      if (S.startAddr) html += '<div style="font-size:11px;color:#22D98A;margin-top:4px">&#10003; Saved &mdash; edit above or tap &#10005; to clear</div>';
-    }
-    html += '</div>';
+  // ── STOPS LIST ──
+  if (cnt) {
+    h += '<div style="margin-bottom:14px">';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">';
+    h += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:#FF9900;text-transform:uppercase;display:flex;align-items:center;gap:8px">Stops <span style="background:#FF9900;color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px">' + cnt + '</span></div>';
+    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + S.stops.filter(function(s){return s.flexNum!=null;}).length + ' scanned &middot; ' + S.stops.filter(function(s){return s.flexNum==null;}).length + ' manual</span>';
+    h += '</div>';
+    h += '<div style="background:#13131E;border-radius:16px;overflow:hidden;padding:12px 14px">';
+    h += '<div class="ir" style="margin-bottom:10px"><div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Add address manually" value="' + escH(S.manVal) + '" style="font-size:14px"/></div>';
+    h += '<button class="badd" id="addBtn" style="height:42px;font-size:20px;padding:0 14px">+</button></div>';
+    h += '<div id="dbgPanel" style="display:none;background:#1A1A28;border:1px solid #2A2A40;border-radius:var(--rs);padding:10px;margin-bottom:8px;font-size:10px;font-family:var(--mono);color:#7878A0;white-space:pre-wrap;max-height:220px;overflow-y:auto;word-break:break-all"></div>';
+    var failed = S.stops.filter(function(s){return s.geoFailed;});
+    var normal = S.stops.filter(function(s){return !s.geoFailed;});
+    h += '<div class="sscr"><div class="slist">' + failed.concat(normal).map(function(s,i){return sRow(s,i);}).join('') + '</div></div>';
+    if (lastS) h += '<div class="al ai" style="margin-top:8px;font-size:12px">Last stop: <strong style="font-family:var(--mono)">' + escH(lastS.address) + '</strong>' + (lastS.flexNum != null ? ' &mdash; pkg <strong>#' + lastS.flexNum + '</strong>' : '') + '</div>';
+    h += '</div></div>';
+  } else {
+    h += '<div style="background:#13131E;border-radius:16px;padding:12px 14px;margin-bottom:14px">';
+    h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Or add stops manually</div>';
+    h += '<div class="ir"><div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Type an address" value="' + escH(S.manVal) + '" style="font-size:14px"/></div>';
+    h += '<button class="badd" id="addBtn" style="height:42px;font-size:20px;padding:0 14px">+</button></div>';
+    if (S._lastOCR) h += '<div id="dbgPanel" style="display:none;background:#1A1A28;border:1px solid #2A2A40;border-radius:var(--rs);padding:10px;margin-top:8px;font-size:10px;font-family:var(--mono);color:#7878A0;white-space:pre-wrap;max-height:220px;overflow-y:auto;word-break:break-all"></div>';
+    h += '</div>';
+  }
 
-    // Home row
-    html += '<div style="padding:10px 14px">';
-    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (S.home ? '0' : '8px') + '">';
-    html += '<span style="font-size:16px;flex-shrink:0">&#127968;</span>';
-    html += '<div style="flex:1;min-width:0">';
-    html += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Home — end of route</div>';
-    if (S.home) {
-      html += '<div style="font-size:13px;font-weight:500;color:#FFFFFF">' + escH(S.home) + '</div>';
-    } else {
-      html += '<div style="font-size:12px;color:#FF9900;font-weight:600">Not set — enter below &#8595;</div>';
-    }
-    html += '</div>';
-    if (S.home) html += '<button id="clearHomeBtn" style="background:transparent;border:none;color:#7878A0;font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>';
-    html += '</div>';
-    html += '<input type="text" id="hi" placeholder="Your home address" value="' + escH(S.home) + '" class="setup-input" style="font-size:13px;padding:9px 12px;width:100%;box-sizing:border-box"/>';
-    if (S.home) {
-      html += '<div style="font-size:11px;color:#22D98A;margin-top:4px">&#10003; Saved &mdash; edit above or tap &#10005; to clear</div>';
-    } else {
-      html += '<div style="font-size:11px;color:#7878A0;margin-top:4px">Auto-saved for all future shifts</div>';
-    }
-    html += '</div>';
+  if (S.geoFailed && S.geoFailed.length > 0 && S.stops.length > 0) {
+    h += '<div class="failed-float" id="failedFloat" onclick="document.getElementById(\'failedFloat\').style.display=\'none\'">&#9888; ' + S.geoFailed.length + ' stop' + (S.geoFailed.length > 1 ? 's' : '') + ' not found &mdash; tap to dismiss</div>';
+  }
 
-    html += '</div></div>';
-    return html;
-  })()}
+  if (S.errMsg) {
+    h += '<div style="background:rgba(255,68,85,.12);border:1px solid #FF4455;border-radius:10px;padding:12px 15px;margin-bottom:14px">';
+    h += '<div style="font-size:14px;color:#FF4455;margin-bottom:10px">' + escH(S.errMsg) + '</div>';
+    h += '<button class="btn bp" id="retryOptBtn">' + t('try_again') + '</button></div>';
+  }
 
-  <!-- SCAN — always visible, slightly dimmed until setup done -->
+  // ── OPTIMIZE BUTTON ──
+  h += '<div style="margin-bottom:20px">';
+  if (S.geoFailed && S.geoFailed.length > 0) {
+    h += '<div style="background:rgba(255,68,85,.12);border:1px solid #FF4455;border-radius:var(--rs);padding:9px 13px;font-family:var(--sans);font-size:13px;color:#FF4455;text-align:center;margin-bottom:10px;font-weight:700;letter-spacing:.5px">&#9888; ' + t('resolve_first').replace('{n}', S.geoFailed.length).replace('{es}', S.geoFailed.length > 1 ? 'es' : '') + '</div>';
+    h += '<button class="btn bp" disabled style="height:54px">&#9889; Optimize my route</button>';
+  } else {
+    h += '<button class="btn bp" id="optBtn"' + (!cnt ? ' disabled' : '') + ' style="height:54px">&#9889; ' + (cnt ? t('optimize_btn') + ' &mdash; ' + cnt + ' stop' + (cnt > 1 ? 's' : '') : 'Optimize my route') + '</button>';
+  }
+  h += '<div style="text-align:center;font-size:12px;color:#7878A0;margin-top:10px;letter-spacing:.3px">3 free routes &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>';
+  h += '</div>';
 
-  ${typeof Tesseract === 'undefined' ? `<div style="background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:var(--t2);line-height:1.5;text-align:center">&#9888; Scanning works at <a href="https://flexrouteapp.com" target="_blank" style="color:var(--acc);font-weight:600">flexrouteapp.com</a></div>` : ''}
-  <label class="dz ${sc ? 'scanning' : ''}" id="dz" style="margin-bottom:14px${!setupDone ? ';opacity:.6' : ''}">
-    <input type="file" id="fi" accept="image/*,application/pdf" multiple style="position:absolute;width:0;height:0;opacity:0;pointer-events:none">
-    ${sc ? `
-      <div style="font-size:24px;margin-bottom:8px">&#8987;</div>
-      <div style="font-family:var(--sans);font-size:16px;font-weight:700;color:var(--acc)">${sc.msg}</div>
-      ${sc.total > 1 ? `<div class="pb" style="margin-top:12px"><div class="pf" style="width:${Math.round(sc.done / sc.total * 100)}%"></div></div><div class="pl" style="margin-top:5px">${sc.done} of ${sc.total} images scanned</div>` : ''}
-    ` : `
-      <div style="font-size:28px;margin-bottom:8px">&#128247;</div>
-      <div style="font-family:var(--sans);font-size:17px;font-weight:700;color:var(--t1);letter-spacing:.2px">${t('scan_tap')}</div>
-      <div style="font-size:13px;color:var(--t3);margin-top:4px">${t('scan_sub')}</div>
-      ${/Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent) ? `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">&#9888; Open in Safari or Chrome</div>` : `<div style="font-size:11px;color:var(--acc);margin-top:8px;font-weight:600">${t('scan_tip')}</div>`}
-    `}
-  </label>
+  // ── STATS BAR ──
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;background:#13131E;border-radius:16px;overflow:hidden;margin-bottom:16px">';
+  h += '<div style="padding:16px;text-align:center;border-right:1px solid #2A2A40"><div style="font-family:var(--sans);font-size:30px;font-weight:900;color:#FF9900;line-height:1">11 km</div><div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1px;text-transform:uppercase;margin-top:5px">avg saved per shift</div></div>';
+  h += '<div style="padding:16px;text-align:center"><div style="font-family:var(--sans);font-size:30px;font-weight:900;color:#FF9900;line-height:1">18 min</div><div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1px;text-transform:uppercase;margin-top:5px">avg saved per shift</div></div>';
+  h += '</div>';
 
-  <!-- STOPS LIST -->
-  ${cnt ? `
-  <div style="margin-bottom:14px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
-      <div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--acc);text-transform:uppercase;display:flex;align-items:center;gap:8px">
-        Stops <span style="background:var(--acc);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px">${cnt}</span>
-      </div>
-      <span id="scanCountLbl" style="font-size:11px;color:var(--t3);user-select:none;-webkit-user-select:none">
-        ${S.stops.filter(s=>s.flexNum!=null).length} scanned &middot; ${S.stops.filter(s=>s.flexNum==null).length} manual
-      </span>
-    </div>
-    <div style="background:var(--surf);border-radius:16px;overflow:hidden;padding:12px 14px">
-      <div class="ir" style="margin-bottom:10px">
-        <div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Add address manually" value="${escH(S.manVal)}" style="font-size:14px"/></div>
-        <button class="badd" id="addBtn" style="height:42px;font-size:20px;padding:0 14px">+</button>
-      </div>
-      <div id="dbgPanel" style="display:none;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:10px;margin-bottom:8px;font-size:10px;font-family:var(--mono);color:var(--t3);white-space:pre-wrap;max-height:220px;overflow-y:auto;word-break:break-all"></div>
-      <div class="sscr"><div class="slist">${(function(){
-  var failed = S.stops.filter(function(s){ return s.geoFailed; });
-  var normal = S.stops.filter(function(s){ return !s.geoFailed; });
-  return failed.concat(normal).map(function(s, i){ return sRow(s, i); }).join('');
-})()}</div></div>
-      ${lastS ? `<div class="al ai" style="margin-top:8px;font-size:12px">Last stop: <strong style="font-family:var(--mono)">${escH(lastS.address)}</strong>${lastS.flexNum != null ? ` &mdash; pkg <strong>#${lastS.flexNum}</strong>` : ''}</div>` : ''}
-    </div>
-  </div>
-  ` : `
-  <div style="background:var(--surf);border-radius:16px;padding:12px 14px;margin-bottom:14px">
-    <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Or add stops manually</div>
-    <div class="ir">
-      <div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Type an address" value="${escH(S.manVal)}" style="font-size:14px"/></div>
-      <button class="badd" id="addBtn" style="height:42px;font-size:20px;padding:0 14px">+</button>
-    </div>
-    ${S._lastOCR ? `<div id="dbgPanel" style="display:none;background:var(--surf2);border:1px solid var(--brd);border-radius:var(--rs);padding:10px;margin-top:8px;font-size:10px;font-family:var(--mono);color:var(--t3);white-space:pre-wrap;max-height:220px;overflow-y:auto;word-break:break-all"></div>` : ''}
-  </div>
-  `}
-
-  ${S.geoFailed && S.geoFailed.length > 0 && S.stops.length > 0 ? `
-  <div class="failed-float" id="failedFloat" onclick="document.getElementById('failedFloat').style.display='none'">
-    &#9888; ${S.geoFailed.length} stop${S.geoFailed.length > 1 ? 's' : ''} not found &mdash; tap to dismiss
-  </div>` : ''}
-
-  ${S.errMsg ? `<div style="background:var(--err-d);border:1px solid var(--err);border-radius:10px;padding:12px 15px;margin-bottom:14px">
-    <div style="font-size:14px;color:var(--err);margin-bottom:10px">${escH(S.errMsg)}</div>
-    <button class="btn bp" id="retryOptBtn">${t("try_again")}</button>
-  </div>` : ''}
-
-  <!-- OPTIMIZE -->
-  <div style="margin-bottom:20px">
-    ${S.geoFailed && S.geoFailed.length > 0 ? `
-    <div style="background:var(--err-d);border:1px solid var(--err);border-radius:var(--rs);padding:9px 13px;font-family:var(--sans);font-size:13px;color:var(--err);text-align:center;margin-bottom:10px;font-weight:700;letter-spacing:.5px">
-      &#9888; ${t('resolve_first').replace('{n}',S.geoFailed.length).replace('{es}',S.geoFailed.length>1?'es':'')}
-    </div>
-    <button class="btn bp" disabled style="height:54px">&#9889; Optimize my route</button>` : `
-    <button class="btn bp" id="optBtn" ${!cnt ? 'disabled' : ''} style="height:54px">
-      &#9889; ${cnt ? `${t('optimize_btn')} &mdash; ${cnt} stop${cnt > 1 ? 's' : ''}` : 'Optimize my route'}
-    </button>`}
-    <div style="text-align:center;font-size:12px;color:var(--t3);margin-top:10px;letter-spacing:.3px">3 free routes &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>
-  </div>
-
-  <!-- STATS -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;background:var(--surf);border-radius:16px;overflow:hidden;margin-bottom:16px">
-    <div style="padding:16px;text-align:center;border-right:1px solid var(--brd)">
-      <div style="font-family:var(--sans);font-size:30px;font-weight:900;color:var(--acc);line-height:1">11 km</div>
-      <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:5px">avg saved per shift</div>
-    </div>
-    <div style="padding:16px;text-align:center">
-      <div style="font-family:var(--sans);font-size:30px;font-weight:900;color:var(--acc);line-height:1">18 min</div>
-      <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:5px">avg saved per shift</div>
-    </div>
-  </div>
-
-</div>`;}
+  h += '</div>'; // close .scr
+  return h;
+}
 
 function sRow(s, i) {
   const isL = S.lastId === s.id;
