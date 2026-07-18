@@ -1,6 +1,6 @@
 // FlexRoute Service Worker — offline support
 // v2: network-first for HTML so deploys reach users immediately
-const CACHE = 'flexroute-v3';   // bumped: v07e adds Netlify function routing   // ← bumped from v1; forces cache wipe on update
+const CACHE = 'flexroute-v4';   // bumped: v07e adds Netlify function routing   // ← bumped from v1; forces cache wipe on update
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
