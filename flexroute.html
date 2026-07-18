@@ -2518,17 +2518,17 @@ function vInput() {
   </div>
 
   <!-- SETUP CARD — always first, orange border until complete -->
-  <div style="background:var(--surf);border-radius:16px;overflow:hidden;margin-bottom:14px;border:1.5px solid ${setupDone ? 'var(--ok)' : 'var(--acc)'}">
-    <div style="padding:11px 16px;border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between">
-      <div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:${setupDone ? 'var(--ok)' : 'var(--acc)'};text-transform:uppercase">
+  <div style="background:#13131E;border-radius:16px;overflow:hidden;margin-bottom:14px;border:1.5px solid ${setupDone ? '#22D98A' : '#FF9900'}">
+    <div style="padding:11px 16px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:${setupDone ? '#22D98A' : '#FF9900'};text-transform:uppercase">
         ${setupDone ? '&#10003; Route setup complete' : '&#9432; Set depot &amp; home address'}
       </div>
       ${setupDone ? `<span style="font-size:11px;color:var(--t3)">${escH(S.userState||'')} &middot; ready</span>` : ''}
     </div>
-    <div style="background:var(--surf2)">
+    <div style="background:#1A1A28">
 
       <!-- Region -->
-      <div style="padding:10px 14px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:10px">
+      <div style="padding:10px 14px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;gap:10px">
         <span style="font-size:16px;flex-shrink:0">&#127758;</span>
         <div style="flex:1;min-width:0">
           <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Region</div>
@@ -2544,7 +2544,7 @@ function vInput() {
       </div>
 
       <!-- Start -->
-      <div style="padding:10px 14px;border-bottom:1px solid var(--brd)">
+      <div style="padding:10px 14px;border-bottom:1px solid #2A2A40">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:${S.gpsCoords || S.startAddr ? '0' : '8px'}">
           <span style="font-size:16px;flex-shrink:0">&#128204;</span>
           <div style="flex:1;min-width:0">
