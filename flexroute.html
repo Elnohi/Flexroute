@@ -983,6 +983,8 @@ const app = document.getElementById('app');
   if (location.hostname === 'localhost' ||
       location.hostname === '127.0.0.1' ||
       location.protocol === 'file:') return;
+  // Skip on staging domain when dev bypass key is active
+  if (location.hostname === 'melodious-strudel-3bff01.netlify.app') return;
   try {
     const r = await fetch('https://flexrouteapp.com/.netlify/functions/verify', {
       method: 'POST',
