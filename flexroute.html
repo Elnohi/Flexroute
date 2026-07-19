@@ -708,6 +708,14 @@ if (!navigator.onLine) document.getElementById('offlineBar').classList.add('show
 // by vPaywall() (declared earlier in the script than this used to be
 // declared), so this must come before any code that could call vPaywall().
 const FREE_TRIAL_ROUTE_LIMIT = 3;
+// ── PREMIUM MASTER SWITCH ────────────────────────────────────────────────────
+// false = silent mode: app is fully free, no trial counting, no paywall, no
+//         auth, no server entitlement calls. Grandfathering timestamps still
+//         accumulate so pre-paywall users are marked for launch day.
+// true  = monetization live: trial gate, paywall, Stripe — the full flow.
+// FLIP TO true ON LAUNCH DAY together with LAUNCH_DATE_MS (see legacyFree init).
+const PREMIUM_LIVE = false;
+// ─────────────────────────────────────────────────────────────────────────────
 
 const S = {
   apiKey:     ''  /* legacy Gemini key — unused */,   // Google Gemini key
@@ -775,10 +783,12 @@ const S = {
     var THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
     var granted = parseInt(localStorage.getItem('fr_legacy_free') || '0', 10);
     if (!granted) return false;
-    // Use launch date as the expiry anchor if set, otherwise fall back to
-    // the individual grant timestamp — ensures all legacy users expire at
-    // the same time (30 days after launch) not 30 days after their first visit.
-    var anchor = LAUNCH_DATE_MS > 0 ? LAUNCH_DATE_MS : granted;
+    // Until LAUNCH_DATE_MS is set, the clock does NOT tick: legacy users stay
+    // legacy indefinitely through the silent pre-launch period. The 30-day
+    // window only starts counting from the launch date itself, so all legacy
+    // users expire together 30 days after launch — never before it.
+    if (LAUNCH_DATE_MS === 0) return true;
+    var anchor = LAUNCH_DATE_MS;
     var expired = (Date.now() - anchor) > THIRTY_DAYS_MS;
     if (expired) {
       // Grace period over — downgrade to trial_available so they get the
@@ -1079,7 +1089,7 @@ window.addEventListener('load', () => {
   })();
 
   // ── Live entitlement check (fire-and-forget) ────────────────────────────
-  if (S.userEmail && S.legacyFree !== true) {
+  if (PREMIUM_LIVE && S.userEmail && S.legacyFree !== true) {
     fetch('/.netlify/functions/check-entitlement', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -2661,7 +2671,7 @@ function vInput() {
   } else {
     h += '<button class="btn bp" id="optBtn"' + (!cnt ? ' disabled' : '') + ' style="height:54px">&#9889; ' + (cnt ? t('optimize_btn') + ' &mdash; ' + cnt + ' stop' + (cnt > 1 ? 's' : '') : 'Optimize my route') + '</button>';
   }
-  h += '<div style="text-align:center;font-size:12px;color:#7878A0;margin-top:10px;letter-spacing:.3px">3 free routes &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>';
+  h += '<div style="text-align:center;font-size:12px;color:#7878A0;margin-top:10px;letter-spacing:.3px">' + (PREMIUM_LIVE ? '3 free routes' : 'Free') + ' &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>';
   h += '</div>';
 
   // ── STATS BAR ──
@@ -3864,6 +3874,7 @@ async function tryCensusBureau(address, ctxState, biasLat, biasLon, maxKm) {
 // counts toward the trial limit regardless of which optimizer produced it.
 // Never increments for legacy_free or paid users.
 function _consumeTrialIfApplicable() {
+  if (!PREMIUM_LIVE) return; // silent mode — no counting until launch day
   if (S.entitlement === 'legacy_free' || S.entitlement === 'paid') return;
   S.trialRoutesUsed = (S.trialRoutesUsed || 0) + 1;
   localStorage.setItem('fr_trial_routes_used', String(S.trialRoutesUsed));
@@ -3891,7 +3902,7 @@ async function optimize() {
   // users always pass. Everyone else gets FREE_TRIAL_ROUTE_LIMIT (3) free
   // optimized routes, tracked by a counter rather than a single used/unused
   // flag (was 1 free route; increased to 3 per updated plan).
-  if (S.entitlement !== 'legacy_free' && S.entitlement !== 'paid' && S.trialRoutesUsed >= FREE_TRIAL_ROUTE_LIMIT) {
+  if (PREMIUM_LIVE && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid' && S.trialRoutesUsed >= FREE_TRIAL_ROUTE_LIMIT) {
     S.phase = 'paywall';
     render();
     trackEvent('paywall_shown', { reason: 'trial_used', routes_used: S.trialRoutesUsed });
