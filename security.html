@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Security — FlexRoute</title>
+<meta name="description" content="How FlexRoute protects your data, and how to report a vulnerability.">
+<style>
+  :root{
+    --bg:#0A0A12; --card:#13131E; --line:#2A2A40;
+    --acc:#FF9900; --ok:#22D98A; --t1:#FFFFFF; --t2:#C8C8E8; --t3:#7878A0;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--t2);font-family:var(--sans);font-size:16px;line-height:1.65;-webkit-text-size-adjust:100%}
+  .wrap{max-width:720px;margin:0 auto;padding:32px 20px 72px}
+  header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:28px}
+  .brand{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);font-weight:700}
+  h1{font-size:28px;line-height:1.2;color:var(--t1);margin:10px 0 8px;font-weight:900;letter-spacing:-.3px}
+  .sub{color:var(--t3);font-size:15px}
+  h2{font-size:18px;color:var(--t1);font-weight:800;margin:34px 0 12px;letter-spacing:-.2px}
+  p{margin:0 0 14px} a{color:var(--acc)}
+  ul{margin:0 0 14px;padding-left:20px} li{margin-bottom:7px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:12px}
+  .card h3{margin:0 0 6px;font-size:15px;color:var(--t1);font-weight:700}
+  .card p{margin:0;font-size:14px}
+  .card.good{border-left:3px solid var(--ok)}
+  .note{background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:14px 16px;font-size:14px;margin:20px 0}
+  .mail{display:block;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;text-decoration:none;margin:18px 0;transition:border-color .15s ease}
+  .mail:hover,.mail:focus-visible{border-color:var(--acc);outline:none}
+  .mail .lbl{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--t3);font-weight:700}
+  .mail .addr{font-family:var(--mono);font-size:17px;color:var(--acc);margin-top:6px;word-break:break-all}
+  footer{border-top:1px solid var(--line);margin-top:44px;padding-top:20px;font-size:13px;color:var(--t3)}
+  .lnks{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:14px;margin-bottom:14px}
+  .lnks a{color:var(--t2);text-decoration:none}
+  .lnks a:hover,.lnks a:focus-visible{color:var(--acc);text-decoration:underline;outline:none}
+  .lnks .sep{color:var(--line)}
+  .lnks a.play,.lnks a[aria-current]{color:var(--acc);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand">FlexRoute</div>
+  <h1>Security</h1>
+  <div class="sub">What we do to protect your data, stated plainly &mdash; including the parts we don't control.</div>
+</header>
+
+<h2>How FlexRoute is built</h2>
+
+<div class="card good">
+  <h3>Your route data stays on your phone</h3>
+  <p>Stops, addresses, depot and home locations are held in your device's local storage. There is no FlexRoute database of driver routes, so there is no central store of delivery addresses to breach.</p>
+</div>
+
+<div class="card good">
+  <h3>No passwords to steal</h3>
+  <p>FlexRoute has no password system. Free use needs no account at all. Subscribers sign in with a short-lived code sent to their email, so there's no password database and nothing to reuse if another service is breached.</p>
+</div>
+
+<div class="card good">
+  <h3>We never touch your card</h3>
+  <p>Payment details are entered on Stripe's own checkout and never reach FlexRoute's servers. We store only your email and whether your subscription is active.</p>
+</div>
+
+<div class="card good">
+  <h3>Encrypted in transit</h3>
+  <p>All traffic runs over HTTPS. The app refuses to run on any domain other than flexrouteapp.com, so a cloned copy on another host won't function.</p>
+</div>
+
+<div class="card good">
+  <h3>Backend requests are origin-checked</h3>
+  <p>Our scanning and address-lookup functions reject requests that don't come from FlexRoute itself. This stops third parties from running billed services in your name and protects the shared rate limits the app depends on.</p>
+</div>
+
+<h2>What we don't claim</h2>
+<p>Being straight with you is more useful than a wall of badges:</p>
+<ul>
+  <li>FlexRoute is built and maintained by <strong>one developer</strong>. There is no security team and no 24/7 monitoring.</li>
+  <li>We have <strong>no formal certification</strong> &mdash; no SOC 2, no ISO 27001, no third-party penetration test.</li>
+  <li>Addresses you enter <strong>are sent to outside mapping services</strong> to be turned into coordinates and a route. That's unavoidable for any routing tool. See the <a href="/privacy.html">Privacy Policy</a> for exactly who receives what.</li>
+  <li>We depend on Netlify, Stripe, Google and OpenStreetMap. Their security is theirs, not ours.</li>
+</ul>
+
+<h2>What you can do</h2>
+<ul>
+  <li>Use <strong>Settings &rarr; Clear app data</strong> at the end of a shift if you share your phone.</li>
+  <li>Keep a lock screen on your device &mdash; it's the main thing protecting locally stored route data.</li>
+  <li>Install from <a href="https://play.google.com/store/apps/details?id=com.flexrouteapp.twa&amp;pcampaignid=web_share" target="_blank" rel="noopener">Google Play</a> or use flexrouteapp.com directly. Don't trust copies on other domains.</li>
+  <li>FlexRoute will <strong>never</strong> ask for your delivery platform login, and never asks for a password. If something claiming to be FlexRoute does, it isn't us.</li>
+</ul>
+
+<h2>Reporting a vulnerability</h2>
+<p>If you've found a security problem, we want to hear about it, and you won't get a hostile response.</p>
+
+<a class="mail" href="mailto:flexrouteapp@gmail.com?subject=Security%20report">
+  <div class="lbl">Security reports</div>
+  <div class="addr">flexrouteapp@gmail.com</div>
+</a>
+
+<p>Please include what you found, how to reproduce it, and what an attacker could do with it. We'll acknowledge within <strong>3 business days</strong>, tell you our assessment and a rough fix timeline, and let you know when it's resolved. We're happy to credit you publicly if you'd like.</p>
+
+<p><strong>What we ask:</strong> give us reasonable time to fix an issue before disclosing it publicly. Don't access, modify or delete data belonging to other drivers. Don't run attacks that degrade the service for people trying to work. Test against your own account and data only.</p>
+
+<div class="note">
+FlexRoute is a solo project with running API costs and no security budget, so we can't offer paid bounties. What we can offer is a fast, respectful response, public credit, and an actual fix.
+</div>
+
+<h2>If something goes wrong</h2>
+<p>If a breach ever affects your data, we'll tell affected users by email, publish what happened here, and notify regulators where the law requires it. We won't quietly sit on it.</p>
+
+<footer>
+  <nav class="lnks">
+    <a href="/privacy.html">Privacy Policy</a><span class="sep">&bull;</span>
+    <a href="/tos.html">Terms of Service</a><span class="sep">&bull;</span>
+    <a href="/refund.html">Refund Policy</a><span class="sep">&bull;</span>
+    <a href="/security.html" aria-current="page">Security</a><span class="sep">&bull;</span>
+    <a href="/contact.html">Contact</a><span class="sep">&bull;</span>
+    <a class="play" href="https://play.google.com/store/apps/details?id=com.flexrouteapp.twa&amp;pcampaignid=web_share" target="_blank" rel="noopener">Get it on Google Play</a>
+  </nav>
+  <div>&copy; 2026 FlexRoute. Not affiliated with Amazon.com, Inc.</div>
+</footer>
+
+</div>
+</body>
+</html>

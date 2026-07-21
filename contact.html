@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Contact — FlexRoute</title>
+<meta name="description" content="Get help with FlexRoute — billing, missing addresses, bug reports and feature requests.">
+<style>
+  :root{
+    --bg:#0A0A12; --card:#13131E; --line:#2A2A40;
+    --acc:#FF9900; --ok:#22D98A; --t1:#FFFFFF; --t2:#C8C8E8; --t3:#7878A0;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--t2);font-family:var(--sans);
+       font-size:16px;line-height:1.65;-webkit-text-size-adjust:100%}
+  .wrap{max-width:720px;margin:0 auto;padding:32px 20px 80px}
+  header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:28px}
+  .brand{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);font-weight:700}
+  h1{font-size:28px;line-height:1.2;color:var(--t1);margin:10px 0 8px;font-weight:900;letter-spacing:-.3px}
+  .sub{color:var(--t3);font-size:15px}
+  h2{font-size:18px;color:var(--t1);font-weight:800;margin:34px 0 12px;letter-spacing:-.2px}
+  p{margin:0 0 14px}
+  a{color:var(--acc)}
+  ul{margin:0 0 14px;padding-left:20px}
+  li{margin-bottom:7px}
+
+  .mail{display:block;background:var(--card);border:1px solid var(--line);
+        border-radius:14px;padding:20px;text-decoration:none;margin-bottom:10px;
+        transition:border-color .15s ease}
+  .mail:hover,.mail:focus-visible{border-color:var(--acc);outline:none}
+  .mail .lbl{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--t3);font-weight:700}
+  .mail .addr{font-family:var(--mono);font-size:17px;color:var(--acc);margin-top:6px;word-break:break-all}
+  .mail .hint{font-size:13px;color:var(--t3);margin-top:6px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+        padding:18px 20px;margin-bottom:12px}
+  .card h3{margin:0 0 6px;font-size:15px;color:var(--t1);font-weight:700}
+  .card p{margin:0;font-size:14px;color:var(--t2)}
+  .card .tag{display:inline-block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
+             font-weight:700;color:var(--ok);margin-bottom:8px}
+  .tag.slow{color:var(--t3)}
+
+  .fix{border-left:3px solid var(--ok)}
+  .checklist{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .checklist ul{margin-bottom:0}
+  .note{background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);
+        border-radius:10px;padding:14px 16px;font-size:14px;margin:20px 0}
+  footer{border-top:1px solid var(--line);margin-top:44px;padding-top:20px;font-size:13px;color:var(--t3)}
+  footer a{color:var(--t3)}
+  .nav{display:flex;gap:16px;flex-wrap:wrap;font-size:14px}
+  .lnks{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:14px;margin-bottom:14px}
+  .lnks a{color:var(--t2);text-decoration:none}
+  .lnks a:hover,.lnks a:focus-visible{color:var(--acc);text-decoration:underline;outline:none}
+  .lnks .sep{color:var(--line)}
+  .lnks a.play,.lnks a[aria-current]{color:var(--acc);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand">FlexRoute</div>
+  <h1>Contact &amp; support</h1>
+  <div class="sub">FlexRoute is built and supported by one person. You'll get a real reply, not a ticket bot &mdash; but give it a day or two.</div>
+</header>
+
+<a class="mail" href="mailto:flexrouteapp@gmail.com">
+  <div class="lbl">Email support</div>
+  <div class="addr">flexrouteapp@gmail.com</div>
+  <div class="hint">Tap to open your mail app</div>
+</a>
+
+<h2>What to expect</h2>
+
+<div class="card">
+  <div class="tag">Within 24 hours</div>
+  <h3>Billing and subscriptions</h3>
+  <p>Charged twice, need a refund, can't access premium after paying, or want to cancel. Payment issues jump the queue.</p>
+</div>
+
+<div class="card">
+  <div class="tag">1&ndash;3 days</div>
+  <h3>Something's broken</h3>
+  <p>Scanning misses addresses, a stop won't geocode, the route looks wrong, or the app won't load.</p>
+</div>
+
+<div class="card">
+  <div class="tag slow">When there's time</div>
+  <h3>Feature requests</h3>
+  <p>Tell us anyway. A lot of what's in FlexRoute today came from drivers emailing to say what was missing.</p>
+</div>
+
+<div class="card">
+  <div class="tag">Within 30 days</div>
+  <h3>Privacy and data requests</h3>
+  <p>Access, correction, or deletion of anything we hold. See the <a href="/privacy.html">Privacy Policy</a> for what that covers.</p>
+</div>
+
+<h2>Try this first</h2>
+<p>These four cover most of what lands in the inbox, and each takes under a minute.</p>
+
+<div class="card fix">
+  <h3>A stop won't geocode</h3>
+  <p>Check that your <strong>Region</strong> is set correctly at the top of the app &mdash; a wrong region sends the lookup to the wrong country. Then try adding the city and postal code to the address.</p>
+</div>
+
+<div class="card fix">
+  <h3>Scanning missed addresses</h3>
+  <p>Screenshot the itinerary list rather than photographing your screen, and keep the text upright and unobscured. You can always add any missed stop by typing it.</p>
+</div>
+
+<div class="card fix">
+  <h3>A stop looks like it's in the wrong place</h3>
+  <p>Tap the 📍 verify link next to it. That opens the exact pin on Google Maps, so you can see where FlexRoute thinks the stop is. If the pin is wrong, send us the address.</p>
+</div>
+
+<div class="card fix">
+  <h3>You paid but premium isn't active</h3>
+  <p>Make sure you're using the same email you entered at checkout. If it still won't unlock, email us with that address and we'll fix it manually.</p>
+</div>
+
+<h2>Sending a bug report</h2>
+<div class="checklist">
+  <p style="margin-bottom:10px;font-size:14px">Include these and there's a good chance it's fixed in one round instead of four:</p>
+  <ul>
+    <li>Your phone and browser &mdash; e.g. "Pixel 7, Chrome" or "iPhone 13, Safari"</li>
+    <li>Whether you installed from Google Play or use it in a browser</li>
+    <li>The exact address or stop involved, if it's a routing or scanning issue</li>
+    <li>What you expected, and what happened instead</li>
+    <li>A screenshot, if you can</li>
+  </ul>
+</div>
+
+<div class="note">
+<strong>One thing we can't help with:</strong> anything about your delivery account, your blocks, your pay, or your standing with a delivery platform. FlexRoute is an independent tool with no connection to any of them and no access to your account. For those, contact the platform's own support.
+</div>
+
+<footer>
+  <nav class="lnks">
+    <a href="/privacy.html">Privacy Policy</a><span class="sep">&bull;</span>
+    <a href="/tos.html">Terms of Service</a><span class="sep">&bull;</span>
+    <a href="/refund.html">Refund Policy</a><span class="sep">&bull;</span>
+    <a href="/security.html">Security</a><span class="sep">&bull;</span>
+    <a href="/contact.html" aria-current="page">Contact</a><span class="sep">&bull;</span>
+    <a class="play" href="https://play.google.com/store/apps/details?id=com.flexrouteapp.twa&amp;pcampaignid=web_share" target="_blank" rel="noopener">Get it on Google Play</a>
+  </nav>
+  <div>&copy; 2026 FlexRoute. Not affiliated with Amazon.com, Inc.</div>
+</footer>
+
+</div>
+</body>
+</html>

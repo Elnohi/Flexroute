@@ -1,57 +1,195 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Privacy Policy – FlexRoute</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Privacy Policy — FlexRoute</title>
+<meta name="description" content="How FlexRoute handles addresses, screenshots, location and payment data.">
 <style>
-  body { font-family: -apple-system, sans-serif; max-width: 720px; margin: 0 auto; padding: 32px 20px; color: #222; line-height: 1.7; }
-  h1 { color: #D97000; }
-  h2 { margin-top: 2rem; color: #333; }
-  a { color: #D97000; }
-  footer { margin-top: 3rem; font-size: 13px; color: #888; }
+  :root{
+    --bg:#0A0A12; --card:#13131E; --line:#2A2A40;
+    --acc:#FF9900; --ok:#22D98A; --t1:#FFFFFF; --t2:#C8C8E8; --t3:#7878A0;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--t2);font-family:var(--sans);
+       font-size:16px;line-height:1.65;-webkit-text-size-adjust:100%}
+  .wrap{max-width:720px;margin:0 auto;padding:32px 20px 80px}
+  header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:32px}
+  .brand{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);font-weight:700}
+  h1{font-size:28px;line-height:1.2;color:var(--t1);margin:10px 0 6px;font-weight:900;letter-spacing:-.3px}
+  .eff{font-family:var(--mono);font-size:12px;color:var(--t3)}
+  h2{font-size:18px;color:var(--t1);font-weight:800;margin:36px 0 10px;letter-spacing:-.2px}
+  h3{font-size:14px;color:var(--acc);font-weight:700;margin:22px 0 6px}
+  p{margin:0 0 14px}
+  a{color:var(--acc)}
+  ul{margin:0 0 14px;padding-left:20px}
+  li{margin-bottom:7px}
+  .tl{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--ok);
+      border-radius:12px;padding:18px 20px;margin-bottom:8px}
+  .tl h2{margin-top:0;font-size:15px}
+  .tl ul{margin-bottom:0}
+  .note{background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);
+        border-radius:10px;padding:14px 16px;font-size:14px;color:var(--t2);margin:18px 0}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin:0 0 16px;display:block;overflow-x:auto}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--t3);font-size:11px;letter-spacing:1px;text-transform:uppercase;font-weight:700;white-space:nowrap}
+  td:first-child{color:var(--t1);font-weight:600;white-space:nowrap}
+  footer{border-top:1px solid var(--line);margin-top:48px;padding-top:20px;
+         font-size:13px;color:var(--t3)}
+  footer a{color:var(--t3)}
+  .nav{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:14px}
+  code{font-family:var(--mono);font-size:13px;color:var(--ok)}
+  .lnks{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:14px;margin-bottom:14px}
+  .lnks a{color:var(--t2);text-decoration:none}
+  .lnks a:hover,.lnks a:focus-visible{color:var(--acc);text-decoration:underline;outline:none}
+  .lnks .sep{color:var(--line)}
+  .lnks a.play,.lnks a[aria-current]{color:var(--acc);font-weight:700}
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<h1>Privacy Policy</h1>
-<p><strong>FlexRoute</strong> – <a href="https://flexrouteapp.com">flexrouteapp.com</a><br>
-Last updated: May 31, 2026</p>
+<header>
+  <div class="brand">FlexRoute</div>
+  <h1>Privacy Policy</h1>
+  <div class="eff">Effective 1 August 2026 &middot; Last updated 21 July 2026</div>
+</header>
 
-<h2>Overview</h2>
-<p>FlexRoute is a free route optimization tool for delivery drivers. We are committed to protecting your privacy. This policy explains what data we collect, how we use it, and your rights.</p>
+<div class="tl">
+  <h2>The short version</h2>
+  <ul>
+    <li>You don't need an account to use FlexRoute. No sign-up, no password, no delivery-platform login.</li>
+    <li>Your stops, depot and home address live in your phone's local storage &mdash; not on our servers.</li>
+    <li>Addresses are sent to mapping services so they can be turned into map pins and a route. That's what makes the app work.</li>
+    <li>Screenshots you scan are read for text and then discarded. We don't keep them.</li>
+    <li>We ask for your email only if you buy a subscription. Card details go straight to Stripe &mdash; we never see them.</li>
+    <li>We don't sell your data, and we don't run ads.</li>
+  </ul>
+</div>
 
-<h2>Data We Collect</h2>
-<p><strong>No personal data is collected or stored on our servers.</strong></p>
+<p style="font-size:13px;color:var(--t3)">The rest of this page explains each of those points precisely, including exactly which companies receive which data.</p>
+
+<h2>1. Who we are</h2>
+<p>FlexRoute is an independent route-optimisation tool operated by a single developer. You can reach us at <a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a> or through our <a href="/contact.html">contact page</a>.</p>
+<p>FlexRoute is not affiliated with, endorsed by, or connected to Amazon.com, Inc. or any of its subsidiaries. We are not affiliated with any delivery platform.</p>
+
+<h2>2. What FlexRoute stores on your device</h2>
+<p>Most of what you put into FlexRoute never leaves your phone. The following are saved in your browser's local storage so the app still works the next time you open it:</p>
 <ul>
-  <li><strong>Screenshots you upload</strong> are processed entirely in your browser using OCR. They are never sent to our servers.</li>
-  <li><strong>Addresses</strong> from your delivery itinerary are sent to third-party geocoding services (Photon, Nominatim / OpenStreetMap) to convert addresses to GPS coordinates. These requests do not include any identifying information about you.</li>
-  <li><strong>Route optimization</strong> is performed via the OSRM public API using only GPS coordinates — no addresses or personal information.</li>
-  <li><strong>Local storage</strong> is used to save your home address, start location, and last route on your own device. This data never leaves your device.</li>
+  <li>Your current list of stops and the optimised order</li>
+  <li>Your depot / warehouse start address</li>
+  <li>Your home address, if you set one as an end point</li>
+  <li>Preferences: region, distance units, navigation app, text size, map zoom</li>
+  <li>Shift Mode progress &mdash; which stops you've completed</li>
+  <li>An optional Google Maps API key, if you choose to add your own</li>
+</ul>
+<p>We cannot read any of this remotely. You can erase all of it at any time using <strong>Settings &rarr; Clear app data</strong>, or by clearing site data for FlexRoute in your browser or Android app settings. Uninstalling the app also removes it.</p>
+
+<h2>3. What gets sent off your device, and to whom</h2>
+<p>Some features can't work without sending data to an outside service. Here is the complete list.</p>
+
+<table>
+  <tr><th>Data</th><th>Goes to</th><th>Why</th></tr>
+  <tr>
+    <td>Addresses<br>you type or scan</td>
+    <td>Photon (Komoot), Nominatim (OpenStreetMap Foundation), U.S. Census Geocoder, and Google Maps &mdash; only if you supply your own API key</td>
+    <td>To convert a written address into map coordinates, and to suggest addresses as you type</td>
+  </tr>
+  <tr>
+    <td>Map coordinates<br>for your stops</td>
+    <td>OSRM routing service</td>
+    <td>To calculate real driving times and produce the optimised order</td>
+  </tr>
+  <tr>
+    <td>Screenshots or<br>PDFs you scan</td>
+    <td>Google Cloud Vision, for server-side scanning</td>
+    <td>To read the addresses printed in the image</td>
+  </tr>
+  <tr>
+    <td>Your email address</td>
+    <td>Resend (delivers the code), Stripe (payment records)</td>
+    <td>Only if you buy a subscription &mdash; to send your sign-in code and link your purchase</td>
+  </tr>
+  <tr>
+    <td>Payment details</td>
+    <td>Stripe only</td>
+    <td>To process payment. These never touch FlexRoute's servers.</td>
+  </tr>
+  <tr>
+    <td>IP address and<br>basic request logs</td>
+    <td>Netlify, our host</td>
+    <td>Standard server logs, security and abuse prevention</td>
+  </tr>
+</table>
+
+<h3>About scanning</h3>
+<p>Depending on your device, scanning happens either entirely on your phone or on our server. When it happens on the server, the image is sent to Google Cloud Vision, the text is extracted, and the image is discarded when the request finishes. FlexRoute does not save your screenshots, and does not store them in any database.</p>
+<p>Scanned screenshots typically contain delivery addresses and package numbers. Please avoid uploading images containing information you don't want processed &mdash; you can always add stops by typing them instead.</p>
+
+<h3>About location</h3>
+<p>If you tap <strong>Use GPS to detect location</strong>, your browser asks for permission and FlexRoute uses those coordinates once to fill in your starting point. We don't track you in the background, we don't log your movements during a shift, and we don't record where you drive. Declining the permission only means you type your depot address instead.</p>
+
+<h3>About addresses and privacy</h3>
+<p>To be direct with you: delivery addresses and your home address are personal information. FlexRoute is built so that this data stays on your device wherever possible, but geocoding and routing genuinely require sending addresses to the mapping services listed above. Any tool that turns an address into a route must do this. What we can promise is that we don't store them server-side, don't attach them to your identity, and don't sell or share them for advertising.</p>
+
+<h2>4. Accounts and email</h2>
+<p>FlexRoute is usable with no account at all. If you subscribe, we ask for an email address and send you a six-digit sign-in code. We store that email and a short-lived code so we can confirm it's you and check whether your subscription is active. The code expires shortly after it's issued.</p>
+<p>We use your email only to: deliver sign-in codes, confirm your subscription status, and reply if you contact support. We don't send marketing email.</p>
+
+<h2>5. Payments</h2>
+<p>Subscriptions are handled by <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe</a>. Card numbers are entered on Stripe's own checkout page and are never transmitted to or stored by FlexRoute. We keep only your email and whether your subscription is currently active.</p>
+
+<h2>6. How long we keep things</h2>
+<ul>
+  <li><strong>On-device data</strong> &mdash; until you clear it or uninstall. We have no copy.</li>
+  <li><strong>Screenshots</strong> &mdash; not retained. Discarded once text is extracted.</li>
+  <li><strong>Addresses sent for geocoding</strong> &mdash; not retained by us. Third-party providers keep their own logs under their own policies.</li>
+  <li><strong>Sign-in codes</strong> &mdash; deleted shortly after they expire.</li>
+  <li><strong>Email and subscription status</strong> &mdash; kept while your subscription is active, and afterwards only as long as needed for tax and accounting records.</li>
+  <li><strong>Server logs</strong> &mdash; kept briefly by Netlify for security and diagnostics.</li>
 </ul>
 
-<h2>Analytics</h2>
-<p>We use Google Analytics (GA4) to collect anonymous usage statistics such as page views, feature usage counts, and general location (country level). No personally identifiable information is collected. You can opt out using standard browser settings or extensions.</p>
+<h2>7. Your rights</h2>
+<p>Because most of your data is on your own device, the fastest way to exercise most rights is <strong>Settings &rarr; Clear app data</strong>, which is immediate and complete.</p>
+<p>For anything we hold server-side &mdash; realistically, your email and subscription record &mdash; you can ask us to show it to you, correct it, delete it, or send you a copy. Email <a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a> and we'll respond within 30 days.</p>
+<p>If you're in the UK or the European Economic Area, the GDPR gives you these rights plus the right to object to processing and to complain to your national data protection authority. Our lawful bases are: performance of a contract, for delivering the service you asked for; legitimate interests, for security and abuse prevention; and consent, for optional device location.</p>
+<p>If you're in California, the CCPA gives you rights to know, delete, correct, and opt out of sale or sharing. <strong>We do not sell or share personal information</strong>, and we never have.</p>
 
-<h2>Third-Party Services</h2>
-<ul>
-  <li><a href="https://www.openstreetmap.org/copyright">OpenStreetMap / Nominatim</a> – geocoding</li>
-  <li><a href="https://photon.komoot.io">Photon by Komoot</a> – geocoding</li>
-  <li><a href="https://project-osrm.org">OSRM</a> – route optimization</li>
-  <li><a href="https://policies.google.com/privacy">Google Analytics</a> – anonymous usage analytics</li>
-</ul>
+<h2>8. Children</h2>
+<p>FlexRoute is a tool for working delivery drivers and is not directed at children. We don't knowingly collect information from anyone under 13 (or under 16 in the EEA/UK). If you believe a child has provided us information, contact us and we'll delete it.</p>
 
-<h2>Children's Privacy</h2>
-<p>FlexRoute is intended for adult delivery drivers. We do not knowingly collect data from children under 13.</p>
+<h2>9. Security</h2>
+<p>Traffic to FlexRoute is encrypted over HTTPS. Payments are isolated at Stripe. Our backend functions reject requests that don't originate from our own domain, which limits third parties from running up our billed services in your name.</p>
+<p>No system is perfectly secure. If you find a vulnerability, please tell us at <a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a> before disclosing it publicly &mdash; we'll respond quickly and credit you if you'd like.</p>
 
-<h2>Changes to This Policy</h2>
-<p>We may update this policy from time to time. Changes will be posted on this page with an updated date.</p>
+<h2>10. International transfers</h2>
+<p>Our providers &mdash; Netlify, Stripe, Google, Resend, and the mapping services &mdash; operate servers in several countries, including the United States. Using FlexRoute means your data may be processed outside your home country under those providers' own safeguards.</p>
 
-<h2>Contact</h2>
-<p>If you have any questions about this privacy policy, contact us at:<br>
-<a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a></p>
+<h2>11. Changes to this policy</h2>
+<p>If we change how FlexRoute handles data, we'll update this page and move the "last updated" date at the top. For changes that meaningfully affect your privacy, we'll show a notice in the app. Continuing to use FlexRoute after a change means you accept the updated policy.</p>
 
-<footer>© 2026 FlexRoute · <a href="https://flexrouteapp.com">flexrouteapp.com</a></footer>
+<h2>12. Contact</h2>
+<p>Questions about privacy, or a request about your data:<br>
+<a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a> &middot; <a href="/contact.html">Contact page</a></p>
 
+<div class="note">
+FlexRoute is an independent tool. It is not affiliated with, endorsed by, or connected to Amazon.com, Inc. or any delivery platform. Trademarks belong to their respective owners.
+</div>
+
+<footer>
+  <nav class="lnks">
+    <a href="/privacy.html" aria-current="page">Privacy Policy</a><span class="sep">&bull;</span>
+    <a href="/tos.html">Terms of Service</a><span class="sep">&bull;</span>
+    <a href="/refund.html">Refund Policy</a><span class="sep">&bull;</span>
+    <a href="/security.html">Security</a><span class="sep">&bull;</span>
+    <a href="/contact.html">Contact</a><span class="sep">&bull;</span>
+    <a class="play" href="https://play.google.com/store/apps/details?id=com.flexrouteapp.twa&amp;pcampaignid=web_share" target="_blank" rel="noopener">Get it on Google Play</a>
+  </nav>
+  <div>&copy; 2026 FlexRoute. All rights reserved. Not affiliated with Amazon.com, Inc.</div>
+</footer>
+
+</div>
 </body>
 </html>

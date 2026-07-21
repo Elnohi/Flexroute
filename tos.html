@@ -1,132 +1,161 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="robots" content="noindex">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Terms of Service — FlexRoute</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<meta name="description" content="The terms you agree to when using FlexRoute.">
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:#0A0A12;color:#C8C8E8;font-family:'DM Sans',sans-serif;font-size:16px;line-height:1.7;padding:0 0 80px}
-nav{position:sticky;top:0;background:rgba(10,10,18,.95);backdrop-filter:blur(12px);border-bottom:1px solid #2A2A40;padding:14px 24px;display:flex;align-items:center;justify-content:space-between}
-.nav-logo{font-family:'DM Sans',sans-serif;font-weight:600;font-size:18px;color:#FF9900;text-decoration:none}
-.nav-home{font-size:14px;color:#7878A0;text-decoration:none}
-.nav-home:hover{color:#C8C8E8}
-main{max-width:720px;margin:0 auto;padding:48px 24px 0}
-h1{font-size:32px;font-weight:600;color:#FFFFFF;margin-bottom:8px}
-.last-updated{font-size:13px;color:#7878A0;margin-bottom:40px}
-h2{font-size:19px;font-weight:600;color:#FFFFFF;margin:36px 0 12px;padding-bottom:8px;border-bottom:1px solid #2A2A40}
-h3{font-size:16px;font-weight:600;color:#C8C8E8;margin:20px 0 8px}
-p{margin-bottom:14px;color:#C8C8E8}
-ul{margin:0 0 14px 20px}
-li{margin-bottom:8px;color:#C8C8E8}
-strong{color:#FFFFFF;font-weight:500}
-.highlight{background:#13131E;border:1px solid #2A2A40;border-left:3px solid #FF9900;border-radius:0 8px 8px 0;padding:14px 18px;margin:16px 0}
-.highlight p{margin:0;font-size:15px}
-a{color:#FF9900;text-decoration:none}
-a:hover{text-decoration:underline}
-.footer{margin-top:60px;padding-top:24px;border-top:1px solid #2A2A40;font-size:13px;color:#7878A0}
-.contact-box{background:#13131E;border:1px solid #2A2A40;border-radius:10px;padding:20px 24px;margin-top:24px}
-.contact-box p{margin:0;font-size:15px}
+  :root{
+    --bg:#0A0A12; --card:#13131E; --line:#2A2A40;
+    --acc:#FF9900; --ok:#22D98A; --warn:#FF4455; --t1:#FFFFFF; --t2:#C8C8E8; --t3:#7878A0;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--t2);font-family:var(--sans);font-size:16px;line-height:1.65;-webkit-text-size-adjust:100%}
+  .wrap{max-width:720px;margin:0 auto;padding:32px 20px 72px}
+  header{border-bottom:1px solid var(--line);padding-bottom:20px;margin-bottom:28px}
+  .brand{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--acc);font-weight:700}
+  h1{font-size:28px;line-height:1.2;color:var(--t1);margin:10px 0 6px;font-weight:900;letter-spacing:-.3px}
+  .eff{font-family:var(--mono);font-size:12px;color:var(--t3)}
+  h2{font-size:18px;color:var(--t1);font-weight:800;margin:34px 0 10px;letter-spacing:-.2px}
+  h2 .n{color:var(--t3);font-family:var(--mono);font-size:13px;font-weight:400;margin-right:8px}
+  p{margin:0 0 14px} a{color:var(--acc)}
+  ul{margin:0 0 14px;padding-left:20px} li{margin-bottom:7px}
+  .tl{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--ok);border-radius:12px;padding:18px 20px}
+  .tl h2{margin-top:0;font-size:15px} .tl ul{margin-bottom:0}
+  .safety{background:rgba(255,68,85,.10);border:1px solid rgba(255,68,85,.45);border-radius:12px;padding:18px 20px;margin:22px 0}
+  .safety h3{margin:0 0 8px;font-size:15px;color:var(--warn);font-weight:800;letter-spacing:.3px}
+  .safety p{margin:0;font-size:14px;color:var(--t2)}
+  .note{background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:14px 16px;font-size:14px;margin:20px 0}
+  .caps{font-size:14px;color:var(--t2)}
+  footer{border-top:1px solid var(--line);margin-top:44px;padding-top:20px;font-size:13px;color:var(--t3)}
+  .lnks{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:14px;margin-bottom:14px}
+  .lnks a{color:var(--t2);text-decoration:none}
+  .lnks a:hover,.lnks a:focus-visible{color:var(--acc);text-decoration:underline;outline:none}
+  .lnks .sep{color:var(--line)}
+  .lnks a.play,.lnks a[aria-current]{color:var(--acc);font-weight:700}
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<nav>
-  <a href="/" class="nav-logo">FlexRoute</a>
-  <a href="/flexroute.html" class="nav-home">&#8592; Back to app</a>
-</nav>
-
-<main>
+<header>
+  <div class="brand">FlexRoute</div>
   <h1>Terms of Service</h1>
-  <div class="last-updated">Last updated: May 2026</div>
+  <div class="eff">Effective 1 August 2026 &middot; Last updated 21 July 2026</div>
+</header>
 
-  <div class="highlight">
-    <p>FlexRoute is free to use for personal delivery work. The code, design, and algorithms are protected by copyright. You may not copy, clone, or redistribute this software.</p>
-  </div>
-
-  <h2>1. Acceptance of Terms</h2>
-  <p>By accessing or using FlexRoute at <strong>flexrouteapp.com</strong> ("the App"), you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the App.</p>
-
-  <h2>2. Intellectual Property</h2>
-  <p>FlexRoute — including its source code, algorithms, design, user interface, route optimization logic, OCR parsing logic, and all associated materials — is the exclusive intellectual property of FlexRoute and is protected by copyright law.</p>
-
-  <h3>You may not:</h3>
+<div class="tl">
+  <h2>The short version</h2>
   <ul>
-    <li>Copy, reproduce, or redistribute the App's source code or design, in whole or in part</li>
-    <li>Create derivative works based on the App without written permission</li>
-    <li>Deploy the App on any domain other than <strong>flexrouteapp.com</strong></li>
-    <li>Reverse engineer, decompile, or attempt to extract the App's proprietary algorithms</li>
-    <li>Use the App's code or design as the basis for a competing product or service</li>
-    <li>Remove or alter any copyright notices contained in the App</li>
-    <li>Sell, sublicense, or commercially exploit the App or any portion thereof</li>
+    <li>FlexRoute suggests an efficient order for your stops. You're still the driver &mdash; use your judgement.</li>
+    <li>Never operate the app while the vehicle is moving.</li>
+    <li>We're independent. No connection to Amazon or any delivery platform, and you're responsible for your own agreements with them.</li>
+    <li>Free routes for everyone; paid plans are optional and cancellable any time.</li>
+    <li>Routing data comes from third parties and won't always be right.</li>
   </ul>
+</div>
 
-  <h3>You may:</h3>
-  <ul>
-    <li>Use the App freely for your personal Amazon Flex delivery work</li>
-    <li>Share the link <strong>flexrouteapp.com</strong> with other drivers</li>
-    <li>Take screenshots of your optimized routes for personal use</li>
-  </ul>
+<p style="font-size:13px;color:var(--t3)">The full terms below are what legally applies. The summary above is for convenience and doesn't override anything.</p>
 
-  <h2>3. Permitted Use</h2>
-  <p>FlexRoute is provided for <strong>personal, non-commercial use</strong> by individual Amazon Flex drivers. Any commercial use — including but not limited to reselling route optimization services, integrating FlexRoute into a paid product, or charging other drivers for access — requires prior written permission.</p>
+<h2><span class="n">1</span>Agreeing to these terms</h2>
+<p>By using FlexRoute &mdash; the website at flexrouteapp.com and the Android app &mdash; you agree to these Terms. If you don't agree, don't use it. We refer to FlexRoute as "we" or "us", and to you as "you".</p>
+<p>You must be at least 18 years old and legally able to enter a contract.</p>
 
-  <h2>4. No Affiliation with Amazon</h2>
-  <p>FlexRoute is an independent tool created by and for Amazon Flex drivers. It is <strong>not affiliated with, endorsed by, or connected to Amazon.com, Inc.</strong> or any of its subsidiaries. "Amazon Flex" is a trademark of Amazon.com, Inc.</p>
-  <p>FlexRoute does not access your Amazon account, store your delivery data on any server, or communicate with Amazon's systems. All processing occurs locally in your browser.</p>
+<h2><span class="n">2</span>What FlexRoute is</h2>
+<p>FlexRoute takes a list of delivery addresses, converts them into map coordinates, and suggests an efficient order to visit them. It can read addresses from screenshots you upload, and hand the resulting route to your navigation app.</p>
+<p>That's the whole service. FlexRoute does not dispatch work, does not connect to any delivery platform's systems, and has no access to your driver account.</p>
 
-  <h2>5. Privacy</h2>
-  <p>FlexRoute does not collect personally identifiable information. The App operates entirely in your browser — your stop addresses, route data, and home address are stored only on your device using browser localStorage and are never transmitted to our servers.</p>
-  <p>We use Google Analytics (GA4) to collect anonymous usage statistics including page views, feature usage counts, and general geographic region. No delivery addresses or personal data are included in analytics.</p>
+<div class="safety">
+  <h3>&#9888; Safety comes before the route</h3>
+  <p>Do not interact with FlexRoute while your vehicle is moving. Pull over and stop safely before adding stops, scanning, or reading a route. Obey all traffic laws, road signs, and posted restrictions &mdash; they override anything the app suggests. A suggested route may include a road that is closed, restricted, unsafe, or wrong for your vehicle. You are the driver, and every decision on the road is yours.</p>
+</div>
 
-  <h2>6. Disclaimer of Warranties</h2>
-  <p>FlexRoute is provided <strong>"as is"</strong> without warranties of any kind, express or implied. We do not warrant that:</p>
-  <ul>
-    <li>The App will be error-free or uninterrupted</li>
-    <li>Route optimizations will always produce shorter routes than Amazon's order</li>
-    <li>Address geocoding will be accurate for all locations</li>
-    <li>The App will be compatible with all devices or operating systems</li>
-  </ul>
-  <p>You use FlexRoute at your own risk. Always follow traffic laws and use your own judgment when navigating delivery routes.</p>
+<h2><span class="n">3</span>Not affiliated with any delivery platform</h2>
+<p>FlexRoute is an independent tool built by an independent developer. It is not affiliated with, endorsed by, sponsored by, or connected to Amazon.com, Inc., any of its subsidiaries, or any other delivery platform. All trademarks belong to their owners.</p>
+<p><strong>You are responsible for your own compliance</strong> with any agreement you have with a delivery platform, including any rules that platform has about using third-party tools. We can't advise you on those agreements and we're not a party to them. If you're unsure whether using a tool like FlexRoute is permitted under your arrangement, check with the platform before you use it.</p>
 
-  <h2>7. Limitation of Liability</h2>
-  <p>To the fullest extent permitted by law, FlexRoute and its creators shall not be liable for any direct, indirect, incidental, special, or consequential damages arising from your use of the App, including but not limited to:</p>
-  <ul>
-    <li>Incorrect route optimization or navigation</li>
-    <li>Loss of earnings, tips, or delivery bonuses</li>
-    <li>Vehicle damage, accidents, or traffic violations</li>
-    <li>Data loss or device malfunction</li>
-    <li>Suspension or termination of your Amazon Flex account</li>
-  </ul>
+<h2><span class="n">4</span>Your responsibilities</h2>
+<ul>
+  <li>Enter accurate addresses. Bad input produces bad routes.</li>
+  <li>Verify stops before driving. Every stop has a verify link showing exactly where the app placed it.</li>
+  <li>Only upload images you're entitled to use, and don't upload anything containing information you shouldn't be sharing.</li>
+  <li>Keep your device secure. Route data is stored on your phone.</li>
+  <li>Use FlexRoute lawfully.</li>
+</ul>
 
-  <h2>8. Enforcement</h2>
-  <p>Unauthorized copying, cloning, or redistribution of FlexRoute's code or design may result in:</p>
-  <ul>
-    <li>DMCA takedown notices to hosting providers</li>
-    <li>Cease and desist notices</li>
-    <li>Legal action for copyright infringement</li>
-  </ul>
-  <p>If you discover an unauthorized copy of FlexRoute, please contact us so we can take action.</p>
+<h2><span class="n">5</span>Free use and paid plans</h2>
+<p>FlexRoute offers a number of free optimised routes at no cost. Continued use beyond that may require a paid subscription. Current plans are $9.99 monthly and $79.00 yearly, both recurring until cancelled, with payment handled by Stripe.</p>
+<p>We may change prices. Existing subscribers will be told before a price change affects them, and can cancel rather than accept it. We may change what's included in the free tier at any time.</p>
+<p>Cancellation, renewals and refunds are covered in the <a href="/refund.html">Refund Policy</a>, which forms part of these Terms.</p>
 
-  <h2>9. Changes to These Terms</h2>
-  <p>We reserve the right to modify these Terms at any time. Changes will be posted at this URL with an updated date. Continued use of the App after changes constitutes acceptance of the revised terms.</p>
+<h2><span class="n">6</span>Acceptable use</h2>
+<p>Don't:</p>
+<ul>
+  <li>Copy, rehost, resell or redistribute FlexRoute, or run a modified copy of it</li>
+  <li>Reverse engineer the app except where the law expressly permits it</li>
+  <li>Access our backend functions other than through the app itself, or automate requests to run up our costs</li>
+  <li>Attempt to bypass the free-route limit or payment system</li>
+  <li>Interfere with the service, or with other drivers' use of it</li>
+  <li>Use FlexRoute for anything illegal</li>
+</ul>
+<p>We may suspend or end access for anyone doing these things.</p>
 
-  <h2>10. Governing Law</h2>
-  <p>These Terms are governed by the laws of Ontario, Canada, without regard to conflict of law principles.</p>
+<h2><span class="n">7</span>Third-party services</h2>
+<p>FlexRoute depends on outside services for maps, address lookup, routing, text recognition, hosting and payments. Those services are controlled by their providers, not by us. If one is slow, wrong, or unavailable, parts of FlexRoute may be too. We don't control their accuracy and aren't responsible for it. Which providers receive what is set out in the <a href="/privacy.html">Privacy Policy</a>.</p>
 
-  <h2>Contact</h2>
-  <div class="contact-box">
-    <p>Questions about these terms, licensing inquiries, or to report unauthorized use of FlexRoute code:</p>
-    <p style="margin-top:10px"><a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a></p>
-  </div>
+<h2><span class="n">8</span>Your data</h2>
+<p>Most of what you enter stays on your device. How we handle everything else is described in the <a href="/privacy.html">Privacy Policy</a>, which forms part of these Terms. You keep any rights you have in the addresses and images you provide; you grant us only the limited permission needed to process them so the app can work.</p>
 
-  <div class="footer">
-    <p>&copy; 2026 FlexRoute. All rights reserved. &nbsp;|&nbsp; <a href="/flexroute.html">Open App</a> &nbsp;|&nbsp; <a href="/">Home</a></p>
-  </div>
-</main>
+<h2><span class="n">9</span>Availability</h2>
+<p>We aim to keep FlexRoute running but don't promise uninterrupted service. It may go down for maintenance, third-party outages, or reasons outside our control. We may change or discontinue features. If we discontinue the service entirely while you hold a paid subscription, we'll refund the unused portion.</p>
 
+<h2><span class="n">10</span>No warranty</h2>
+<p class="caps">FLEXROUTE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT ROUTES ARE OPTIMAL, THAT ADDRESSES ARE GEOCODED CORRECTLY, THAT ROADS SUGGESTED ARE OPEN OR PASSABLE, OR THAT THE SERVICE WILL BE ERROR-FREE OR UNINTERRUPTED.</p>
+<p>Route suggestions are estimates produced from third-party map data. Real conditions &mdash; traffic, closures, access restrictions, weather, building layouts &mdash; will differ.</p>
+
+<h2><span class="n">11</span>Limitation of liability</h2>
+<p class="caps">TO THE FULLEST EXTENT PERMITTED BY LAW, WE ARE NOT LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL OR PUNITIVE DAMAGES, OR FOR LOST EARNINGS, LOST DELIVERIES, MISSED TIME WINDOWS, VEHICLE COSTS, FUEL COSTS, TRAFFIC PENALTIES, OR LOSS OF STANDING WITH ANY DELIVERY PLATFORM, ARISING FROM YOUR USE OF FLEXROUTE.</p>
+<p class="caps">OUR TOTAL LIABILITY FOR ANY CLAIM IS LIMITED TO THE GREATER OF THE AMOUNT YOU PAID US IN THE 12 MONTHS BEFORE THE CLAIM, OR CAD $50.</p>
+<p>Nothing here excludes liability that cannot lawfully be excluded &mdash; including for death or personal injury caused by negligence, fraud, or rights you have under consumer protection legislation.</p>
+
+<h2><span class="n">12</span>Indemnity</h2>
+<p>You agree to cover us against claims arising from your misuse of FlexRoute, your breach of these Terms, or your breach of an agreement with a delivery platform or other third party.</p>
+
+<h2><span class="n">13</span>Ending access</h2>
+<p>You can stop using FlexRoute at any time; clearing app data removes what's stored on your device. We may suspend or terminate access if you breach these Terms, or if we discontinue the service. Sections 3, 8, 10, 11, 12 and 15 survive termination.</p>
+
+<h2><span class="n">14</span>Changes to these terms</h2>
+<p>We may update these Terms. Material changes will be posted here with an updated date, and shown in the app where they meaningfully affect you. Continuing to use FlexRoute after a change means you accept it. If you don't, stop using the service and contact us about a refund of any unused subscription.</p>
+
+<h2><span class="n">15</span>Governing law</h2>
+<p>These Terms are governed by the laws of the Province of Quebec and the applicable laws of Canada, without regard to conflict-of-law rules. Disputes will be heard in the courts of Quebec. If you're a consumer elsewhere, this doesn't remove your right to the protections of your own local law or to bring proceedings where you live.</p>
+
+<h2><span class="n">16</span>General</h2>
+<p>If any provision is found unenforceable, the rest remains in force. Our not enforcing a provision isn't a waiver of it. These Terms, with the Privacy Policy and Refund Policy, are the entire agreement between us. You may not transfer your rights under them; we may transfer ours if the service changes hands.</p>
+<p>The parties have requested that these Terms be drawn up in English. / Les parties ont demand&eacute; que ces conditions soient r&eacute;dig&eacute;es en anglais.</p>
+
+<h2><span class="n">17</span>Contact</h2>
+<p><a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a> &middot; <a href="/contact.html">Contact page</a></p>
+
+<div class="note">
+FlexRoute is an independent tool. It is not affiliated with, endorsed by, or connected to Amazon.com, Inc. or any delivery platform.
+</div>
+
+<footer>
+  <nav class="lnks">
+    <a href="/privacy.html">Privacy Policy</a><span class="sep">&bull;</span>
+    <a href="/tos.html" aria-current="page">Terms of Service</a><span class="sep">&bull;</span>
+    <a href="/refund.html">Refund Policy</a><span class="sep">&bull;</span>
+    <a href="/security.html">Security</a><span class="sep">&bull;</span>
+    <a href="/contact.html">Contact</a><span class="sep">&bull;</span>
+    <a class="play" href="https://play.google.com/store/apps/details?id=com.flexrouteapp.twa&amp;pcampaignid=web_share" target="_blank" rel="noopener">Get it on Google Play</a>
+  </nav>
+  <div>&copy; 2026 FlexRoute. Not affiliated with Amazon.com, Inc.</div>
+</footer>
+
+</div>
 </body>
 </html>

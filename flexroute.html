@@ -702,7 +702,7 @@ if (!navigator.onLine) document.getElementById('offlineBar').classList.add('show
  * strictly prohibited and may result in legal action.
  *
  * Terms of Service: https://flexrouteapp.com/tos.html
- * Contact: flexrouteapp.com
+ * Contact: https://flexrouteapp.com/contact.html
  * ============================================================ */
 // Number of free optimized routes allowed before the paywall — referenced
 // by vPaywall() (declared earlier in the script than this used to be
@@ -1665,7 +1665,7 @@ var LANGS = {
     gmaps_saved: 'Active — used as fallback when addresses can\'t be found',
     save_key: 'Save key',
     key_saved: '✓ Key saved',
-    about_sub: 'Free route optimizer for Amazon Flex drivers',
+    about_sub: 'Route optimizer for delivery drivers',
     tos: 'Terms of Service →',
     not_affiliated: 'Not affiliated with Amazon.com, Inc.',
     clear_data: 'Clear app data',
@@ -2447,14 +2447,18 @@ function vSetup() {
     <div style="display:flex;align-items:center;justify-content:space-between">
       <div>
         <div class="setup-label-main">FlexRoute</div>
-        <div style="font-size:13px;color:var(--t2)">Free route optimizer for Amazon Flex drivers</div>
+        <div style="font-size:13px;color:var(--t2)">Route optimizer for delivery drivers</div>
       </div>
       <div style="font-size:11px;color:var(--t3);text-align:right;font-family:var(--sans)">v2.0</div>
     </div>
-    <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
-      <a href="/tos.html" target="_blank" style="font-size:14px;color:var(--inf);text-decoration:none">Terms of Service &rarr;</a>
-      <div style="font-size:13px;color:var(--t3)">Not affiliated with Amazon.com, Inc.</div>
+    <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:13px">
+      <a href="/privacy.html" target="_blank" style="color:var(--inf);text-decoration:none">Privacy Policy</a><span style="color:var(--t3)">&bull;</span>
+      <a href="/tos.html" target="_blank" style="color:var(--inf);text-decoration:none">Terms of Service</a><span style="color:var(--t3)">&bull;</span>
+      <a href="/refund.html" target="_blank" style="color:var(--inf);text-decoration:none">Refund Policy</a><span style="color:var(--t3)">&bull;</span>
+      <a href="/security.html" target="_blank" style="color:var(--inf);text-decoration:none">Security</a><span style="color:var(--t3)">&bull;</span>
+      <a href="/contact.html" target="_blank" style="color:var(--inf);text-decoration:none">Contact</a>
     </div>
+    <div style="font-size:13px;color:var(--t3);margin-top:10px">Not affiliated with Amazon.com, Inc.</div>
   </div>
 
   <!-- Danger zone -->
@@ -2675,10 +2679,23 @@ function vInput() {
   h += '</div>';
 
   // ── STATS BAR ──
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;background:#13131E;border-radius:16px;overflow:hidden;margin-bottom:16px">';
-  h += '<div style="padding:16px;text-align:center;border-right:1px solid #2A2A40"><div style="font-family:var(--sans);font-size:30px;font-weight:900;color:#FF9900;line-height:1">11 km</div><div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1px;text-transform:uppercase;margin-top:5px">avg saved per shift</div></div>';
-  h += '<div style="padding:16px;text-align:center"><div style="font-family:var(--sans);font-size:30px;font-weight:900;color:#FF9900;line-height:1">18 min</div><div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1px;text-transform:uppercase;margin-top:5px">avg saved per shift</div></div>';
-  h += '</div>';
+  // ── STATS BAR — this device's real cumulative savings ──
+  // Shows nothing until the driver has optimized at least one route.
+  // (Previously displayed hardcoded "11 km / 18 min" figures.)
+  var _tot = getTotals();
+  if (_tot.routes > 0) {
+    var _tv = _tot.min >= 120
+      ? (Math.round(_tot.min / 6) / 10) + ' h'
+      : _tot.min + ' min';
+    var _nCell = 'padding:16px;text-align:center';
+    var _nNum  = 'font-family:var(--sans);font-size:30px;font-weight:900;color:#FF9900;line-height:1';
+    var _nLbl  = 'font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1px;text-transform:uppercase;margin-top:5px';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;background:#13131E;border-radius:16px;overflow:hidden;margin-bottom:6px">';
+    h += '<div style="' + _nCell + ';border-right:1px solid #2A2A40"><div style="' + _nNum + '">' + kmToDisplay(_tot.km) + ' ' + distUnit() + '</div><div style="' + _nLbl + '">distance saved</div></div>';
+    h += '<div style="' + _nCell + '"><div style="' + _nNum + '">' + _tv + '</div><div style="' + _nLbl + '">time saved</div></div>';
+    h += '</div>';
+    h += '<div style="text-align:center;font-size:11px;color:#7878A0;margin-bottom:16px">across ' + _tot.routes + ' optimized route' + (_tot.routes > 1 ? 's' : '') + '</div>';
+  }
 
   h += '</div>'; // close .scr
   return h;
@@ -4470,6 +4487,7 @@ async function optimize() {
       origMin: Math.round(origDur / 60), optMin: Math.round(tripDur / 60),
       savedKm, savedMin, realGPS: true
     };
+    bumpTotals(S.savings);
   }
 
   trackEvent('route_optimized', {
@@ -4603,6 +4621,7 @@ async function optimizeWithGemini() {
       savedMin: Math.max(0, Math.round(_savedKm2 / spd * 60)),
       realGPS: false
     };
+    bumpTotals(S.savings);
   }
 
   trackEvent('route_optimized', {
@@ -5705,6 +5724,30 @@ function gMapsURL(chunkIndex) {
   return 'https://www.google.com/maps/dir/' + pts.map(p => encodeURIComponent(p)).join('/');
 }
 function totalChunks() { return Math.ceil(S.optimized.length / 5); }
+// ── Cumulative savings (display only) ───────────────────────────────────────
+// Lifetime distance/time saved on this device, shown in the stats tile.
+// Replaces the previously hardcoded "11 km / 18 min" marketing figures.
+// NEVER used for entitlement, trial counting, or route optimization.
+// Note: 'fr_totals' is deliberately NOT in priorUsageSignals, so writing it
+// cannot affect grandfathering eligibility.
+function getTotals() {
+  try {
+    var t = JSON.parse(localStorage.getItem('fr_totals') || 'null');
+    if (!t || typeof t.km !== 'number') return { km: 0, min: 0, routes: 0 };
+    return { km: t.km || 0, min: t.min || 0, routes: t.routes || 0 };
+  } catch (e) { return { km: 0, min: 0, routes: 0 }; }
+}
+function bumpTotals(sv) {
+  if (!sv) return;
+  try {
+    var t = getTotals();
+    t.km     = Math.round((t.km + (sv.savedKm || 0)) * 10) / 10;
+    t.min    = t.min + (sv.savedMin || 0);
+    t.routes = t.routes + 1;
+    localStorage.setItem('fr_totals', JSON.stringify(t));
+  } catch (e) {}
+}
+
 function round1(n) { return Math.round(n * 10) / 10; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
