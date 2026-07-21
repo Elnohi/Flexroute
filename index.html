@@ -139,6 +139,7 @@ footer a:hover{color:var(--t2);}
 
 <nav>
   <img src="data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==" data-logo="1" class="nav-logo" alt="FlexRoute">
+  <a href="#install" class="nav-cta" style="background:transparent;color:var(--acc);border:1.5px solid var(--acc);margin-right:8px">Get the app</a>
   <a href="flexroute.html" class="nav-cta" onclick="track('cta_click',{location:'nav'})">Optimize My Route &rarr;</a>
 </nav>
 
@@ -163,7 +164,7 @@ footer a:hover{color:var(--t2);}
 <section id="how" style="padding:90px 24px 60px">
   <div class="section-label">How it works</div>
   <div class="section-title">3 steps. Under 2 minutes.</div>
-  <p class="section-sub">No account. No installation. Works on any phone browser right now.</p>
+  <p class="section-sub">No account, no delivery-platform login. Works in any phone browser, or install it from Google Play.</p>
   <div class="steps-grid">
     <div class="step">
       <div class="step-num">01</div>
@@ -321,14 +322,22 @@ footer a:hover{color:var(--t2);}
 <hr class="section-divider">
 
 <!-- INSTALL GUIDE -->
-<section style="padding:90px 24px 60px">
-  <div class="section-label">Install to Home Screen</div>
-  <div class="section-title">Works like a native app.<br>No App Store needed.</div>
-  <p class="section-sub">Add FlexRoute to your home screen for instant access before every shift. Opens in under a second, works offline, saves your route and shift progress.</p>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:48px;max-width:700px;">
+<section id="install" style="padding:90px 24px 60px">
+  <div class="section-label">Get the app</div>
+  <div class="section-title">Install once.<br>Ready before every shift.</div>
+  <p class="section-sub">FlexRoute opens in under a second, keeps working when you lose signal in a stairwell or underground garage, and remembers your route and shift progress between runs.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:48px;max-width:760px;">
+
+    <div style="background:rgba(255,153,0,.04);border:1.5px solid rgba(255,153,0,.4);border-radius:14px;padding:28px;display:flex;flex-direction:column;">
+      <div style="display:inline-block;align-self:flex-start;background:rgba(34,217,138,.15);border:1px solid rgba(34,217,138,.4);color:var(--ok);font-family:var(--sans);font-weight:700;font-size:10px;letter-spacing:2px;padding:4px 10px;border-radius:20px;margin-bottom:16px;">RECOMMENDED</div>
+      <h3 style="font-family:var(--sans);font-size:20px;font-weight:700;margin-bottom:10px;">Android</h3>
+      <p style="font-size:14px;color:var(--t2);line-height:1.65;margin-bottom:24px;flex:1">Install from Google Play. It launches straight from your app drawer, updates arrive automatically, and there&rsquo;s no browser step before a shift.</p>
+      <a href="https://play.google.com/store/apps/details?id=com.flexrouteapp.twa&amp;pcampaignid=web_share" target="_blank" rel="noopener" onclick="track('cta_click',{location:'install_play'})" style="display:block;background:var(--acc);color:#000;text-align:center;font-family:var(--sans);font-weight:800;font-size:16px;padding:15px 20px;border-radius:12px;text-decoration:none;">Get it on Google Play &rarr;</a>
+    </div>
+
     <div style="background:var(--surf);border:1.5px solid var(--brd);border-radius:14px;padding:28px;">
-      <div style="font-size:32px;margin-bottom:14px;">&#63743;</div>
-      <h3 style="font-family:var(--sans);font-size:20px;font-weight:700;margin-bottom:12px;">iPhone / iPad</h3>
+      <h3 style="font-family:var(--sans);font-size:20px;font-weight:700;margin-bottom:10px;">iPhone &amp; iPad</h3>
+      <p style="font-size:14px;color:var(--t2);line-height:1.65;margin-bottom:18px;">No App Store version yet. Add FlexRoute to your home screen instead &mdash; it behaves the same way and takes about twenty seconds.</p>
       <ol style="list-style:none;display:flex;flex-direction:column;gap:10px;">
         <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">1.</span>Open flexrouteapp.com in Safari</li>
         <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">2.</span>Tap Share &#11015; at the bottom</li>
@@ -336,16 +345,7 @@ footer a:hover{color:var(--t2);}
         <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">4.</span>Tap &ldquo;Add&rdquo; in the top right</li>
       </ol>
     </div>
-    <div style="background:var(--surf);border:1.5px solid var(--brd);border-radius:14px;padding:28px;">
-      <div style="font-size:32px;margin-bottom:14px;">&#129303;</div>
-      <h3 style="font-family:var(--sans);font-size:20px;font-weight:700;margin-bottom:12px;">Android</h3>
-      <ol style="list-style:none;display:flex;flex-direction:column;gap:10px;">
-        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">1.</span>Open flexrouteapp.com in Chrome</li>
-        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">2.</span>Tap the three-dot menu &#8942; at top right</li>
-        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">3.</span>Tap &ldquo;Add to Home Screen&rdquo;</li>
-        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">4.</span>Tap &ldquo;Add&rdquo; to confirm</li>
-      </ol>
-    </div>
+
   </div>
 </section>
 
@@ -392,7 +392,9 @@ footer a:hover{color:var(--t2);}
 </section>
 
 <footer>
-  <p>&copy; 2026 FlexRoute &nbsp;|&nbsp; <a href="flexroute.html">Open App</a> &nbsp;|&nbsp; Not affiliated with Amazon</p>
+  <p style="margin-bottom:14px"><a href="flexroute.html">Open App</a> &nbsp;|&nbsp; <a href="/privacy.html">Privacy Policy</a> &nbsp;|&nbsp; <a href="/tos.html">Terms of Service</a> &nbsp;|&nbsp; <a href="/refund.html">Refund Policy</a> &nbsp;|&nbsp; <a href="/security.html">Security</a> &nbsp;|&nbsp; <a href="/contact.html">Contact</a></p>
+  <p><a href="https://play.google.com/store/apps/details?id=com.flexrouteapp.twa&amp;pcampaignid=web_share" target="_blank" rel="noopener">Get it on Google Play</a></p>
+  <p style="margin-top:14px">&copy; 2026 FlexRoute &nbsp;|&nbsp; Not affiliated with Amazon.com, Inc.</p>
 </footer>
 
 <script>
