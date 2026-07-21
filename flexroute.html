@@ -3622,6 +3622,8 @@ function shareRoute() {
   var lines = S.optimized.filter(function(s){return !s.geoFailed;}).map(function(s,i){
     return (i+1) + '. ' + s.address;
   });
+  var _shareStart = S.gpsCoords ? S.gpsAddr : S.startAddr;
+  if (_shareStart) lines.unshift('Start: ' + _shareStart);
   if (S.home) lines.push('Home: ' + S.home);
   var text = 'My FlexRoute (' + lines.length + ' stops):\n' + lines.join('\n');
   if (navigator.share) {
@@ -3666,10 +3668,12 @@ function copyRoute() {
     region: S.userState || 'unknown',
     saved_km: S.savings ? S.savings.savedKm : 0
   });
+  const _startLbl = S.gpsCoords ? S.gpsAddr : S.startAddr;
   const lines = [
-    S.home ? `Start: ${S.home}` : '',
+    _startLbl ? `Start: ${_startLbl}` : '',
     S.savings ? `Saved: ${S.savings.savedKm}km, ~${S.savings.savedMin}min vs Amazon order${S.savings.realGPS ? ' (real GPS)' : ''}` : '',
-    ...S.optimized.map((s, i) => `${i + 1}.${s.flexNum != null ? ` [pkg #${s.flexNum}]` : ''} ${s.address}`)
+    ...S.optimized.map((s, i) => `${i + 1}.${s.flexNum != null ? ` [pkg #${s.flexNum}]` : ''} ${s.address}`),
+    S.home ? `End — Home: ${S.home}` : ''
   ].filter(Boolean).join('\n');
   // Primary: Clipboard API (HTTPS, modern browsers)
   if (navigator.clipboard && navigator.clipboard.writeText) {
