@@ -31,11 +31,15 @@
   .note{background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:14px 16px;font-size:14px;margin:20px 0}
   .caps{font-size:14px;color:var(--t2)}
   footer{border-top:1px solid var(--line);margin-top:44px;padding-top:20px;font-size:13px;color:var(--t3)}
-  .lnks{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:14px;margin-bottom:14px}
-  .lnks a{color:var(--t2);text-decoration:none}
-  .lnks a:hover,.lnks a:focus-visible{color:var(--acc);text-decoration:underline;outline:none}
-  .lnks .sep{color:var(--line)}
-  .lnks a.play,.lnks a[aria-current]{color:var(--acc);font-weight:700}
+  .lnks{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .lnks a{display:inline-block;padding:9px 14px;border:1px solid var(--line);border-radius:10px;
+          background:var(--card);color:var(--t2);text-decoration:none;font-size:13px;font-weight:600;
+          transition:border-color .15s ease,color .15s ease}
+  .lnks a:hover,.lnks a:focus-visible{border-color:var(--acc);color:var(--acc);outline:none}
+  .lnks a[aria-current]{border-color:var(--acc);color:var(--acc)}
+  .lnks a.play{background:var(--acc);border-color:var(--acc);color:#000}
+  .lnks a.play:hover,.lnks a.play:focus-visible{color:#000;filter:brightness(1.12)}
+  @media (max-width:420px){.lnks a{flex:1 1 calc(50% - 4px);text-align:center}.lnks a.play{flex-basis:100%}}
 </style>
 </head>
 <body>
@@ -110,7 +114,7 @@
 <p>Most of what you enter stays on your device. How we handle everything else is described in the <a href="/privacy.html">Privacy Policy</a>, which forms part of these Terms. You keep any rights you have in the addresses and images you provide; you grant us only the limited permission needed to process them so the app can work.</p>
 
 <h2><span class="n">9</span>Availability</h2>
-<p>We aim to keep FlexRoute running but don't promise uninterrupted service. It may go down for maintenance, third-party outages, or reasons outside our control. We may change or discontinue features. If we discontinue the service entirely while you hold a paid subscription, we'll refund the unused portion.</p>
+<p>We aim to keep FlexRoute running but don't promise uninterrupted service. It may go down for maintenance, third-party outages, or reasons outside our control. We may change, suspend or discontinue features at any time.</p>
 
 <h2><span class="n">10</span>No warranty</h2>
 <p class="caps">FLEXROUTE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT ROUTES ARE OPTIMAL, THAT ADDRESSES ARE GEOCODED CORRECTLY, THAT ROADS SUGGESTED ARE OPEN OR PASSABLE, OR THAT THE SERVICE WILL BE ERROR-FREE OR UNINTERRUPTED.</p>
@@ -128,7 +132,7 @@
 <p>You can stop using FlexRoute at any time; clearing app data removes what's stored on your device. We may suspend or terminate access if you breach these Terms, or if we discontinue the service. Sections 3, 8, 10, 11, 12 and 15 survive termination.</p>
 
 <h2><span class="n">14</span>Changes to these terms</h2>
-<p>We may update these Terms. Material changes will be posted here with an updated date, and shown in the app where they meaningfully affect you. Continuing to use FlexRoute after a change means you accept it. If you don't, stop using the service and contact us about a refund of any unused subscription.</p>
+<p>We may update these Terms. Material changes will be posted here with an updated date, and shown in the app where they meaningfully affect you. Continuing to use FlexRoute after a change means you accept it. If you don't, stop using the service and cancel your subscription; cancellation is covered in the <a href="/refund.html">Refund Policy</a>.</p>
 
 <h2><span class="n">15</span>Governing law</h2>
 <p>These Terms are governed by the laws of the Province of Quebec and the applicable laws of Canada, without regard to conflict-of-law rules. Disputes will be heard in the courts of Quebec. If you're a consumer elsewhere, this doesn't remove your right to the protections of your own local law or to bring proceedings where you live.</p>
@@ -146,11 +150,11 @@ FlexRoute is an independent tool. It is not affiliated with, endorsed by, or con
 
 <footer>
   <nav class="lnks">
-    <a href="/privacy.html">Privacy Policy</a><span class="sep">&bull;</span>
-    <a href="/tos.html" aria-current="page">Terms of Service</a><span class="sep">&bull;</span>
-    <a href="/refund.html">Refund Policy</a><span class="sep">&bull;</span>
-    <a href="/security.html">Security</a><span class="sep">&bull;</span>
-    <a href="/contact.html">Contact</a><span class="sep">&bull;</span>
+    <a href="/privacy.html">Privacy Policy</a>
+    <a href="/tos.html" aria-current="page">Terms of Service</a>
+    <a href="/refund.html">Refund Policy</a>
+    <a href="/security.html">Security</a>
+    <a href="/contact.html">Contact</a>
     <a class="play" href="https://play.google.com/store/apps/details?id=com.flexrouteapp.twa&amp;pcampaignid=web_share" target="_blank" rel="noopener">Get it on Google Play</a>
   </nav>
   <div>&copy; 2026 FlexRoute. Not affiliated with Amazon.com, Inc.</div>
