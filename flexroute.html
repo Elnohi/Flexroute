@@ -2681,8 +2681,7 @@ function vInput() {
   // ── STATS BAR ──
   // ── STATS BAR — this device's real cumulative savings ──
   // Shows nothing until the driver has optimized at least one route.
-  // (Previously displayed hardcoded "11 km / 18 min" figures.)
-  var _tot = getTotals();
+    var _tot = getTotals();
   if (_tot.routes > 0) {
     var _tv = _tot.min >= 120
       ? (Math.round(_tot.min / 6) / 10) + ' h'
