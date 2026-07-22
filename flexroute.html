@@ -184,6 +184,13 @@ input:focus{border-color:var(--brd2);background:var(--surf3)}
 /* ── Result rows ── */
 .ri-active{outline:2px solid var(--acc)!important;background:var(--acc-d)!important}
 .ri{display:flex;align-items:flex-start;gap:14px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);padding:16px 15px}
+.ri-mv{display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:auto;align-self:center}
+.rbtn{width:34px;height:30px;background:transparent;border:1.5px solid var(--brd);border-radius:6px;cursor:pointer;color:var(--t3);font-size:13px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.rbtn:active{background:rgba(255,153,0,.12);border-color:var(--acc);color:var(--acc)}
+.rbtn[disabled]{opacity:.25;cursor:default}
+.rbtn-del{border-color:rgba(255,68,85,.35);color:var(--err);font-size:11px}
+.rbtn-del:active{background:rgba(255,68,85,.12);border-color:var(--err);color:var(--err)}
+.ri-manual{display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--acc);border:1px solid rgba(255,153,0,.4);border-radius:8px;padding:2px 7px;margin-top:6px}
 
 /* Route zoom levels — applied to body when on route view */
 body.rzoom-1 .rlist .ri{padding:18px 17px;gap:16px}
@@ -1146,60 +1153,11 @@ function saveKey() {
   render();
 }
 
-function activateMoveRow(row) {
-  // Clear any previous active row
-  document.querySelectorAll('.ri-active').forEach(function(r){ 
-    r.classList.remove('ri-active');
-    var prev = r.querySelector('.ri-move-ctrl');
-    if (prev) prev.parentNode.removeChild(prev);
-  });
-  var idx = parseInt(row.getAttribute('data-ridx'));
-  row.classList.add('ri-active');
-  var ctrl = document.createElement('div');
-  ctrl.className = 'ri-move-ctrl';
-  ctrl.style.cssText = 'display:flex;flex-direction:column;gap:3px;position:absolute;right:8px;top:50%;transform:translateY(-50%);z-index:5';
-  var n = S.optimized.length;
-  if (idx > 0) {
-    var up = document.createElement('button');
-    up.innerHTML = '&#8593;';
-    up.style.cssText = 'width:30px;height:30px;background:var(--acc);color:#000;border:none;border-radius:5px;cursor:pointer;font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center';
-    up.addEventListener('click', function(e){ e.stopPropagation(); var t=S.optimized[idx]; S.optimized[idx]=S.optimized[idx-1]; S.optimized[idx-1]=t; S.tweakMode=true; saveSession(); render(); });
-    ctrl.appendChild(up);
-  }
-  if (idx < n - 1) {
-    var dn = document.createElement('button');
-    dn.innerHTML = '&#8595;';
-    dn.style.cssText = 'width:30px;height:30px;background:var(--acc);color:#000;border:none;border-radius:5px;cursor:pointer;font-size:16px;font-weight:900;display:flex;align-items:center;justify-content:center';
-    dn.addEventListener('click', function(e){ e.stopPropagation(); var t=S.optimized[idx]; S.optimized[idx]=S.optimized[idx+1]; S.optimized[idx+1]=t; S.tweakMode=true; saveSession(); render(); });
-    ctrl.appendChild(dn);
-  }
-  row.style.position = 'relative';
-  row.appendChild(ctrl);
-  // Dismiss on tap outside
-  setTimeout(function(){
-    function dismiss(e){ if (!row.contains(e.target)){ row.classList.remove('ri-active'); if(ctrl.parentNode) ctrl.parentNode.removeChild(ctrl); document.removeEventListener('touchstart', dismiss); document.removeEventListener('mousedown', dismiss); } }
-    document.addEventListener('touchstart', dismiss, {passive:true});
-    document.addEventListener('mousedown', dismiss);
-  }, 80);
-}
-
-function bindGestures() {
-  document.querySelectorAll('.ri[data-ridx]').forEach(function(row) {
-    var _t = null, _y0 = 0;
-    row.addEventListener('touchstart', function(e){
-      _y0 = e.touches[0].clientY;
-      _t = setTimeout(function(){
-        _t = null;
-        if (navigator.vibrate) navigator.vibrate(40);
-        activateMoveRow(row);
-      }, 420);
-    }, {passive:true});
-    row.addEventListener('touchmove', function(e){
-      if (_t && Math.abs(e.touches[0].clientY - _y0) > 8){ clearTimeout(_t); _t = null; }
-    }, {passive:true});
-    row.addEventListener('touchend', function(){ clearTimeout(_t); _t = null; }, {passive:true});
-  });
-}
+// activateMoveRow (long-press floating arrows) REMOVED.
+// It was undiscoverable — arrows only appeared after a 420ms press with no
+// visual hint they existed. Replaced by always-visible per-row arrows in
+// rRow() handled via data-rup/data-rdn -> reorderStop().
+function bindMoveRows() { /* long-press reorder retired — see note above */ }
 
 function bind() {
   // Document-level listeners — added ONCE only (guard prevents accumulation on each render)
@@ -1340,7 +1298,7 @@ function bind() {
   // Replaces per-element on() calls that caused listener accumulation across renders
   document.addEventListener('click', function(e) {
     // ── data-attribute buttons (delete, move, last, tweak reorder, lang) ──
-    var dataEl = e.target.closest ? e.target.closest('[data-del],[data-up],[data-dn],[data-last],[data-rup],[data-rdn],[data-lang]') : null;
+    var dataEl = e.target.closest ? e.target.closest('[data-del],[data-up],[data-dn],[data-last],[data-rup],[data-rdn],[data-rdel],[data-lang]') : null;
     if (dataEl) {
       var delId  = dataEl.getAttribute('data-del');
       var upId   = dataEl.getAttribute('data-up');
@@ -1450,13 +1408,18 @@ function bind() {
       if (lstId) { S.lastId = S.lastId===lstId ? null : lstId; saveSession(); render(); return; }
       if (rupI !== null) {
         var ri=parseInt(rupI);
-        if (ri > 0) { var t3=S.optimized[ri]; S.optimized[ri]=S.optimized[ri-1]; S.optimized[ri-1]=t3; }
-        render(); return;
+        if (ri > 0) { reorderStop(ri, ri-1); }
+        return;
       }
       if (rdnI !== null) {
         var rdi=parseInt(rdnI);
-        if (rdi < S.optimized.length-1) { var t4=S.optimized[rdi]; S.optimized[rdi]=S.optimized[rdi+1]; S.optimized[rdi+1]=t4; }
-        render(); return;
+        if (rdi < S.optimized.length-1) { reorderStop(rdi, rdi+1); }
+        return;
+      }
+      var rdelI = dataEl.getAttribute('data-rdel');
+      if (rdelI !== null) {
+        removeOptimizedStop(parseInt(rdelI));
+        return;
       }
       if (langV) { S.lang=langV; localStorage.setItem('fr_lang',S.lang); render(); return; }
     }
@@ -1478,8 +1441,13 @@ function bind() {
       case 'shareBtn':     shareRoute(); break;
       case 'reoptBtn':
         S.tweakMode=false;
-        // From route view, the visible order is in S.optimized; copy back as the new input order.
-        // From edit view, S.stops is already the source of truth — no copy needed.
+        // MID-SHIFT: delivered stops exist — never feed them back to the
+        // optimizer. Freeze them and re-optimize only what's left, starting
+        // from the last delivered location.
+        if (S.cDone && S.cDone.length > 0 && S.optimized && S.optimized.length > 0) {
+          saveSession(); reoptimizeRemaining(); break;
+        }
+        // Pre-shift: original behaviour.
         if (S.phase === 'result' && S.optimized && S.optimized.length > 0) {
           S.stops=S.optimized.map(function(s){return Object.assign({},s);});
         }
@@ -2451,12 +2419,12 @@ function vSetup() {
       </div>
       <div style="font-size:11px;color:var(--t3);text-align:right;font-family:var(--sans)">v2.0</div>
     </div>
-    <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:13px">
-      <a href="/privacy.html" target="_blank" style="color:var(--inf);text-decoration:none">Privacy Policy</a><span style="color:var(--t3)">&bull;</span>
-      <a href="/tos.html" target="_blank" style="color:var(--inf);text-decoration:none">Terms of Service</a><span style="color:var(--t3)">&bull;</span>
-      <a href="/refund.html" target="_blank" style="color:var(--inf);text-decoration:none">Refund Policy</a><span style="color:var(--t3)">&bull;</span>
-      <a href="/security.html" target="_blank" style="color:var(--inf);text-decoration:none">Security</a><span style="color:var(--t3)">&bull;</span>
-      <a href="/contact.html" target="_blank" style="color:var(--inf);text-decoration:none">Contact</a>
+    <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:8px">
+      <a href="/privacy.html" target="_blank" style="display:inline-block;padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);color:var(--inf);text-decoration:none;font-size:13px;font-weight:600">Privacy Policy</a>
+      <a href="/tos.html" target="_blank" style="display:inline-block;padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);color:var(--inf);text-decoration:none;font-size:13px;font-weight:600">Terms of Service</a>
+      <a href="/refund.html" target="_blank" style="display:inline-block;padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);color:var(--inf);text-decoration:none;font-size:13px;font-weight:600">Refund Policy</a>
+      <a href="/security.html" target="_blank" style="display:inline-block;padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);color:var(--inf);text-decoration:none;font-size:13px;font-weight:600">Security</a>
+      <a href="/contact.html" target="_blank" style="display:inline-block;padding:9px 13px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);color:var(--inf);text-decoration:none;font-size:13px;font-weight:600">Contact</a>
     </div>
     <div style="font-size:13px;color:var(--t3);margin-top:10px">Not affiliated with Amazon.com, Inc.</div>
   </div>
@@ -2681,7 +2649,8 @@ function vInput() {
   // ── STATS BAR ──
   // ── STATS BAR — this device's real cumulative savings ──
   // Shows nothing until the driver has optimized at least one route.
-    var _tot = getTotals();
+  // (Previously displayed hardcoded "11 km / 18 min" figures.)
+  var _tot = getTotals();
   if (_tot.routes > 0) {
     var _tv = _tot.min >= 120
       ? (Math.round(_tot.min / 6) / 10) + ' h'
@@ -2738,8 +2707,9 @@ function sRow(s, i) {
     </div>
   </div>
   <div class="sbtns">
-    ${i > 0 ? `<button class="sbtn" data-up="${s.id}">&#8593;</button>` : ''}
-    ${i < S.stops.length - 1 ? `<button class="sbtn" data-dn="${s.id}">&#8595;</button>` : ''}
+    ${''/* Pre-optimization reordering removed: this list IS the delivery-app
+          order used as the savings baseline, and the optimizer discards it
+          anyway. Reordering now lives on the optimized route (rRow). */}
     <button class="sbtn ${isL ? 'lon' : ''}" data-last="${s.id}" title="Mark as last stop">&#9873;</button>
     <button class="sbtn del" data-del="${s.id}" title="Remove">&#10005;</button>
   </div>
@@ -3419,6 +3389,7 @@ function vSavings(sv) {
           <div class="cbox-min">~${sv.optMin} min</div>
         </div>
       </div>
+      ${sv.manualEdit ? `<div class="sv-src" style="color:var(--acc);border-top:1px solid rgba(255,153,0,.25);padding-top:8px">&#9998; You've reordered stops by hand. These savings describe the original optimized order, not your current one.</div>` : ''}
       <div class="sv-src">
         ${sv.realGPS
           ? `Real driving distances via <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a> &amp; OSRM. Times from actual route data.`
@@ -3426,6 +3397,161 @@ function vSavings(sv) {
       </div>
     </div>
   </div>`;
+}
+
+// Position of S.optimized[i] within the filtered list Shift Mode walks.
+// Returns -1 if the stop is not in that list (failed geocoding).
+function activeIndexOf(optIdx) {
+  if (optIdx < 0 || optIdx >= S.optimized.length) return -1;
+  if (S.optimized[optIdx].geoFailed) return -1;
+  var n = 0;
+  for (var k = 0; k < optIdx; k++) {
+    if (!S.optimized[k].geoFailed) n++;
+  }
+  return n;
+}
+
+// ── Manual stop reordering on the OPTIMIZED route ───────────────────────────
+// Drivers hit locked gates, closed depots and callbacks no optimizer can
+// predict, so the route order has to stay editable after optimization.
+//
+// This only reorders the RESULT list (S.optimized). It does not touch the
+// optimizer itself — OSRM, twoOptImprove and the savings clamp are untouched.
+//
+// Shift Mode tracks progress by INDEX (S.cIdx / S.cDone), so any swap must
+// remap those indices or completed stops would silently point at the wrong
+// addresses mid-shift.
+// Remove a stop from the OPTIMIZED list mid-shift, keeping Shift Mode
+// progress (index-based S.cDone / S.cIdx) attached to the right stops.
+function removeOptimizedStop(idx) {
+  if (idx < 0 || idx >= S.optimized.length) return;
+  if (S.cDone && S.cDone.indexOf(idx) >= 0) {
+    toast('That stop is already delivered — can\'t remove it.');
+    return;
+  }
+  var removed = S.optimized.splice(idx, 1)[0];
+  // Mirror the removal into the editable input list so Edit view agrees
+  if (removed && removed.id) {
+    S.stops = S.stops.filter(function(st){ return st.id !== removed.id; });
+  }
+  // Remap index-based shift progress past the removed position
+  if (S.cDone && S.cDone.length) {
+    S.cDone = S.cDone.map(function(n){ return n > idx ? n - 1 : n; });
+  }
+  if (typeof S.cIdx === 'number' && S.cIdx > idx) S.cIdx = S.cIdx - 1;
+  if (S.savings) S.savings.manualEdit = true;
+  saveSession(); render();
+}
+
+// ── Shift-aware re-optimization ─────────────────────────────────────────────
+// Re-optimizes ONLY the undelivered stops, starting from the driver's last
+// delivered location. Delivered stops are frozen as a completed prefix and
+// are NEVER fed back into the optimizer.
+//
+// This wraps the existing optimize() without modifying it: optimize() reads
+// S.stops and (via the S.gpsCoords fast-path) skips start geocoding, so we
+// stage those, run it, then reassemble. OSRM, twoOptImprove and the savings
+// clamp are untouched.
+async function reoptimizeRemaining() {
+  if (!S.optimized || !S.optimized.length) return;
+  var doneIdx = (S.cDone || []).slice().sort(function(a,b){ return a-b; });
+  var delivered = doneIdx.map(function(n){ return S.optimized[n]; }).filter(Boolean);
+
+  // Undelivered = optimized stops not marked done…
+  var remaining = S.optimized.filter(function(_, i){ return doneIdx.indexOf(i) < 0; });
+  // …minus any the driver deleted from the Edit list since optimizing…
+  var liveIds = {};
+  S.stops.forEach(function(st){ liveIds[st.id] = true; });
+  remaining = remaining.filter(function(st){ return !st.id || liveIds[st.id]; });
+  // …plus any NEW stops added in Edit that were never optimized.
+  var optIds = {};
+  S.optimized.forEach(function(st){ if (st.id) optIds[st.id] = true; });
+  S.stops.forEach(function(st){ if (!optIds[st.id]) remaining.push(st); });
+
+  if (!remaining.length) { toast('All remaining stops are delivered.'); return; }
+
+  // Snapshot for rollback if optimization fails
+  var snap = {
+    stops: S.stops, optimized: S.optimized, savings: S.savings,
+    gpsCoords: S.gpsCoords, gpsAddr: S.gpsAddr,
+    cDone: (S.cDone||[]).slice(), cIdx: S.cIdx
+  };
+
+  // Stage: remaining stops become the input; start = last delivered location.
+  S.stops = remaining.map(function(st){
+    return { id: st.id || mkId(), address: st.address, flexNum: st.flexNum != null ? st.flexNum : null,
+             coords: st.coords || null, pkgCount: st.pkgCount || 1 };
+  });
+  var last = delivered.length ? delivered[delivered.length - 1] : null;
+  if (last && last.coords) {
+    S.gpsCoords = { lat: last.coords.lat, lon: last.coords.lon };
+    S.gpsAddr = last.address;
+  }
+  S._reoptRemaining = true;          // suppress trial consumption — same route
+  S.cDone = []; S.cIdx = 0;          // progress re-attached after reassembly
+
+  try {
+    await optimize();
+    if (!S.optimized || !S.optimized.length) throw new Error('empty result');
+    // Reassemble: delivered prefix (frozen) + newly optimized remainder
+    var newOrder = delivered.concat(S.optimized);
+    S.optimized = newOrder;
+    S.cDone = delivered.map(function(_, i){ return i; });
+    S.cIdx = delivered.length;
+    S.gpsCoords = snap.gpsCoords; S.gpsAddr = snap.gpsAddr;
+    if (S.savings) S.savings.partial = delivered.length; // describes remainder only
+    trackEvent('route_reoptimized', { trigger: 'mid_shift', delivered: delivered.length, remaining: S.optimized.length - delivered.length });
+    saveSession(); render();
+  } catch (e) {
+    // Restore everything — a failed re-optimize must not lose shift progress
+    S.stops = snap.stops; S.optimized = snap.optimized; S.savings = snap.savings;
+    S.gpsCoords = snap.gpsCoords; S.gpsAddr = snap.gpsAddr;
+    S.cDone = snap.cDone; S.cIdx = snap.cIdx;
+    toast('Re-optimization failed — your route and progress are unchanged.');
+    S.phase = 'result'; saveSession(); render();
+  } finally {
+    S._reoptRemaining = false;
+  }
+}
+
+function reorderStop(from, to) {
+  if (from === to) return;
+  if (from < 0 || to < 0) return;
+  if (from >= S.optimized.length || to >= S.optimized.length) return;
+
+  // Shift Mode walks S.optimized.filter(s => !s.geoFailed), so its indices
+  // are into that FILTERED list, not into S.optimized. Translate before the
+  // swap or completed stops end up pointing at the wrong addresses.
+  var aFrom = activeIndexOf(from);
+  var aTo   = activeIndexOf(to);
+
+  var moved = S.optimized[from];
+  S.optimized[from] = S.optimized[to];
+  S.optimized[to]   = moved;
+
+  // The stop the driver dragged is PINNED — a later re-optimization must
+  // leave it where they put it. The displaced stop is not pinned.
+  moved._moved  = true;
+  moved._pinned = true;
+
+  // Remap Shift Mode progress in filtered-index space
+  if (aFrom >= 0 && aTo >= 0) {
+    if (S.cDone && S.cDone.length) {
+      S.cDone = S.cDone.map(function(n) {
+        return n === aFrom ? aTo : (n === aTo ? aFrom : n);
+      });
+    }
+    if (S.cIdx === aFrom)    S.cIdx = aTo;
+    else if (S.cIdx === aTo) S.cIdx = aFrom;
+  }
+
+  // Savings were computed for the optimized order — they no longer describe
+  // this sequence. Flag it rather than showing a number we can't stand behind.
+  if (S.savings) S.savings.manualEdit = true;
+
+  S.manualOrder = true;
+  saveSession();
+  render();
 }
 
 function rRow(s, i) {
@@ -3462,6 +3588,7 @@ function rRow(s, i) {
     <div class="rn">${i + 1}</div>
     ${hn ? `<div class="rpkg"><div class="rpkg-l">pkg</div><div class="rpkg-v">${'#'+s.flexNum}</div></div>` : '<div style="height:4px"></div>'}
   </div>
+  <div style="flex:1;min-width:0">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
     <div class="ri-addr" style="flex:1">${escH(s.address)}</div>
     ${s.coords ? `<a href="https://www.google.com/maps/search/?api=1&query=${s.coords.lat},${s.coords.lon}" target="_blank"
@@ -3469,7 +3596,14 @@ function rRow(s, i) {
       title="Verify this location on Google Maps">&#128205; verify</a>` : ''}
   </div>
   ${(s.pkgCount||1) > 1 ? `<div style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,153,0,.15);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:700;padding:3px 9px;border-radius:10px;margin-top:6px;font-family:var(--sans)">&#128230; ${s.pkgCount} packages at this stop</div>` : ''}
+  ${s._moved ? `<div class="ri-manual">&#128204; MOVED BY YOU${s._pinned ? ' \u00b7 STAYS HERE' : ''}</div>` : ''}
   ${isL ? `<div class="ri-tag">LAST</div>` : ''}
+  </div>
+  <div class="ri-mv">
+    <button class="rbtn" data-rup="${i}" ${i === 0 ? 'disabled' : ''} title="Move up" aria-label="Move stop up">&#9650;</button>
+    <button class="rbtn" data-rdn="${i}" ${i === S.optimized.length - 1 ? 'disabled' : ''} title="Move down" aria-label="Move stop down">&#9660;</button>
+    <button class="rbtn rbtn-del" data-rdel="${i}" title="Remove stop" aria-label="Remove stop">&#10005;</button>
+  </div>
 </div>`;
 }
 
@@ -3895,6 +4029,7 @@ async function tryCensusBureau(address, ctxState, biasLat, biasLon, maxKm) {
 // Never increments for legacy_free or paid users.
 function _consumeTrialIfApplicable() {
   if (!PREMIUM_LIVE) return; // silent mode — no counting until launch day
+  if (S._reoptRemaining) return; // mid-shift re-optimize of the SAME route — not a new trial route
   if (S.entitlement === 'legacy_free' || S.entitlement === 'paid') return;
   S.trialRoutesUsed = (S.trialRoutesUsed || 0) + 1;
   localStorage.setItem('fr_trial_routes_used', String(S.trialRoutesUsed));
