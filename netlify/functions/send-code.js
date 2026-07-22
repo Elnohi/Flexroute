@@ -2,7 +2,7 @@
 // FlexRoute — sends a 6-digit one-time login code to an email address.
 
 // Node 18+ provides global fetch — no need for node-fetch
-const { getStore } = require('@netlify/blobs/functions');
+const { getStore } = require('@netlify/blobs');
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
 const CODE_TTL_MS = 10 * 60 * 1000;      // 10 minutes
@@ -57,7 +57,7 @@ async function sendEmail(email, code) {
   }
 }
 
-exports.handler = async (event, context) => {
+exports.handler = async (event) => {
   try {
     if (!isAuthorizedOrigin(event)) {
       logRejected(event);
@@ -77,7 +77,7 @@ exports.handler = async (event, context) => {
       };
     }
 
-    // Correct Netlify Blobs usage for Functions
+    // Correct Netlify Blobs usage for your runtime
     const store = getStore(blobOpts('otp'));
 
     const now = Date.now();
