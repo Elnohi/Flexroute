@@ -27,6 +27,21 @@
 // from 1 to 3 routes; a boolean couldn't express "used 2 of 3."
 
 const { getStore, connectLambda } = require('@netlify/blobs');
+
+// Build Blobs store options. Netlify's automatic context injection is
+// unreliable on this site (see MissingBlobsEnvironmentError), so when
+// BLOBS_SITE_ID + BLOBS_TOKEN env vars are set we configure Blobs manually —
+// the officially documented fallback. connectLambda remains as a best-effort
+// for environments where injection does work.
+function blobOpts(name) {
+  var opts = { name: name, consistency: 'strong' };
+  if (process.env.BLOBS_SITE_ID && process.env.BLOBS_TOKEN) {
+    opts.siteID = process.env.BLOBS_SITE_ID;
+    opts.token  = process.env.BLOBS_TOKEN;
+  }
+  return opts;
+}
+
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
 // Keep this in sync with FREE_TRIAL_ROUTE_LIMIT in flexroute.html. There is
@@ -131,7 +146,7 @@ exports.handler = async function(event) {
   // could let someone slip through in the ~60s propagation window right
   // after a 'consume' write. The cost is a slightly slower read, which is
   // fine here — this isn't a hot path called many times per second.
-  const store = getStore({ name: 'trials', consistency: 'strong' });
+  const store = getStore(blobOpts('trials'));
   const result = await handleTrialRequest(body, store);
   return { statusCode: result.statusCode, headers: cors, body: JSON.stringify(result.body) };
 };
