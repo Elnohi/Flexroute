@@ -11,6 +11,21 @@
 
 const crypto = require('crypto');
 const { getStore, connectLambda } = require('@netlify/blobs');
+
+// Build Blobs store options. Netlify's automatic context injection is
+// unreliable on this site (see MissingBlobsEnvironmentError), so when
+// BLOBS_SITE_ID + BLOBS_TOKEN env vars are set we configure Blobs manually —
+// the officially documented fallback. connectLambda remains as a best-effort
+// for environments where injection does work.
+function blobOpts(name) {
+  var opts = { name: name, consistency: 'strong' };
+  if (process.env.BLOBS_SITE_ID && process.env.BLOBS_TOKEN) {
+    opts.siteID = process.env.BLOBS_SITE_ID;
+    opts.token  = process.env.BLOBS_TOKEN;
+  }
+  return opts;
+}
+
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
 const MAX_ATTEMPTS = 5;
@@ -89,8 +104,8 @@ exports.handler = async function(event) {
   try { body = JSON.parse(event.body || '{}'); }
   catch (e) { return { statusCode: 400, headers: cors, body: JSON.stringify({ error: 'Invalid JSON', code: 'BAD_JSON' }) }; }
 
-  const otpStore = getStore({ name: 'otp', consistency: 'strong' });
-  const sessionStore = getStore({ name: 'sessions', consistency: 'strong' });
+  const otpStore = getStore(blobOpts('otp'));
+  const sessionStore = getStore(blobOpts('sessions'));
   const result = await handleVerifyCode(body, otpStore, sessionStore);
   return { statusCode: result.statusCode, headers: cors, body: JSON.stringify(result.body) };
 };
