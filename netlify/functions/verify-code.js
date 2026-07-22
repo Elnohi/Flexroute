@@ -2,7 +2,7 @@
 // FlexRoute — verifies a one-time code and issues a session token.
 
 const crypto = require('crypto');
-const { getStore, connectLambda } = require('@netlify/blobs');
+const { getStore } = require('@netlify/blobs');
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
 const MAX_ATTEMPTS = 5;
@@ -52,19 +52,15 @@ async function handleVerifyCode(body, otpStore, sessionStore) {
   }
 
   if (record.code !== code) {
-    // Increment failed attempts
     try {
       await otpStore.setJSON(email, {
         ...record,
         attempts: (record.attempts || 0) + 1
       });
-    } catch (e) {
-      // Non-fatal — worst case attempts counter doesn't increment
-    }
+    } catch {}
     return { statusCode: 400, body: { error: 'Incorrect code', code: 'WRONG_CODE' } };
   }
 
-  // Correct code — issue session token and clear OTP
   const token = crypto.randomBytes(32).toString('hex');
 
   try {
@@ -83,19 +79,11 @@ async function handleVerifyCode(body, otpStore, sessionStore) {
 }
 
 exports.handler = async function (event) {
-  // Ensure Blobs context is available
-  try {
-    connectLambda(event);
-  } catch {
-    // Local dev — ignore
-  }
-
   const cors = {
     'Access-Control-Allow-Origin': '*',
     'Content-Type': 'application/json'
   };
 
-  // Preflight
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 204,
