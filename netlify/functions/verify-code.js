@@ -10,7 +10,7 @@
 // still the source of truth for that, keyed by email).
 
 const crypto = require('crypto');
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
 const MAX_ATTEMPTS = 5;
@@ -67,6 +67,10 @@ async function handleVerifyCode(body, otpStore, sessionStore) {
 }
 
 exports.handler = async function(event) {
+  // Classic (v1) Netlify Functions don't auto-inject the Blobs context —
+  // connectLambda reads it from the invocation event. Without this,
+  // getStore() throws MissingBlobsEnvironmentError (502) in production.
+  try { connectLambda(event); } catch (e) { /* local dev — ignore */ }
   const cors = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: {

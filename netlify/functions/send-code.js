@@ -10,7 +10,7 @@
 // local/manual testing you can read the code back out of the Blobs UI in
 // the Netlify dashboard.
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -88,6 +88,10 @@ async function handleSendCode(body, store) {
 }
 
 exports.handler = async function(event) {
+  // Classic (v1) Netlify Functions don't auto-inject the Blobs context —
+  // connectLambda reads it from the invocation event. Without this,
+  // getStore() throws MissingBlobsEnvironmentError (502) in production.
+  try { connectLambda(event); } catch (e) { /* local dev — ignore */ }
   const cors = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: {

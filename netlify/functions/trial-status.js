@@ -26,7 +26,7 @@
 // Updated from a binary flag to a count when the trial allowance increased
 // from 1 to 3 routes; a boolean couldn't express "used 2 of 3."
 
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
 // Keep this in sync with FREE_TRIAL_ROUTE_LIMIT in flexroute.html. There is
@@ -101,6 +101,10 @@ async function handleTrialRequest(body, store) {
 }
 
 exports.handler = async function(event) {
+  // Classic (v1) Netlify Functions don't auto-inject the Blobs context —
+  // connectLambda reads it from the invocation event. Without this,
+  // getStore() throws MissingBlobsEnvironmentError (502) in production.
+  try { connectLambda(event); } catch (e) { /* local dev — ignore */ }
   const cors = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
 
   if (event.httpMethod === 'OPTIONS') {
