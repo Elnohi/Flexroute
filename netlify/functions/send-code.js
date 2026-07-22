@@ -1,7 +1,7 @@
 // /netlify/functions/send-code.js
 // FlexRoute — sends a 6-digit one-time login code to an email address.
 
-const fetch = require('node-fetch'); // Required for Netlify Node runtimes <18
+// Node 18+ provides global fetch — no need for node-fetch
 const { getStore, connectLambda } = require('@netlify/blobs');
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
