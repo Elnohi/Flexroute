@@ -16,15 +16,17 @@
 const Stripe = require('stripe');
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
-// LIVE-mode Price IDs for FlexRoute Premium (Stripe account also used by
-// SpellRightPro — these IDs are specific to the FlexRoute Premium product,
-// not shared with SpellRightPro's own prices). These only work with a LIVE
-// secret key (sk_live_...) — using them with a test-mode key (sk_test_...)
-// will cause Stripe to reject the request, since test and live Price IDs
-// live in separate, non-overlapping namespaces in Stripe's API.
+// LIVE-mode Price IDs for FlexRoute Premium.
+// These live on FlexRoute's OWN dedicated Stripe account (migrated off the
+// shared SpellRightPro account, which caused cross-product entitlement leaks).
+// These only work with a LIVE secret key (sk_live_...) — using them with a
+// test-mode key (sk_test_...) will cause Stripe to reject the request, since
+// test and live Price IDs live in separate, non-overlapping namespaces.
+//
+// Keep in sync with FLEXROUTE_PRICE_IDS in check-entitlement.js.
 const PRICE_IDS = {
-  monthly: 'price_1TnKXhEl99zwdEZrEfAF76Be', // $9.99 USD / month
-  yearly:  'price_1TnKcjEl99zwdEZrM0E4cVfU', // $79.00 USD / year
+  monthly: 'price_1TvpRYK7RvJpTQ3hubMkSWwy', // $9.99 USD / month
+  yearly:  'price_1TvpTSK7RvJpTQ3hi6YTdqT0', // $79.00 USD / year
 };
 
 function normalizeEmail(raw) { return (raw || '').trim().toLowerCase(); }
