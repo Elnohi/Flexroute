@@ -721,7 +721,7 @@ const FREE_TRIAL_ROUTE_LIMIT = 3;
 //         accumulate so pre-paywall users are marked for launch day.
 // true  = monetization live: trial gate, paywall, Stripe — the full flow.
 // FLIP TO true ON LAUNCH DAY together with LAUNCH_DATE_MS (see legacyFree init).
-const PREMIUM_LIVE = false;
+const PREMIUM_LIVE = true;
 // ─────────────────────────────────────────────────────────────────────────────
 
 const S = {
@@ -786,7 +786,7 @@ const S = {
   // Leave as 0 until the domain swap — grandfathering won't activate until set.
   // ─────────────────────────────────────────────────────────────────────────────
   legacyFree: (function() {
-    var LAUNCH_DATE_MS = 0; // ← SET THIS TO DOMAIN SWAP DATE BEFORE DEPLOYING
+    var LAUNCH_DATE_MS = 1784952000000; // 2026-07-24 00:00 EDT — legacy users free through Aug 23
     var THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
     var granted = parseInt(localStorage.getItem('fr_legacy_free') || '0', 10);
     if (!granted) return false;
