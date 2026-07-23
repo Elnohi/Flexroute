@@ -114,18 +114,6 @@ async function handleSendCode(body, store) {
     const code = genCode();
     const record = { code, expiresAt: Date.now() + CODE_TTL_MS, sentAt: Date.now(), attempts: 0 };
     await writeJSON(store, email, record);
-    // TEMP DEBUG (remove after OTP issue resolved): masked trace of the write.
-    // Never logs the full code — first 2 digits + length only.
-    console.log('[FlexRoute][DEBUG] OTP WRITE key=' + email
-      + ' codeMask=' + code.slice(0,2) + '****'
-      + ' len=' + code.length + ' type=' + typeof code
-      + ' sentAt=' + record.sentAt);
-    // Read-back: confirms the write is visible to a strong read in THIS invocation
-    try {
-      const rb = await readJSON(store, email);
-      console.log('[FlexRoute][DEBUG] OTP READBACK match=' + (rb && rb.code === code)
-        + ' mask=' + (rb && rb.code ? String(rb.code).slice(0,2) + '****' : 'null'));
-    } catch (e) { console.log('[FlexRoute][DEBUG] OTP READBACK failed: ' + (e && e.message)); }
     await sendEmail(email, code);
     return { statusCode: 200, body: { sent: true } };
   } catch (e) {

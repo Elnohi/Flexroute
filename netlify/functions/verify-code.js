@@ -77,13 +77,6 @@ async function handleVerifyCode(body, otpStore, sessionStore) {
     return { statusCode: 429, body: { error: 'Too many attempts — request a new code', code: 'TOO_MANY_ATTEMPTS' } };
   }
 
-  // TEMP DEBUG (remove after OTP issue resolved): masked comparison trace.
-  console.log('[FlexRoute][DEBUG] OTP COMPARE key=' + email
-    + ' stored=' + String(record.code).slice(0,2) + '**** typed=' + code.slice(0,2) + '****'
-    + ' storedLen=' + String(record.code).length + ' typedLen=' + code.length
-    + ' storedType=' + typeof record.code
-    + ' ageSec=' + Math.round((Date.now() - (record.sentAt||0))/1000)
-    + ' attempts=' + (record.attempts||0));
   if (record.code !== code) {
     // Record the failed attempt so MAX_ATTEMPTS actually limits brute-forcing
     // a 6-digit code (1,000,000 possibilities — trivially guessable without
