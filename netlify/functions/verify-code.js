@@ -33,6 +33,26 @@ const SESSION_TTL_MS = 180 * 24 * 60 * 60 * 1000; // 180 days
 
 function normalizeEmail(raw) { return (raw || '').trim().toLowerCase(); }
 
+// Own-serialization helpers: we JSON.stringify/parse ourselves instead of
+// relying on the bundled @netlify/blobs setJSON/typed-get, after production
+// showed blobs containing the literal string "[object Object]" — i.e. the
+// deployed bundle's JSON helpers string-coerced the value. Manual
+// serialization is immune to that regardless of which blobs build Netlify
+// ships. safeParse tolerates corrupt/legacy blobs by returning null.
+async function readJSON(store, key) {
+  const raw = await store.get(key);
+  if (raw === null || raw === undefined) return null;
+  try { return JSON.parse(typeof raw === 'string' ? raw : String(raw)); }
+  catch (e) {
+    console.warn('[FlexRoute] corrupt blob at key=' + key + ' — treating as absent');
+    return null;
+  }
+}
+async function writeJSON(store, key, value) {
+  await store.set(key, JSON.stringify(value));
+}
+
+
 async function handleVerifyCode(body, otpStore, sessionStore) {
   const email = normalizeEmail(body.email);
   const code = (body.code || '').trim();
@@ -41,7 +61,7 @@ async function handleVerifyCode(body, otpStore, sessionStore) {
   }
 
   let record;
-  try { record = await otpStore.get(email, { type: 'json' }); }
+  try { record = await readJSON(otpStore, email); }
   catch (e) {
     console.error('[FlexRoute] verify-code read error:', e && e.message);
     return { statusCode: 502, body: { error: 'Storage error', code: 'STORAGE' } };
@@ -69,7 +89,7 @@ async function handleVerifyCode(body, otpStore, sessionStore) {
     // a 6-digit code (1,000,000 possibilities — trivially guessable without
     // a rate limit on attempts).
     try {
-      await otpStore.setJSON(email, Object.assign({}, record, { attempts: (record.attempts || 0) + 1 }));
+      await writeJSON(otpStore, email, Object.assign({}, record, { attempts: (record.attempts || 0) + 1 }));
     } catch (e) { /* non-fatal — worst case attempts counter doesn't increment this one time */ }
     return { statusCode: 400, body: { error: 'Incorrect code', code: 'WRONG_CODE' } };
   }
@@ -78,7 +98,7 @@ async function handleVerifyCode(body, otpStore, sessionStore) {
   // can't be reused.
   const token = crypto.randomBytes(32).toString('hex');
   try {
-    await sessionStore.setJSON(token, { email, createdAt: Date.now(), expiresAt: Date.now() + SESSION_TTL_MS });
+    await writeJSON(sessionStore, token, { email, createdAt: Date.now(), expiresAt: Date.now() + SESSION_TTL_MS });
     await otpStore.delete(email);
   } catch (e) {
     console.error('[FlexRoute] verify-code write error:', e && e.message);

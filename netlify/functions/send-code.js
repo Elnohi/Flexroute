@@ -32,6 +32,26 @@ const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const RESEND_COOLDOWN_MS = 30 * 1000; // prevent rapid-fire resend spam
 
 function normalizeEmail(raw) { return (raw || '').trim().toLowerCase(); }
+
+// Own-serialization helpers: we JSON.stringify/parse ourselves instead of
+// relying on the bundled @netlify/blobs setJSON/typed-get, after production
+// showed blobs containing the literal string "[object Object]" — i.e. the
+// deployed bundle's JSON helpers string-coerced the value. Manual
+// serialization is immune to that regardless of which blobs build Netlify
+// ships. safeParse tolerates corrupt/legacy blobs by returning null.
+async function readJSON(store, key) {
+  const raw = await store.get(key);
+  if (raw === null || raw === undefined) return null;
+  try { return JSON.parse(typeof raw === 'string' ? raw : String(raw)); }
+  catch (e) {
+    console.warn('[FlexRoute] corrupt blob at key=' + key + ' — treating as absent');
+    return null;
+  }
+}
+async function writeJSON(store, key, value) {
+  await store.set(key, JSON.stringify(value));
+}
+
 function isPlausibleEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
 }
@@ -87,13 +107,13 @@ async function handleSendCode(body, store) {
     return { statusCode: 400, body: { error: 'Invalid email', code: 'BAD_EMAIL' } };
   }
   try {
-    const existing = await store.get(email, { type: 'json' });
+    const existing = await readJSON(store, email);
     if (existing && existing.sentAt && (Date.now() - existing.sentAt) < RESEND_COOLDOWN_MS) {
       return { statusCode: 429, body: { error: 'Please wait before requesting another code', code: 'COOLDOWN' } };
     }
     const code = genCode();
     const record = { code, expiresAt: Date.now() + CODE_TTL_MS, sentAt: Date.now(), attempts: 0 };
-    await store.setJSON(email, record);
+    await writeJSON(store, email, record);
     // TEMP DEBUG (remove after OTP issue resolved): masked trace of the write.
     // Never logs the full code — first 2 digits + length only.
     console.log('[FlexRoute][DEBUG] OTP WRITE key=' + email
@@ -102,7 +122,7 @@ async function handleSendCode(body, store) {
       + ' sentAt=' + record.sentAt);
     // Read-back: confirms the write is visible to a strong read in THIS invocation
     try {
-      const rb = await store.get(email, { type: 'json' });
+      const rb = await readJSON(store, email);
       console.log('[FlexRoute][DEBUG] OTP READBACK match=' + (rb && rb.code === code)
         + ' mask=' + (rb && rb.code ? String(rb.code).slice(0,2) + '****' : 'null'));
     } catch (e) { console.log('[FlexRoute][DEBUG] OTP READBACK failed: ' + (e && e.message)); }
