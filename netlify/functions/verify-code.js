@@ -29,9 +29,10 @@ async function handleVerifyCode(body, otpStore, sessionStore) {
     return { statusCode: 400, body: { error: 'Invalid request', code: 'BAD_INPUT' } };
   }
 
+  // Read OTP record
   let record;
   try {
-    record = await otpStore.get(email, { type: 'json' });
+    record = await otpStore.get(email); // ✔ new API
   } catch (e) {
     console.error('[FlexRoute] verify-code read error:', e?.message);
     return { statusCode: 502, body: { error: 'Storage error', code: 'STORAGE' } };
@@ -51,25 +52,33 @@ async function handleVerifyCode(body, otpStore, sessionStore) {
     return { statusCode: 429, body: { error: 'Too many attempts — request a new code', code: 'TOO_MANY_ATTEMPTS' } };
   }
 
+  // Wrong code → increment attempts
   if (record.code !== code) {
     try {
-      await otpStore.setJSON(email, {
+      await otpStore.set(email, {
         ...record,
         attempts: (record.attempts || 0) + 1
       });
-    } catch {}
+    } catch (e) {
+      console.error('[FlexRoute] verify-code attempt increment error:', e?.message);
+    }
     return { statusCode: 400, body: { error: 'Incorrect code', code: 'WRONG_CODE' } };
   }
 
+  // Correct code → create session token
   const token = crypto.randomBytes(32).toString('hex');
 
   try {
-    await sessionStore.setJSON(token, {
+    await sessionStore.set(token, {
       email,
       createdAt: now,
       expiresAt: now + SESSION_TTL_MS
     });
-    await otpStore.delete(email);
+
+    // Netlify Blobs free tier does NOT support delete()
+    // Overwrite OTP with null to invalidate it
+    await otpStore.set(email, null);
+
   } catch (e) {
     console.error('[FlexRoute] verify-code write error:', e?.message);
     return { statusCode: 502, body: { error: 'Storage error', code: 'STORAGE' } };
