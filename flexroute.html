@@ -5222,6 +5222,9 @@ function parseFlexOCR(rawText) {
     if (/^#\s*[A-Za-z]{1,3}[.\-]\w{2,}/i.test(line.trim())) return true;
     // Tracking ID fragments when # is dropped by OCR: "015, CH.018"
     if (/^\d{2,4},\s*[A-Z]{2,3}[.\-]\d{3}/i.test(line.trim())) return true;
+    // Single-letter / symbol-only lines — OCR artifacts from Flex UI elements
+    // (e.g. "i      -", "v", "[ ") that aren't caught by keyword checks above.
+    if (line.replace(/[^a-zA-Z]/g, '').length <= 2 && !/\d/.test(line)) return true;
     return /^(deliver|package|itinerary|current|next stop|map|summary|list|search|tracking|locations|after you|you.ll|location|locker|buzzer|pickup)/i.test(line)
       || /^\d+\s*v$/.test(line)   // "2 v" locations dropdown
       || line.length < 3;
@@ -5259,12 +5262,47 @@ function parseFlexOCR(rawText) {
       var addrLine = '', cityLine = '', j = i + 1;
       var currentPkgCount = 1;  // reset per stop block
 
+      // ── Inline address extraction ─────────────────────────────────────
+      // Google Vision sometimes puts the address on the SAME line as the
+      // Scheduled annotation, e.g.:
+      //   "(© # D-34.3G » Scheduled 4:00 - 8:00 a.m. 230 Elm Road"
+      // instead of breaking it onto the next line. When that happens, the
+      // scanner sees a Scheduled block with no address on subsequent lines
+      // and skips it entirely — silently losing the stop.
+      //
+      // Fix: after the time portion, check if the remainder of the line
+      // contains a street address. If so, extract it and treat it as if
+      // it were on the next line, so the rest of the block scanner (city,
+      // package count, dedup) works unchanged.
+      var _schedLine = lines[i];
+      var _inlineAddr = '';
+      // Strip everything up to and including the time pattern, then check what's left
+      var _afterTime = _schedLine
+        .replace(/^.*?\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?)\s*/i, '')
+        .replace(/^[.·\-–—]+\s*/, '')  // trailing dots/dashes after time
+        .trim();
+      // If what remains looks like a street address (has a street keyword),
+      // pull it out so the block scanner finds it
+      if (_afterTime && isStreet(_afterTime)) {
+        _inlineAddr = cleanLine(_afterTime);
+      }
+
       // Skip any immediately following scheduled/time lines (multi-line scheduled)
       while (j < lines.length && isScheduled(lines[j])) j++;
 
+      // If we extracted an inline address, seed addrLine with it
+      if (_inlineAddr) {
+        addrLine = truncateAfterStreetType(
+          _inlineAddr
+            .replace(/\s+for\s*\.+$/i, '')
+            .replace(/\.{2,}$/, '')
+            .trim()
+        );
+      }
+
       var pendingCity = '';
       while (j < lines.length && j < i + 12) {
-        var ln = lines[j];
+        var ln = lines[j].replace(/^[|\[\]]+\s*/, '');  // strip OCR pipe/bracket artifacts from Flex UI columns
         if (isScheduled(ln)) break;
         // Parse package count from "Deliver N package(s)" BEFORE noise filter
         var _deliverM = ln.match(/^deliver\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+packages?/i);
