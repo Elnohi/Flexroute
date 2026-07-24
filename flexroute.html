@@ -2631,7 +2631,7 @@ function vInput() {
 
   if (S.errMsg) {
     h += '<div style="background:rgba(255,68,85,.12);border:1px solid #FF4455;border-radius:10px;padding:12px 15px;margin-bottom:14px">';
-    h += '<div style="font-size:14px;color:#FF4455;margin-bottom:10px">' + escH(S.errMsg) + '</div>';
+    h += '<div style="font-size:14px;color:#FF4455;margin-bottom:10px;white-space:pre-line">' + escH(S.errMsg) + '</div>';
     h += '<button class="btn bp" id="retryOptBtn">' + t('try_again') + '</button></div>';
   }
 
@@ -2904,7 +2904,7 @@ function vResult() {
   </div>
 
   ${S.errMsg ? `<div style="background:var(--err-d);border:1px solid var(--err);border-radius:16px;padding:12px 15px;margin-bottom:10px">
-    <div style="font-size:14px;color:var(--err);margin-bottom:10px">${escH(S.errMsg)}</div>
+    <div style="font-size:14px;color:var(--err);margin-bottom:10px;white-space:pre-line">${escH(S.errMsg)}</div>
     <button class="btn bp" id="retryOptBtn">${t("try_again")}</button>
   </div>` : ''}
 
@@ -3863,12 +3863,16 @@ async function handleFiles(files) {
   S.sc = { done: 0, total: imgs.length, msg: 'Reading images...' };
   S.errMsg = ''; render();
   let added = 0, failed = 0, lastErr = '', unreadable = 0;
+  let unreadableDetails = [];
   for (let i = 0; i < imgs.length; i++) {
     S.sc = { done: i, total: imgs.length, msg: `Scanning image ${i + 1} of ${imgs.length}...` };
     render();
     try {
       const items = await extractFromFile(imgs[i]);
       unreadable += items._skipped || 0;
+      if (items._skippedDetails && items._skippedDetails.length) {
+        unreadableDetails = unreadableDetails.concat(items._skippedDetails);
+      }
       // Depot auto-fill: the itinerary's "Picked up at" block reveals the depot.
       // Only fill when the driver hasn't set a start address themselves.
       if (items._pickup && !S.startAddr && !S.gpsCoords) {
@@ -3939,10 +3943,14 @@ async function handleFiles(files) {
     S._showDebug = false;
     saveSession();
     if (unreadable > 0) {
-      // Some stops were detected but couldn't be read — TELL the driver so
-      // they can add the missing stop(s) manually instead of finding out on the road.
-      S.errMsg = `⚠ ${added} stop${added > 1 ? 's' : ''} added, but ${unreadable} stop${unreadable > 1 ? 's' : ''} couldn't be read from the screenshot. Compare the list below against your Flex app and add any missing stop manually.`;
-      trackEvent('ocr_stops_unreadable', { unreadable: unreadable, added: added });
+      // Some stops were detected but couldn't be read — name WHICH ones so the
+      // driver can jump straight to them instead of diffing 23 stops by hand.
+      var _detailLines = unreadableDetails.map(function(d) {
+        if (d.num) return `  • Stop #${d.num}` + (d.raw ? ` — "${d.raw}"` : ' — check your Flex app for this stop');
+        return `  • ` + (d.raw ? `"${d.raw}"` : 'one stop') + ` — number unclear, check your Flex app`;
+      });
+      S.errMsg = `⚠ ${added} stop${added > 1 ? 's' : ''} added, but ${unreadable} stop${unreadable > 1 ? 's' : ''} couldn't be read:\n` + _detailLines.join('\n') + `\nAdd ${unreadable > 1 ? 'them' : 'it'} manually using the field above.`;
+      trackEvent('ocr_stops_unreadable', { unreadable: unreadable, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
     }
@@ -4963,6 +4971,7 @@ function parseFlexOCR(rawText) {
   var lines = rawText.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
   var results = [];
   var _skippedBlocks = 0;
+  var _skippedDetails = [];
 
   var CITIES = ['east york','north york','scarborough','etobicoke','toronto',
     'mississauga','brampton','markham','richmond hill','vaughan','ajax','pickering',
@@ -5218,8 +5227,17 @@ function parseFlexOCR(rawText) {
       || line.length < 3;
   }
 
+  // Pulls the stop number Flex prints on the annotation line itself, e.g.
+  // "(14) # D-38.3D « Scheduled 3:00 - 8:00 a.m." -> 14
+  // "13) # D-38.3X « Scheduled..." -> 13   (OCR sometimes drops the "(")
+  // Used ONLY for driver-facing display (which stop to check) — never for
+  // route sequencing, so an occasional miss here is cosmetic, not a bug.
+  function extractStopNum(scheduledLine) {
+    if (!scheduledLine) return null;
+    var m = scheduledLine.match(/^\(?\s*(\d{1,3})\s*\)/);
+    return m ? parseInt(m[1], 10) : null;
+  }
   function extractNumFromAddr(addrLine) { return null; }
-  function extractStopNum(scheduledLine, prevLines) { return null; }
 
   var i = 0;
   while (i < lines.length) {
@@ -5332,13 +5350,40 @@ function parseFlexOCR(rawText) {
           .replace(/[,\s]+(enter\s+code|buzz(?:er)?(?:\s*(?:code|#))?|gate\s+code|door\s+code|access\s+code|call\s+(?:on|upon)\s+arrival|leave\s+(?:at|with)|side\s+door|back\s+door|front\s+desk|concierge|reception|ring\s+bell|intercom)\b.*$/i, '')
           .trim();
         var fullAddr = city ? (addrLine + ', ' + city) : addrLine;
-        // Exact-match dedup (case/space-insensitive). A substring key here
-        // previously swallowed real stops: "7437 kingston road" matched INSIDE
-        // "611B-7437 Kingston Road" and the second stop was silently dropped.
-        var keyFull = addrLine.toLowerCase().replace(/\s+/g,' ').trim();
-        var _existingResult = results.find(function(r){
-          var ra = r.address.toLowerCase().replace(/\s+/g,' ').trim();
-          return ra === keyFull || ra.indexOf(keyFull + ',') === 0;
+        // Dedup key: normalize the FULL address (not a truncated prefix).
+        // Why not truncate to ~22 chars like before? Because two different
+        // units on the same long street name (e.g. "77 Shuter St Unit 1603"
+        // vs "77 Shuter Street Suite 999") share an identical prefix well
+        // under 22 characters — truncating merges genuinely different
+        // deliveries into one stop and silently drops/sums package counts
+        // for the wrong address.
+        //
+        // What we actually need to catch: the SAME physical line read
+        // slightly differently across two overlapping screenshots (e.g. one
+        // crop cuts off "Unit 1603", the other captures it in full). That's
+        // a "one is a prefix of the other" relationship on the FULL string,
+        // not a fixed character count — so compare the complete normalized
+        // address, and only treat a prefix-match as the same stop when the
+        // shorter one isn't simply missing a unit/suite/apartment number
+        // (which would mean it's actually a different sub-address).
+        var normAddr = fullAddr.toLowerCase().replace(/\s+/g, ' ').trim();
+        var hasUnitInfo = /\b(unit|apt|apartment|suite|ste|#)\.?\s*\d/i.test(fullAddr);
+        var _existingResult = results.find(function(r) {
+          var rNorm = r.address.toLowerCase().replace(/\s+/g, ' ').trim();
+          if (rNorm === normAddr) return true; // exact match, always same stop
+          // Prefix relationship (one is a truncated OCR read of the other) —
+          // only treat as the same stop if NEITHER side carries unit/suite
+          // info the other lacks. If either has a unit number the other
+          // doesn't, they're different sub-addresses, not OCR variance.
+          var shorter = normAddr.length <= rNorm.length ? normAddr : rNorm;
+          var longer  = normAddr.length <= rNorm.length ? rNorm : normAddr;
+          if (longer.indexOf(shorter) !== 0) return false; // not a prefix relationship
+          var rHasUnit = /\b(unit|apt|apartment|suite|ste|#)\.?\s*\d/i.test(r.address);
+          if (hasUnitInfo !== rHasUnit) return false; // one has unit info, other doesn't → different sub-address
+          // Require the prefix to be reasonably long relative to the shorter
+          // string so two short, unrelated lines don't accidentally collide
+          // (e.g. avoids matching on just a house number + first letter).
+          return shorter.length >= 12;
         });
         if (_existingResult) {
           // Same address found:
@@ -5356,8 +5401,21 @@ function parseFlexOCR(rawText) {
         }
       } else {
         // Scheduled block found but no address line could be parsed —
-        // count it so the driver is TOLD instead of silently losing a stop.
+        // capture WHICH stop so the driver can find it instead of diffing
+        // their entire itinerary by hand. We keep two independent trails:
+        //   - stopNum: parsed from the annotation line, e.g. "(14) # D-38.3D"
+        //   - raw: whatever text WAS on the block, even if unparseable,
+        //     so the driver has something to visually match on their phone
+        //     even when stop-number OCR also failed.
         _skippedBlocks++;
+        var _rawLines = [];
+        for (var _k = i + 1; _k < j; _k++) {
+          if (lines[_k] && !isNoise(lines[_k])) _rawLines.push(lines[_k]);
+        }
+        _skippedDetails.push({
+          num: extractStopNum(lines[i]),
+          raw: _rawLines.join(' / ').substring(0, 80)
+        });
       }
       i = j;
     } else {
@@ -5368,6 +5426,7 @@ function parseFlexOCR(rawText) {
   // Number stops by position in list — matches package loading order in car
   results.forEach(function(r, idx) { r.num = idx + 1; });
   results._skipped = _skippedBlocks;
+  results._skippedDetails = _skippedDetails;
   return results;
 }
 
@@ -5845,19 +5904,81 @@ async function osrmRoute(coords) {
 }
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
+const GMAPS_MAX_CHUNK = 3;
+const GMAPS_MIN_CHUNK = 2;
+
+// Splits the optimized route into Google Maps nav legs at genuine geographic
+// breaks rather than a rigid stop count, so a leg doesn't get cut mid-cluster
+// (e.g. two adjacent stops on the same block split across two links).
+function _gMapsChunkBounds() {
+  const stops = S.optimized;
+  const n = stops.length;
+  if (n === 0) return [];
+  if (n <= GMAPS_MAX_CHUNK) return [[0, n]];
+
+  // Distance from each stop to the next (km), where coords are known.
+  // Stops with missing coords (geoFailed) get a gap of 0 so they never
+  // force an artificial break — we only want to break on REAL distance.
+  const gaps = [];
+  for (let i = 0; i < n - 1; i++) {
+    const a = stops[i].coords, b = stops[i + 1].coords;
+    gaps.push((a && b) ? haversineKm(a.lat, a.lon, b.lat, b.lon) : 0);
+  }
+  // Typical gap size across the WHOLE route — used as a baseline so we only
+  // break early on a gap that's a genuine outlier (e.g. a detour to a far
+  // stop), not just "the biggest of several similar small gaps in this
+  // particular window" (that was the bug in the first version of this
+  // function — it broke at every local maximum and produced too many tiny
+  // chunks). A median is more robust to a few huge outlier gaps skewing
+  // things than a mean would be.
+  const sortedGaps = gaps.slice().sort((a, b) => a - b);
+  const medianGap = sortedGaps.length
+    ? sortedGaps[Math.floor(sortedGaps.length / 2)]
+    : 0;
+  // A gap has to be at least this many times the median to count as a real
+  // "natural break" worth cutting early for. Otherwise we fall back to the
+  // old fixed-size cut, which is a perfectly fine default when the route
+  // doesn't have any standout jumps in this window.
+  const OUTLIER_FACTOR = 2.5;
+  const outlierThreshold = Math.max(medianGap * OUTLIER_FACTOR, 1.5); // km floor
+
+  const bounds = [];
+  let start = 0;
+  while (start < n) {
+    const maxEnd = Math.min(start + GMAPS_MAX_CHUNK, n);
+    const minEnd = Math.min(start + GMAPS_MIN_CHUNK, n);
+    if (maxEnd >= n) { bounds.push([start, n]); break; }
+
+    // Find the single biggest gap in this window. Only break there if it
+    // clears the outlier threshold — otherwise just take the full-size
+    // chunk (old fixed behavior), so we don't fragment a route that's
+    // genuinely one continuous cluster with no standout jump.
+    let bestIdx = -1, bestGap = -1;
+    for (let i = minEnd - 1; i < maxEnd; i++) {
+      if (gaps[i] > bestGap) { bestGap = gaps[i]; bestIdx = i; }
+    }
+    const end = (bestGap >= outlierThreshold) ? bestIdx + 1 : maxEnd;
+    bounds.push([start, end]);
+    start = end;
+  }
+  return bounds;
+}
+
 function gMapsURL(chunkIndex) {
-  const CHUNK = 5;
   const allStops = S.optimized.map(s => s.address);
+  const bounds = _gMapsChunkBounds();
   const idx = chunkIndex || 0;
-  const chunk = allStops.slice(idx * CHUNK, (idx + 1) * CHUNK);
+  if (idx >= bounds.length) return '#';
+  const [from, to] = bounds[idx];
+  const chunk = allStops.slice(from, to);
   if (!chunk.length) return '#';
-  const chunkStart = idx === 0 ? (S.startAddr || '') : allStops[idx * CHUNK - 1];
-  const isLast = (idx + 1) * CHUNK >= allStops.length;
+  const chunkStart = idx === 0 ? (S.startAddr || '') : allStops[from - 1];
+  const isLast = idx === bounds.length - 1;
   const chunkEnd = isLast ? S.home : '';
   const pts = [chunkStart, ...chunk, chunkEnd].filter(Boolean);
   return 'https://www.google.com/maps/dir/' + pts.map(p => encodeURIComponent(p)).join('/');
 }
-function totalChunks() { return Math.ceil(S.optimized.length / 5); }
+function totalChunks() { return _gMapsChunkBounds().length; }
 // ── Cumulative savings (display only) ───────────────────────────────────────
 // Lifetime distance/time saved on this device, shown in the stats tile.
 // Replaces the previously hardcoded "11 km / 18 min" marketing figures.
