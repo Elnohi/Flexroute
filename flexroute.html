@@ -199,6 +199,14 @@ body.rzoom-1 .rlist .rn{width:42px;height:42px;font-size:18px}
 body.rzoom-1 .rlist .ri-l{min-width:48px}
 body.rzoom-1 .rlist .rpkg{min-width:42px;padding:4px 7px}
 body.rzoom-1 .rlist .rpkg-v{font-size:18px}
+/* Secondary row elements now scale WITH the address text instead of staying
+   frozen at their original tiny size — previously only the address line and
+   stop-number circle grew, leaving labels/links/notes stuck at ~9-12px,
+   which made the zoom feel broken/inconsistent rather than making the row
+   genuinely easier to read as a whole. */
+body.rzoom-1 .rlist .ri a[href*="google.com/maps"]{font-size:14px;padding:5px 10px}
+body.rzoom-1 .rlist .ri .ri-l > div:last-child{font-size:11px}
+body.rzoom-1 .rlist .ri-manual{font-size:12px;padding:3px 9px}
 body.rzoom-2 .rlist .ri{padding:22px 19px;gap:18px}
 body.rzoom-2 .rlist .ri-addr{font-size:24px;line-height:1.4;font-weight:600}
 body.rzoom-2 .rlist .rn{width:50px;height:50px;font-size:22px;font-weight:900}
@@ -206,6 +214,9 @@ body.rzoom-2 .rlist .ri-l{min-width:56px}
 body.rzoom-2 .rlist .rpkg{min-width:48px;padding:5px 9px}
 body.rzoom-2 .rlist .rpkg-v{font-size:22px}
 body.rzoom-2 .rlist .ri{border-width:2px}
+body.rzoom-2 .rlist .ri a[href*="google.com/maps"]{font-size:16px;padding:6px 12px}
+body.rzoom-2 .rlist .ri .ri-l > div:last-child{font-size:13px}
+body.rzoom-2 .rlist .ri-manual{font-size:13px;padding:4px 10px}
 /* Higher contrast borders in zoom mode for visual separation */
 body.rzoom-1 .rlist .ri,body.rzoom-2 .rlist .ri{border-color:var(--t3)}
 
@@ -389,6 +400,9 @@ body.rzoom-1 .rlist .rn{width:42px;height:42px;font-size:18px}
 body.rzoom-1 .rlist .ri-l{min-width:48px}
 body.rzoom-1 .rlist .rpkg{min-width:42px;padding:4px 7px}
 body.rzoom-1 .rlist .rpkg-v{font-size:18px}
+body.rzoom-1 .rlist .ri a[href*="google.com/maps"]{font-size:14px;padding:5px 10px}
+body.rzoom-1 .rlist .ri .ri-l > div:last-child{font-size:11px}
+body.rzoom-1 .rlist .ri-manual{font-size:12px;padding:3px 9px}
 body.rzoom-2 .rlist .ri{padding:22px 19px;gap:18px}
 body.rzoom-2 .rlist .ri-addr{font-size:24px;line-height:1.4;font-weight:600}
 body.rzoom-2 .rlist .rn{width:50px;height:50px;font-size:22px;font-weight:900}
@@ -396,9 +410,29 @@ body.rzoom-2 .rlist .ri-l{min-width:56px}
 body.rzoom-2 .rlist .rpkg{min-width:48px;padding:5px 9px}
 body.rzoom-2 .rlist .rpkg-v{font-size:22px}
 body.rzoom-2 .rlist .ri{border-width:2px}
+body.rzoom-2 .rlist .ri a[href*="google.com/maps"]{font-size:16px;padding:6px 12px}
+body.rzoom-2 .rlist .ri .ri-l > div:last-child{font-size:13px}
+body.rzoom-2 .rlist .ri-manual{font-size:13px;padding:4px 10px}
 body.rzoom-1 .rlist .ri,body.rzoom-2 .rlist .ri{border-color:var(--brd2)}
 .zoom-btn{background:var(--surf);border:1px solid var(--brd);border-radius:var(--rs);padding:0 12px;height:36px;font-size:14px;font-weight:700;color:var(--t2);cursor:pointer;font-family:var(--sans);display:flex;align-items:center;gap:4px;line-height:1}
 .zoom-btn.active{border-color:var(--acc);color:var(--acc)}
+
+/* Map preview attention cue — quiet pulsing glow + sparkle badge */
+@keyframes mapGlowPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(255,153,0,.35)}
+  50%{box-shadow:0 0 0 6px rgba(255,153,0,0)}
+}
+@keyframes sparkleTwinkle{
+  0%,100%{opacity:1;transform:scale(1)}
+  50%{opacity:.5;transform:scale(.85)}
+}
+.map-toggle-btn.map-attn{animation:mapGlowPulse 2.2s ease-in-out infinite;border-color:rgba(255,153,0,.5)}
+.map-attn-badge{display:inline-flex;align-items:center;justify-content:center;margin-left:6px;
+  animation:sparkleTwinkle 1.6s ease-in-out infinite;color:var(--acc);font-size:14px;line-height:1}
+@media (prefers-reduced-motion: reduce){
+  .map-toggle-btn.map-attn{animation:none;border-color:rgba(255,153,0,.5)}
+  .map-attn-badge{animation:none}
+}
 .ri-l{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;min-width:42px}
 .rn{width:38px;height:38px;border-radius:50%;background:var(--acc);color:#000;font-size:17px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:var(--sans)}
 .rpkg{display:flex;flex-direction:column;align-items:center;background:var(--surf);border:1.5px solid var(--acc);border-radius:5px;padding:2px 5px;min-width:34px}
@@ -2858,10 +2892,11 @@ function vResult() {
   </div>` : ''}
 
   <!-- ── MAP PREVIEW ── Collapsible, Leaflet/OpenStreetMap, no API key ── -->
-  <button class="map-toggle-btn" id="mapToggleBtn" onclick="toggleRouteMap()">
+  <button class="map-toggle-btn${(!S._mapOpen && !localStorage.getItem('fr_map_seen')) ? ' map-attn' : ''}" id="mapToggleBtn" onclick="toggleRouteMap()">
     <div style="display:flex;align-items:center;gap:10px">
       <span style="font-size:18px">&#128506;</span>
       <span>Route map preview</span>
+      ${(!S._mapOpen && !localStorage.getItem('fr_map_seen')) ? '<span class="map-attn-badge">&#10024;</span>' : ''}
     </div>
     <span id="mapToggleIcon" style="font-size:18px;color:var(--acc);font-weight:700">${S._mapOpen ? '&#8963;' : '+'}</span>
   </button>
@@ -2885,18 +2920,18 @@ function vResult() {
 
   <div style="background:var(--surf);border-radius:16px;padding:10px 11px;margin-bottom:10px">
     <div class="rlist">
-      ${S.startAddr ? `<div class="ri" style="border-color:var(--inf);background:var(--inf-d)">
+      ${S.startAddr ? `<div class="ri" style="border-color:var(--inf);border-width:1.5px;background:var(--inf-d)">
         <div class="ri-l">
           <div class="rn" style="background:var(--inf);font-size:14px">&#9654;</div>
-          <div style="font-size:9px;color:var(--inf);font-weight:700;letter-spacing:1px;font-family:var(--sans)">START</div>
+          <div style="font-size:10px;color:var(--inf);font-weight:800;letter-spacing:1.2px;font-family:var(--sans)">START</div>
         </div>
-        <div class="ri-addr" style="color:var(--inf)">${escH(S.startAddr)}</div>
+        <div class="ri-addr">${escH(S.startAddr)}</div>
       </div>` : ''}
       ${S.optimized.map((s, i) => rRow(s, i)).join('')}
       ${S.home ? `<div class="ri rh">
         <div class="ri-l">
           <div class="rn" style="background:var(--ok);font-size:14px">&#8962;</div>
-          <div style="font-size:9px;color:var(--ok);font-weight:700;letter-spacing:1px;font-family:var(--sans)">HOME</div>
+          <div style="font-size:10px;color:var(--ok);font-weight:800;letter-spacing:1.2px;font-family:var(--sans)">HOME</div>
         </div>
         <div class="ri-addr">${escH(S.home)}</div>
       </div>` : ''}
@@ -3113,6 +3148,9 @@ var _mapPopupEl    = null;  // the custom nav popup DOM element
 
 function toggleRouteMap() {
   S._mapOpen = !S._mapOpen;
+  // Once a driver has opened the map once, the attention cue has done its
+  // job — stop pulsing so the UI doesn't nag on every future route.
+  if (S._mapOpen) localStorage.setItem('fr_map_seen', '1');
   var wrap = document.getElementById('mapWrap');
   var icon = document.getElementById('mapToggleIcon');
   if (!wrap) return;
