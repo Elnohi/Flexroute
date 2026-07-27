@@ -1,6 +1,9 @@
 // FlexRoute Service Worker — offline support
-// v2: network-first for HTML so deploys reach users immediately
-const CACHE = 'flexroute-v4';   // bumped: v07e adds Netlify function routing   // ← bumped from v1; forces cache wipe on update
+// v3: HTML fetch explicitly bypasses the HTTP cache so deploys reach TWA
+//     users on their next cold launch. The network-first design only helped
+//     partially before, because Chrome's HTTP cache underneath was still
+//     returning stale flexroute.html in Custom Tab / TWA sessions.
+const CACHE = 'flexroute-v5';   // bumped from v4: forces old cache wipe after Waze TWA fix
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
@@ -14,7 +17,7 @@ self.addEventListener('install', e => {
   self.skipWaiting();
 });
 
-// Activate — wipe ALL old caches (flexroute-v1, etc.)
+// Activate — wipe ALL old caches (flexroute-v1..v4, etc.)
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -76,8 +79,13 @@ self.addEventListener('fetch', e => {
                  url.pathname === '/';
 
   if (isHTML) {
+    // { cache: 'reload' } bypasses the browser's HTTP cache and forces a fresh
+    // trip to Netlify. Without this, a Chrome Custom Tab / TWA session can
+    // keep serving stale flexroute.html for the duration of the HTTP cache's
+    // max-age even though the SW is nominally network-first. The response is
+    // still written into the SW cache after fetch so offline mode still works.
     e.respondWith(
-      fetch(e.request).then(response => {
+      fetch(e.request, { cache: 'reload' }).then(response => {
         if (response && response.status === 200) {
           const clone = response.clone();
           caches.open(CACHE).then(cache => cache.put(e.request, clone));
