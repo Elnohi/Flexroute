@@ -25,76 +25,17 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* ── Dark theme ── */
-:root{
-  --bg:#0A0A12;--surf:#13131E;--surf2:#1A1A28;--surf3:#222235;
-  --brd:#2A2A40;--brd2:#3A3A55;
-  --acc:#FF9900;--acc2:#FFB740;--acc-d:rgba(255,153,0,.12);
-  --ok:#22D98A;--ok-d:rgba(34,217,138,.12);
-  --err:#FF4455;--err-d:rgba(255,68,85,.12);
-  --inf:#4A9EFF;--inf-d:rgba(74,158,255,.12);
-  --warn:#FFD600;--warn-d:rgba(255,214,0,.1);
-  --t1:#FFFFFF;--t2:#C8C8E8;--t3:#7878A0;
-  --sans:'Barlow Condensed',sans-serif;
-  --body:'DM Sans',sans-serif;
-  --mono:'IBM Plex Mono',monospace;
-  --r:12px;--rs:8px
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+/* ─────────────────────────────────────────────────────────────────
+   Legacy base rules kept from an earlier stylesheet iteration.
+   Selectors here are UNIQUE to this section; the main stylesheet
+   below defines everything else. Do not add to this block —
+   add new rules to the main section.
+   ───────────────────────────────────────────────────────────────── */
 html{overflow-x:hidden;max-width:100vw}
-body{height:100%;background:var(--bg);color:var(--t1);font-family:var(--body);overscroll-behavior:none;overflow-x:hidden;max-width:100vw}
-body{padding-bottom:env(safe-area-inset-bottom)}
-#app{max-width:560px;width:100%;margin:0 auto;height:100vh;max-height:100vh;display:flex;flex-direction:column;overflow:hidden}
-.scr{flex:1;display:flex;flex-direction:column;padding:0 12px 32px;overflow-y:auto;-webkit-overflow-scrolling:touch}
-.scr>*{flex-shrink:0}
-
-/* ── Header ── */
-.hdr{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1.5px solid var(--brd);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.hbrand{display:flex;align-items:center;gap:11px}
 .hhex{width:32px;height:32px;background:var(--acc);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
 .htitle{font-size:24px;font-weight:800;letter-spacing:2px;color:var(--acc);font-family:var(--sans)}
 .hsub{font-size:10px;letter-spacing:3px;color:var(--t3);margin-top:-3px;font-family:var(--sans)}
 .hlogo{height:36px;width:auto;display:block}
-.hbtns{display:flex;gap:8px}
-.ib{background:transparent;border:1.5px solid var(--brd2);border-radius:var(--rs);width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);font-size:16px}
-.ib:active{background:var(--surf2)}
-
-/* ── Cards ── */
-.card{background:var(--surf);border:1.5px solid var(--brd);border-radius:var(--r);padding:15px 16px;margin-top:13px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.ct{font-size:11px;font-weight:700;letter-spacing:3px;color:var(--t3);margin-bottom:13px;text-transform:uppercase;font-family:var(--sans);display:flex;align-items:center;gap:6px}
-
-/* ── Free badge ── */
-.free-badge{display:inline-flex;align-items:center;gap:5px;background:var(--ok-d);border:1.5px solid var(--ok);color:var(--ok);font-size:11px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:20px;margin-bottom:10px;font-family:var(--sans)}
-
-/* ── Savings Card ── */
-.sv-card{background:var(--surf);border:1.5px solid var(--ok);border-radius:var(--r);margin-top:14px;overflow:hidden}
-.sv-head{background:var(--ok-d);border-bottom:1.5px solid var(--ok);padding:12px 16px;display:flex;align-items:center;gap:8px}
-.sv-hl{font-size:18px;font-weight:800;color:var(--ok);letter-spacing:.3px;flex:1;font-family:var(--sans)}
-.sv-body{padding:14px 16px}
-.sv-big{display:flex;gap:10px;margin-bottom:13px}
-.sv-stat{flex:1;background:var(--surf2);border-radius:var(--rs);padding:12px 8px;text-align:center;border:1.5px solid var(--brd)}
-.sv-val{font-size:28px;font-weight:800;color:var(--ok);line-height:1;font-family:var(--sans)}
-.sv-unit{font-size:11px;font-weight:700;color:var(--ok);opacity:.85;font-family:var(--sans)}
-.sv-lbl{font-size:10px;color:var(--t3);margin-top:5px;letter-spacing:.8px;text-transform:uppercase;font-family:var(--sans)}
-.sv-cmp{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
-.cbox{background:var(--surf2);border-radius:var(--rs);padding:10px 12px;border:1.5px solid var(--brd)}
-.cbox.orig{border-color:var(--err)}
-.cbox.opt{border-color:var(--ok)}
-.cbox-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:5px;font-family:var(--sans)}
-.cbox-km{font-size:20px;font-weight:700;color:var(--t1);font-family:var(--sans)}
-.cbox-min{font-size:14px;color:var(--t2);margin-top:3px}
-.sv-arr{text-align:center;font-size:22px;color:var(--ok)}
-.sv-src{font-size:13px;color:var(--t3);margin-top:11px;text-align:center;line-height:1.5}
-.sv-src a{color:var(--t3)}
-.warn-card{background:var(--surf);border:1.5px solid var(--warn);border-radius:var(--r);padding:13px 16px;margin-top:14px;display:flex;gap:10px;align-items:flex-start}
-.warn-txt{font-size:14px;color:var(--warn);line-height:1.5}
-.geo-warn{background:var(--warn-d);border:1.5px solid var(--warn);border-radius:var(--rs);padding:10px 13px;font-size:14px;color:var(--warn);margin-top:10px;line-height:1.5}
-
-/* ── Tags ── */
-.tag{font-size:10px;padding:3px 7px;border-radius:5px;font-weight:700;letter-spacing:.5px;flex-shrink:0;font-family:var(--sans)}
-.tag-gps{background:var(--ok-d);color:var(--ok);border:1.5px solid var(--ok)}
-.tag-est{background:var(--acc-d);color:var(--acc);border:1.5px solid var(--acc)}
-
 /* ── Inputs ── */
 input[type=text],input[type=password]{
   width:100%;background:var(--surf2);border:1.5px solid var(--brd);
@@ -102,88 +43,8 @@ input[type=text],input[type=password]{
   font-size:15px;font-family:var(--body);outline:none;-webkit-appearance:none;
   letter-spacing:.01em
 }
-input::placeholder{color:var(--t3)}
-input:focus{border-color:var(--brd2);background:var(--surf3)}
-.ir{display:flex;gap:8px}.ir input{flex:1}
-
-/* ── Buttons ── */
-.btn{font-family:var(--sans);font-weight:700;letter-spacing:1px;cursor:pointer;border:none;border-radius:var(--rs)}
-.btn:active{transform:scale(.98)}
-.bp{background:var(--acc);color:#000;padding:15px 20px;font-size:17px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
-.bp:disabled{background:var(--surf2);color:var(--t3);cursor:not-allowed;transform:none}
-.bg{background:transparent;border:1.5px solid var(--brd2);color:var(--t2);padding:12px 16px;font-size:15px;width:100%}
-.badd{background:var(--acc);color:#000;padding:0 18px;font-size:24px;font-weight:700;height:48px;flex-shrink:0;border-radius:var(--rs);border:none;cursor:pointer;min-width:48px}
-.bmaps{display:block;background:#1565C0;color:#fff;padding:15px 20px;font-size:17px;font-weight:700;letter-spacing:.5px;text-align:center;text-decoration:none;border-radius:var(--rs);width:100%;font-family:var(--sans)}
-.bwaze{display:block;background:#0099DD;color:#fff;padding:15px 20px;font-size:17px;font-weight:700;letter-spacing:.5px;text-align:center;text-decoration:none;border-radius:var(--rs);width:100%;font-family:var(--sans)}
-
-/* ── Drop zone ── */
-.dz{display:block;cursor:pointer;border:2px dashed var(--brd2);border-radius:var(--r);padding:20px 16px;text-align:center;cursor:pointer;transition:.15s}
-.dz:active,.dz.over,.dz.scanning{border-color:var(--acc);background:var(--acc-d)}
 .dz.locked{border-color:var(--brd);background:transparent;cursor:default}
-.dz.scanning{border-style:solid}
-.dz-t{font-size:16px;font-weight:600;color:var(--t2)}
-.dz-s{font-size:12px;color:var(--t3);margin-top:4px}
-.dz-tip{font-size:12px;color:var(--acc);margin-top:8px;font-weight:600;line-height:1.5}
-.pb{height:4px;background:var(--brd);border-radius:2px;overflow:hidden;margin-top:10px}
-.pf{height:100%;background:var(--acc);transition:width .4s;border-radius:2px}
-.pl{font-size:12px;color:var(--t3);margin-top:5px}
-
-/* ── Stop list ── */
-.slist{display:flex;flex-direction:column;gap:8px;margin-top:4px}
-.sscr{max-height:360px;overflow-y:auto;padding-right:2px}
-.sscr::-webkit-scrollbar{width:4px}
-.sscr::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px}
-
-/* Stop item — high contrast for night driving */
-.si{display:flex;align-items:center;gap:10px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);padding:11px 12px;transition:border-color .15s}
-.si.islast{border-color:var(--ok);background:var(--ok-d)}
-
-/* Package number — large and unmistakable */
-.fn{flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--surf);border:2px solid var(--acc);color:var(--acc);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:var(--sans)}
-.fn.nnum{border-color:var(--brd2);color:var(--t3)}
-
-.sb{flex:1;min-width:0}
-/* Address — bright, large, easy to read in the dark */
-.sa{font-size:15px;font-family:var(--body);color:var(--t1);line-height:1.35;word-break:break-word;font-weight:500}
-.sm{font-size:13px;color:var(--t3);margin-top:3px;font-family:var(--body)}
-
-.sbtns{display:flex;gap:5px;flex-shrink:0}
-.sbtn{width:36px;height:44px;background:transparent;border:1.5px solid var(--brd);border-radius:6px;cursor:pointer;color:var(--t3);font-size:14px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-.sbtn.del{width:44px;height:44px;border-color:rgba(255,68,85,.3);color:var(--err);font-size:16px}
 .sbtn.del:active{background:rgba(255,68,85,.1)}
-.sbtn:active{background:var(--surf)}
-.sbtn.lon{border-color:var(--ok);color:var(--ok);background:var(--ok-d)}
-.sbtn.del{color:var(--err);border-color:var(--err-d)}
-.lbdg{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--ok);border:1.5px solid var(--ok);padding:3px 7px;border-radius:5px;flex-shrink:0;font-family:var(--sans)}
-.empty{text-align:center;padding:20px 0;color:var(--t3);font-size:14px}
-
-/* ── Alerts ── */
-.al{border-radius:var(--rs);padding:11px 14px;font-size:14px;margin-top:10px;line-height:1.5}
-.ae{background:var(--err-d);border:1.5px solid var(--err);color:#FF9999}
-.ai{background:var(--inf-d);border:1.5px solid var(--inf);color:var(--inf)}
-
-/* ── Loading ── */
-.ldw{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:20px}
-.ldh{width:50px;height:50px;background:var(--acc);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);animation:pulse 1s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:.3;transform:scale(.9)}50%{opacity:1;transform:scale(1)}}
-.ldt{font-size:20px;font-weight:700;color:var(--t2);letter-spacing:1px;font-family:var(--sans)}
-.ld-steps{display:flex;flex-direction:column;gap:12px;margin-top:4px;width:100%;max-width:280px}
-.ld-step{display:flex;align-items:center;gap:12px}
-.ld-dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--brd2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--sans)}
-.ld-step.done .ld-dot{background:var(--ok);border-color:var(--ok);color:#000}
-.ld-step.active .ld-dot{border-color:var(--acc);animation:pulse 1s ease-in-out infinite}
-.ld-label{font-size:14px}
-.ld-step.done .ld-label{color:var(--ok)}
-.ld-step.active .ld-label{color:var(--acc)}
-.ld-step.waiting .ld-label{color:var(--t3)}
-.ld-sub{font-size:12px;color:var(--t3);margin-top:2px}
-.ld-prog{width:100%;max-width:280px}
-.ld-pbar{height:3px;background:var(--brd);border-radius:2px;overflow:hidden;margin-top:8px}
-.ld-pfill{height:100%;background:var(--acc);border-radius:2px;transition:width .3s}
-
-/* ── Result rows ── */
-.ri-active{outline:2px solid var(--acc)!important;background:var(--acc-d)!important}
-.ri{display:flex;align-items:flex-start;gap:14px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);padding:16px 15px}
 .ri-mv{display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:auto;align-self:center}
 .rbtn{width:34px;height:30px;background:transparent;border:1.5px solid var(--brd);border-radius:6px;cursor:pointer;color:var(--t3);font-size:13px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .rbtn:active{background:rgba(255,153,0,.12);border-color:var(--acc);color:var(--acc)}
@@ -191,69 +52,11 @@ input:focus{border-color:var(--brd2);background:var(--surf3)}
 .rbtn-del{border-color:rgba(255,68,85,.35);color:var(--err);font-size:11px}
 .rbtn-del:active{background:rgba(255,68,85,.12);border-color:var(--err);color:var(--err)}
 .ri-manual{display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--acc);border:1px solid rgba(255,153,0,.4);border-radius:8px;padding:2px 7px;margin-top:6px}
-
-/* Route zoom levels — applied to body when on route view */
-body.rzoom-1 .rlist .ri{padding:18px 17px;gap:16px}
-body.rzoom-1 .rlist .ri-addr{font-size:20px;line-height:1.5;font-weight:600}
-body.rzoom-1 .rlist .rn{width:42px;height:42px;font-size:18px}
-body.rzoom-1 .rlist .ri-l{min-width:48px}
-body.rzoom-1 .rlist .rpkg{min-width:42px;padding:4px 7px}
-body.rzoom-1 .rlist .rpkg-v{font-size:18px}
-/* Secondary row elements now scale WITH the address text instead of staying
-   frozen at their original tiny size — previously only the address line and
-   stop-number circle grew, leaving labels/links/notes stuck at ~9-12px,
-   which made the zoom feel broken/inconsistent rather than making the row
-   genuinely easier to read as a whole. */
-body.rzoom-1 .rlist .ri a[href*="google.com/maps"]{font-size:14px;padding:5px 10px}
-body.rzoom-1 .rlist .ri .ri-l > div:last-child{font-size:11px}
-body.rzoom-1 .rlist .ri-manual{font-size:12px;padding:3px 9px}
-body.rzoom-2 .rlist .ri{padding:22px 19px;gap:18px}
-body.rzoom-2 .rlist .ri-addr{font-size:24px;line-height:1.4;font-weight:600}
-body.rzoom-2 .rlist .rn{width:50px;height:50px;font-size:22px;font-weight:900}
-body.rzoom-2 .rlist .ri-l{min-width:56px}
-body.rzoom-2 .rlist .rpkg{min-width:48px;padding:5px 9px}
-body.rzoom-2 .rlist .rpkg-v{font-size:22px}
-body.rzoom-2 .rlist .ri{border-width:2px}
-body.rzoom-2 .rlist .ri a[href*="google.com/maps"]{font-size:16px;padding:6px 12px}
-body.rzoom-2 .rlist .ri .ri-l > div:last-child{font-size:13px}
-body.rzoom-2 .rlist .ri-manual{font-size:13px;padding:4px 10px}
-/* Higher contrast borders in zoom mode for visual separation */
-body.rzoom-1 .rlist .ri,body.rzoom-2 .rlist .ri{border-color:var(--t3)}
-
-/* Zoom toggle button */
-.zoom-btn{background:var(--surf);border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;height:44px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;font-family:var(--sans);display:flex;align-items:center;gap:4px;line-height:1}
 .zoom-btn:active{background:var(--surf2)}
-.zoom-btn.active{border-color:var(--acc);color:var(--acc)}
-.ri.rl{border-color:var(--ok);background:var(--ok-d)}
-.ri.rh{border-color:var(--ok);background:var(--ok-d)}
-.ri-l{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;min-width:40px}
-.rn{width:34px;height:34px;border-radius:50%;background:var(--acc);color:#000;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:var(--sans)}
-.rpkg{display:flex;flex-direction:column;align-items:center;background:var(--surf);border:1.5px solid var(--acc);border-radius:6px;padding:3px 6px;min-width:38px}
-.rpkg-l{font-size:9px;color:var(--t3);line-height:1;font-family:var(--sans)}
-.rpkg-v{font-size:16px;font-weight:900;color:var(--acc);line-height:1.2;font-family:var(--sans)}
-/* Address in result — bright and large */
-.ri-addr{flex:1;font-size:17px;font-family:var(--body);color:var(--t1);line-height:1.55;word-break:break-word;padding-top:5px;font-weight:500}
-.ri-flag{font-size:10px;color:var(--warn);background:var(--warn-d);border:1px solid var(--warn);border-radius:4px;padding:2px 6px;flex-shrink:0;margin-top:6px;font-family:var(--sans);font-weight:700}
-.ri-tag{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--ok);border:1.5px solid var(--ok);padding:3px 7px;border-radius:5px;flex-shrink:0;margin-top:6px;font-family:var(--sans)}
-.rlist{display:flex;flex-direction:column;gap:8px}
-.rmeta{display:flex;justify-content:space-between;align-items:center;margin-top:14px;margin-bottom:4px}
-.rcnt{font-size:14px;color:var(--t3)}
-.rcp{font-size:14px;color:var(--acc);background:transparent;border:1.5px solid var(--brd);border-radius:6px;padding:5px 12px;cursor:pointer;font-family:var(--sans);font-weight:600}
 .lgd{display:flex;gap:14px;margin-top:11px;padding:10px 13px;background:var(--surf);border-radius:var(--rs);border:1.5px solid var(--brd);flex-wrap:wrap}
 .li{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--t2)}
-.cb{background:var(--acc);color:#000;font-size:11px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:5px;font-family:var(--sans)}
-hr.dv{border:none;border-top:1.5px solid var(--brd);margin:13px 0}
-
-/* ── Setup steps ── */
-.setup-step{display:flex;gap:13px;padding:13px 0;border-bottom:1px solid var(--brd)}
-.setup-step:last-child{border-bottom:none}
-.setup-num{width:26px;height:26px;border-radius:50%;background:var(--acc);color:#000;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-family:var(--sans)}
-.setup-txt{font-size:15px;color:var(--t2);line-height:1.55}
-.setup-txt a{color:var(--acc);text-decoration:none;font-weight:700}
-.setup-txt strong{color:var(--t1)}
 .slbl{font-size:13px;color:var(--t3);letter-spacing:2px;margin-bottom:7px;text-transform:uppercase;font-family:var(--sans)}
 .kh{font-size:12px;color:var(--t3);margin-top:6px;line-height:1.5}
-
 /* ── Cost table ── */
 .cost-table{width:100%;border-collapse:collapse;margin-top:11px;font-size:14px}
 .cost-table th{text-align:left;font-size:10px;letter-spacing:2px;color:var(--t3);text-transform:uppercase;padding:7px 9px;border-bottom:1.5px solid var(--brd);font-family:var(--sans)}
@@ -261,22 +64,6 @@ hr.dv{border:none;border-top:1.5px solid var(--brd);margin:13px 0}
 .cost-table tr:last-child td{border-bottom:none}
 .cost-table .free{color:var(--ok);font-weight:700}
 
-/* ── Toast ── */
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--ok);color:#000;font-family:var(--sans);font-weight:700;font-size:14px;padding:12px 22px;border-radius:24px;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:100}
-.toast.show{opacity:1}
-
-ang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#08080F">
-<title>FlexRoute</title>
-<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js" onerror="window._tesseractCdnFailed=true"></script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
 :root{
   --bg:#0A0A12;--surf:#13131E;--surf2:#1A1A28;--surf3:#222235;
   --brd:#2A2A40;--brd2:#3A3A55;
