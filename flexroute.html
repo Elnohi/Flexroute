@@ -3532,38 +3532,59 @@ function clrAll() {
   S.savings = null; S.optimized = []; S.geoFailed = [];
   clearSession(); render();
 }
+// Full-name → 2-letter code map. Shared between stateFromPhoton() and the
+// candidate-state filter in bestCandidate() (which uses the same info to
+// prefer geocoder candidates matching S.userState).
+var _STATE_NAME_TO_CODE = {
+  'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
+  'Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA',
+  'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA',
+  'Kansas':'KS','Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD',
+  'Massachusetts':'MA','Michigan':'MI','Minnesota':'MN','Mississippi':'MS',
+  'Missouri':'MO','Montana':'MT','Nebraska':'NE','Nevada':'NV',
+  'New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY',
+  'North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK',
+  'Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC',
+  'South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT',
+  'Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI',
+  'Wyoming':'WY','District of Columbia':'DC',
+  'Ontario':'ON','British Columbia':'BC','Alberta':'AB','Quebec':'QC',
+  'Manitoba':'MB','Saskatchewan':'SK','Nova Scotia':'NS','New Brunswick':'NB',
+  'Newfoundland and Labrador':'NL','Prince Edward Island':'PE',
+  'Northwest Territories':'NT','Yukon':'YT','Nunavut':'NU',
+  'United Kingdom':'GB','Germany':'DE','France':'FR','Spain':'ES','Italy':'IT',
+  'Netherlands':'NL','Belgium':'BE','Sweden':'SE','Poland':'PL',
+  'Australia':'AU','Japan':'JP','India':'IND','Mexico':'MX','Brazil':'BR',
+  'Singapore':'SG'
+};
+var _CC_TO_CODE = {
+  'gb':'GB','de':'DE','fr':'FR','es':'ES','it':'IT','nl':'NL','be':'BE',
+  'se':'SE','pl':'PL','au':'AU','jp':'JP','in':'IND','mx':'MX','br':'BR','sg':'SG'
+};
+// Extract a canonical 2-letter state/region code from a fetchCandidates
+// candidate. Handles three input shapes:
+//   Photon:   full name in .state (e.g. "Idaho"), full name in .country
+//   Nominatim (via proxy w/ addressdetails=1): same as Photon
+//   Census:   2-letter .state already (e.g. "ID"), .country_code = "us"
+// Returns '' when state can't be determined — bestCandidate() then falls
+// back to bias-centroid picking so we never do worse than today.
+function _candidateStateCode(c) {
+  if (!c) return '';
+  if (c.state) {
+    if (/^[A-Z]{2}$/.test(c.state)) return c.state;           // Census: already a code
+    if (_STATE_NAME_TO_CODE[c.state]) return _STATE_NAME_TO_CODE[c.state];
+  }
+  if (c.country && _STATE_NAME_TO_CODE[c.country]) return _STATE_NAME_TO_CODE[c.country];
+  if (c.country_code && _CC_TO_CODE[c.country_code.toLowerCase()]) return _CC_TO_CODE[c.country_code.toLowerCase()];
+  return '';
+}
+
 // Map Photon reverse-geocode response → selector value (e.g. 'Michigan' → 'MI')
 function stateFromPhoton(p) {
   if (!p) return '';
-  var STATE_NAME_MAP = {
-    'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
-    'Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA',
-    'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA',
-    'Kansas':'KS','Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD',
-    'Massachusetts':'MA','Michigan':'MI','Minnesota':'MN','Mississippi':'MS',
-    'Missouri':'MO','Montana':'MT','Nebraska':'NE','Nevada':'NV',
-    'New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY',
-    'North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK',
-    'Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC',
-    'South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT',
-    'Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI',
-    'Wyoming':'WY','District of Columbia':'DC',
-    'Ontario':'ON','British Columbia':'BC','Alberta':'AB','Quebec':'QC',
-    'Manitoba':'MB','Saskatchewan':'SK','Nova Scotia':'NS','New Brunswick':'NB',
-    'Newfoundland and Labrador':'NL','Prince Edward Island':'PE',
-    'Northwest Territories':'NT','Yukon':'YT','Nunavut':'NU',
-    'United Kingdom':'GB','Germany':'DE','France':'FR','Spain':'ES','Italy':'IT',
-    'Netherlands':'NL','Belgium':'BE','Sweden':'SE','Poland':'PL',
-    'Australia':'AU','Japan':'JP','India':'IND','Mexico':'MX','Brazil':'BR',
-    'Singapore':'SG',
-  };
-  var CC_MAP = {
-    'gb':'GB','de':'DE','fr':'FR','es':'ES','it':'IT','nl':'NL','be':'BE',
-    'se':'SE','pl':'PL','au':'AU','jp':'JP','in':'IND','mx':'MX','br':'BR','sg':'SG'
-  };
-  if (p.state && STATE_NAME_MAP[p.state]) return STATE_NAME_MAP[p.state];
-  if (p.country && STATE_NAME_MAP[p.country]) return STATE_NAME_MAP[p.country];
-  if (p.countrycode && CC_MAP[p.countrycode.toLowerCase()]) return CC_MAP[p.countrycode.toLowerCase()];
+  if (p.state && _STATE_NAME_TO_CODE[p.state]) return _STATE_NAME_TO_CODE[p.state];
+  if (p.country && _STATE_NAME_TO_CODE[p.country]) return _STATE_NAME_TO_CODE[p.country];
+  if (p.countrycode && _CC_TO_CODE[p.countrycode.toLowerCase()]) return _CC_TO_CODE[p.countrycode.toLowerCase()];
   return '';
 }
 
@@ -3990,7 +4011,20 @@ async function optimize() {
   for (let i = 0; i < toGeocode.length; i++) {
     const x = toGeocode[i];
     var addr = x.address;
-    if (S.userState && addr && !new RegExp(',\s*' + S.userState + '\s*$').test(addr)) {
+    // Only force-append the driver's region when the address has NO state /
+    // province code anywhere. Two problems with the old check:
+    //   1. Force-appending the user's state to any address that doesn't END
+    //      with ", ID" (etc.) broke cross-state routes — an Idaho driver
+    //      with an "Ontario, OR" stop got ", ID" tacked on, producing
+    //      "Ontario, OR, ID" which geocoders can't resolve.
+    //   2. The old check used new RegExp(',\\s*' + S.userState + '\\s*$')
+    //      built from a single-quoted string, where '\s' evaluates to 's'
+    //      (unrecognized escape). The actual regex ran was ,s*IDs*$ which
+    //      matched no realistic address format, so the append fired every
+    //      time — even for same-state stops like "Boise, ID" which became
+    //      "Boise, ID, ID". Geocoder leniency masked this until now.
+    var _addrHasRegion = /,\s*[A-Z]{2}\b/.test(addr);
+    if (S.userState && addr && !_addrHasRegion) {
       addr = addr.replace(/,\s*(ON|Canada)\s*$/i, '') + ', ' + S.userState;
     }
     const result = await Promise.race([
@@ -5485,7 +5519,12 @@ async function fetchCandidates(q, limit) {
         var r = await fetch(url, { signal: _ac(5000).signal });
         if (!r.ok) return [];
         var d = await r.json();
-        return (d.features || []).map(f => ({ lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] }));
+        return (d.features || []).map(f => ({
+          lon: f.geometry.coordinates[0],
+          lat: f.geometry.coordinates[1],
+          state:   (f.properties && f.properties.state) || '',
+          country: (f.properties && f.properties.country) || ''
+        }));
       } catch { return []; }
     })();
     var nominatimP = (async () => {
@@ -5513,7 +5552,12 @@ async function fetchCandidates(q, limit) {
         });
         if (!nr.ok) return [];
         var nd = await nr.json();
-        return (nd.results || []).map(f => ({ lon: f.lon, lat: f.lat }));
+        return (nd.results || []).map(f => ({
+          lon: f.lon, lat: f.lat,
+          state:        f.state || '',
+          country:      f.country || '',
+          country_code: f.country_code || ''
+        }));
       } catch { return []; }
     })();
     var photonHits = await photonP;
@@ -5536,6 +5580,29 @@ async function fetchCandidates(q, limit) {
 
   function bestCandidate(candidates) {
     if (!candidates.length) return null;
+
+    // When the driver has a region set, prefer candidates whose state matches.
+    // This is what stops "Idaho stop → Ontario, OR" — Photon returns both
+    // Boise, ID and Ontario, OR candidates for an ambiguous address, and
+    // without this filter bestCandidate picks whichever is geographically
+    // closer to the bias centroid, which for Treasure Valley drivers is
+    // usually Ontario, OR. Safety valve below: fall back to the full list
+    // if the filter would leave nothing, so we never do worse than before.
+    if (S.userState) {
+      var _matches = candidates.filter(function(c) {
+        var code = _candidateStateCode(c);
+        return code && code === S.userState;
+      });
+      if (_matches.length > 0) {
+        candidates = _matches;
+      } else if (candidates.some(function(c){ return _candidateStateCode(c); })) {
+        // We had state info on some candidates but none matched userState.
+        // Log so we notice legitimate cross-state cases vs. wrong userState.
+        console.warn('[FlexRoute] No candidates match userState=' + S.userState +
+                     ' — using full list. Address may be genuinely cross-region.');
+      }
+    }
+
     if (!biasLat || !biasLon) return candidates[0];
     // Pick candidate closest to cluster centroid
     return candidates.reduce(function(best, c) {
