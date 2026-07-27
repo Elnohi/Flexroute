@@ -23,8 +23,16 @@
 //     viewbox: "minLon,maxLat,maxLon,minLat" (nominatim only, optional),
 //     state: "IN" (census only, optional — added if address lacks a state)
 //   }
-//   Response (200): { results: [{ lat, lon, display_name }] }   // 0+ results
+//   Response (200): {
+//     results: [{ lat, lon, display_name, state, country, country_code }]
+//   }
 //   Response (4xx/5xx): { error, code }
+//
+// state/country/country_code are used by flexroute.html's bestCandidate() to
+// filter candidates by S.userState — an Idaho driver's Ontario, OR candidate
+// gets rejected as state="Oregon" != "ID". Empty string when the upstream
+// didn't return it (e.g. sparse Nominatim result). See the addressdetails=1
+// param below — without it Nominatim omits address.state entirely.
 
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 
@@ -83,7 +91,12 @@ exports.handler = async function(event) {
       q: query,
       format: 'json',
       limit: '5',
-      'accept-language': 'en'
+      'accept-language': 'en',
+      // addressdetails=1 is REQUIRED for us to receive address.state and
+      // address.country_code in the response. Without it, Nominatim omits
+      // those fields entirely and the state filter in bestCandidate() has
+      // nothing to work with. Extra payload is small (a few hundred bytes).
+      addressdetails: '1'
     });
     if (body.countrycodes) params.set('countrycodes', body.countrycodes);
     if (body.viewbox)      params.set('viewbox', body.viewbox);
@@ -139,25 +152,37 @@ exports.handler = async function(event) {
   try { data = await resp.json(); }
   catch (e) { return { statusCode: 502, headers: cors, body: JSON.stringify({ error: 'Bad JSON from geocoder', code: 'PARSE', provider }) }; }
 
-  // Normalize response so client doesn't care which provider was used
+  // Normalize response so client doesn't care which provider was used.
+  // state/country/country_code are best-effort — empty string when the upstream
+  // didn't return the field. bestCandidate() treats missing state as "unknown,
+  // don't filter" rather than a mismatch, so no result is falsely rejected.
   let results = [];
   if (provider === 'nominatim') {
-    // Nominatim returns an array of {lat, lon, display_name, ...}
+    // Nominatim with addressdetails=1 returns array of {lat, lon, display_name,
+    // address:{state, country, country_code, city, town, ...}, ...}
     if (Array.isArray(data)) {
       results = data.map(r => ({
         lat: parseFloat(r.lat),
         lon: parseFloat(r.lon),
-        display_name: r.display_name || ''
+        display_name: r.display_name || '',
+        state:        (r.address && r.address.state) || '',
+        country:      (r.address && r.address.country) || '',
+        country_code: (r.address && r.address.country_code) || ''
       })).filter(r => isFinite(r.lat) && isFinite(r.lon));
     }
   } else {
-    // Census Bureau: data.result.addressMatches[]
+    // Census Bureau: data.result.addressMatches[]. Only US-covered so
+    // country_code is always "us"; state comes from addressComponents.state
+    // (already a 2-letter code, unlike Nominatim's full name).
     const matches = data && data.result && data.result.addressMatches;
     if (Array.isArray(matches)) {
       results = matches.map(m => ({
         lat: m.coordinates && m.coordinates.y,
         lon: m.coordinates && m.coordinates.x,
-        display_name: m.matchedAddress || ''
+        display_name: m.matchedAddress || '',
+        state:        (m.addressComponents && m.addressComponents.state) || '',
+        country:      'United States',
+        country_code: 'us'
       })).filter(r => isFinite(r.lat) && isFinite(r.lon));
     }
   }
