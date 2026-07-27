@@ -2787,6 +2787,35 @@ function vResult() {
 
 </div>`;}
 
+// ── Nav URL builder ─────────────────────────────────────────────────────────
+// TWA / Chrome Custom Tab silently drops cross-origin navigations to
+// waze.com and google.com/maps even from a click-handler window.location.href.
+// intent:// URLs bypass the app-link resolution step by naming the target
+// package directly; Android hands the click straight to Waze / Maps.
+// If the app isn't installed, the browser_fallback_url opens the same https
+// URL the non-Android platforms use. iOS and desktop don't understand intent://
+// so they keep the https path — Waze / Maps universal links handle the rest.
+var _IS_ANDROID = /Android/i.test(navigator.userAgent);
+
+function buildNavURL(app, address) {
+  var q = encodeURIComponent(address);
+  var httpsWaze = 'https://waze.com/ul?q=' + q + '&navigate=yes';
+  var httpsMaps = 'https://www.google.com/maps/search/?api=1&query=' + q;
+  if (!_IS_ANDROID) {
+    return app === 'waze' ? httpsWaze : httpsMaps;
+  }
+  if (app === 'waze') {
+    return 'intent://waze.com/ul?q=' + q + '&navigate=yes' +
+      '#Intent;scheme=https;package=com.waze' +
+      ';S.browser_fallback_url=' + encodeURIComponent(httpsWaze) +
+      ';end';
+  }
+  return 'intent://www.google.com/maps/search/?api=1&query=' + q +
+    '#Intent;scheme=https;package=com.google.android.apps.maps' +
+    ';S.browser_fallback_url=' + encodeURIComponent(httpsMaps) +
+    ';end';
+}
+
 function vCompanion() {
   var stops = S.optimized.filter(function(s){ return !s.geoFailed; });
   var idx   = Math.min(S.cIdx, stops.length);
@@ -2816,8 +2845,8 @@ function vCompanion() {
       '<button id="compFinishBtn" class="btn bp" style="font-size:18px;padding:16px 32px">&#10003; Done &mdash; Back to route</button>' +
       '</div></div>';
   }
-  var wazeURL = 'https://waze.com/ul?q=' + encodeURIComponent(stop.address) + '&navigate=yes';
-  var mapsURL = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(stop.address);
+  var wazeURL = buildNavURL('waze', stop.address);
+  var mapsURL = buildNavURL('maps', stop.address);
   return '<div class="comp-wrap">' +
     '<div class="comp-hdr">' +
       '<button id="compBkBtn" style="background:transparent;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:4px 10px">&#8592;</button>' +
@@ -2916,9 +2945,7 @@ function markDelivered() {
   if (!wasLast && S.cNavApp && S.cAutoNav) {
     var nextStop = stops[S.cIdx];
     if (nextStop && nextStop.address) {
-      var url = S.cNavApp === 'waze'
-        ? 'https://waze.com/ul?q=' + encodeURIComponent(nextStop.address) + '&navigate=yes'
-        : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(nextStop.address);
+      var url = buildNavURL(S.cNavApp, nextStop.address);
       // Same TWA rationale as the manual Waze/Maps buttons above:
       // window.open(_,'_blank') is silently swallowed in Chrome Custom Tabs.
       trackEvent('maps_opened', { map_type: 'companion_autonav_' + S.cNavApp });
