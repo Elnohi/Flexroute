@@ -2919,8 +2919,10 @@ function markDelivered() {
       var url = S.cNavApp === 'waze'
         ? 'https://waze.com/ul?q=' + encodeURIComponent(nextStop.address) + '&navigate=yes'
         : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(nextStop.address);
-      window.open(url, '_blank');
+      // Same TWA rationale as the manual Waze/Maps buttons above:
+      // window.open(_,'_blank') is silently swallowed in Chrome Custom Tabs.
       trackEvent('maps_opened', { map_type: 'companion_autonav_' + S.cNavApp });
+      window.location.href = url;
     }
   }
 }
@@ -3142,17 +3144,27 @@ function bindCompanion() {
     try { localStorage.setItem('fr_auto_nav', S.cAutoNav ? '1' : '0'); } catch(e) {}
     render();
   });
+  // Waze / Maps buttons: intercept the anchor's default and do a top-level
+  // navigation. target="_blank" is silently swallowed inside a TWA / Chrome
+  // Custom Tab, so the app-link intent to Waze / Google Maps never fires.
+  // Setting window.location.href from a click handler triggers the Android
+  // intent-filter chain reliably on Pixel WebView, Samsung Internet, and
+  // Chrome-Android; on desktop it just navigates the tab, which is fine.
   var wBtn = document.getElementById('compWazeBtn');
-  if (wBtn) wBtn.addEventListener('click', function(){
+  if (wBtn) wBtn.addEventListener('click', function(e){
+    e.preventDefault();
     S.cNavApp = 'waze';
-    try { localStorage.setItem('fr_nav_app', 'waze'); } catch(e) {}
+    try { localStorage.setItem('fr_nav_app', 'waze'); } catch(e2) {}
     trackEvent('maps_opened', { map_type: 'companion_waze' });
+    window.location.href = wBtn.href;
   });
   var mBtn = document.getElementById('compMapsBtn');
-  if (mBtn) mBtn.addEventListener('click', function(){
+  if (mBtn) mBtn.addEventListener('click', function(e){
+    e.preventDefault();
     S.cNavApp = 'maps';
-    try { localStorage.setItem('fr_nav_app', 'maps'); } catch(e) {}
+    try { localStorage.setItem('fr_nav_app', 'maps'); } catch(e2) {}
     trackEvent('maps_opened', { map_type: 'companion_maps' });
+    window.location.href = mBtn.href;
   });
 }
 
