@@ -1368,7 +1368,7 @@ var LANGS = {
     scan_title: 'Scan Flex screenshots',
     scan_tap: '📷 Upload screenshots',
     scan_sub: 'Tap to select — pick multiple images at once',
-    scan_tip: '▶ Tip: upload multiple screenshots scrolling through your list for best accuracy',
+    scan_tip: '▶ Tip: one full-list screenshot works best — multiple screenshots also work',
     scanning: 'Scanning image',
     of: 'of',
     images_scanned: 'images scanned',
@@ -1492,7 +1492,7 @@ var LANGS = {
     scan_title: 'Scanner vos captures Flex',
     scan_tap: '📷 Télécharger des captures',
     scan_sub: 'Appuyez pour sélectionner — plusieurs images à la fois',
-    scan_tip: '▶ Conseil : téléchargez plusieurs captures en faisant défiler votre liste',
+    scan_tip: '▶ Conseil : une seule capture de la liste complète fonctionne mieux — plusieurs captures marchent aussi',
     scanning: 'Analyse image',
     of: 'sur',
     images_scanned: 'images analysées',
@@ -1616,7 +1616,7 @@ var LANGS = {
     scan_title: 'Flex-Screenshots scannen',
     scan_tap: '📷 Screenshots hochladen',
     scan_sub: 'Tippen zum Auswählen — mehrere Bilder gleichzeitig',
-    scan_tip: '▶ Tipp: Laden Sie mehrere Screenshots beim Scrollen durch Ihre Liste hoch',
+    scan_tip: '▶ Tipp: Ein Screenshot der ganzen Liste funktioniert am besten — mehrere Screenshots gehen auch',
     scanning: 'Bild wird analysiert',
     of: 'von',
     images_scanned: 'Bilder gescannt',
@@ -1740,7 +1740,7 @@ var LANGS = {
     scan_title: 'Escanear capturas de Flex',
     scan_tap: '📷 Subir capturas de pantalla',
     scan_sub: 'Toca para seleccionar — varias imágenes a la vez',
-    scan_tip: '▶ Consejo: sube varias capturas desplazándote por tu lista para mejores resultados',
+    scan_tip: '▶ Consejo: una sola captura de toda la lista funciona mejor — varias capturas también sirven',
     scanning: 'Analizando imagen',
     of: 'de',
     images_scanned: 'imágenes analizadas',
@@ -3820,7 +3820,7 @@ async function handleFiles(files) {
   } else if (added === 0) {
     // Show debug info — what did Tesseract actually read?
     const rawLines = (S._lastOCR || '').split('\n').filter(l => l.trim()).length;
-    S.errMsg = `OCR read ${rawLines} lines but found no delivery addresses. Tip: take 3-4 overlapping screenshots scrolling through your Flex list and upload them all at once — works better than one long scrolling shot.`;
+    S.errMsg = `OCR read ${rawLines} lines but found no delivery addresses. Tip: try one long screenshot of your full list (scroll / rolldown capture). If that doesn't work, take 3-4 overlapping screenshots and upload them all at once.`;
     S._showDebug = true;
   } else {
     S._showDebug = false;
