@@ -864,6 +864,75 @@ window.addEventListener('unhandledrejection', function(e) {
   }
 });
 
+// Legacy-user welcome modal. Shown ONCE to any user whose device was
+// grandfathered (S.legacyFree === true) and who hasn't dismissed the
+// modal before (localStorage 'fr_legacy_welcome_seen'). Non-blocking:
+// runs after the main render so the app UI is visible behind it.
+function showLegacyWelcome() {
+  // Guard: don't stack modals if called twice, don't show if already dismissed
+  if (document.getElementById('legacyWelcome')) return;
+  if (localStorage.getItem('fr_legacy_welcome_seen')) return;
+
+  // Compute grandfathering end date from launch anchor. Keep the constant
+  // in sync with the LAUNCH_DATE_MS in legacyFree's init above.
+  var LAUNCH_DATE_MS = 1784952000000;
+  var endMs = LAUNCH_DATE_MS + 30 * 24 * 60 * 60 * 1000;
+  var endStr = new Date(endMs).toLocaleDateString(undefined, {
+    year: 'numeric', month: 'long', day: 'numeric'
+  });
+
+  var overlay = document.createElement('div');
+  overlay.id = 'legacyWelcome';
+  overlay.style.cssText =
+    'position:fixed;inset:0;background:rgba(0,0,0,0.82);' +
+    'display:flex;align-items:center;justify-content:center;' +
+    'z-index:9999;padding:20px;backdrop-filter:blur(4px);' +
+    '-webkit-backdrop-filter:blur(4px);opacity:0;transition:opacity 0.25s ease-out';
+
+  var card = document.createElement('div');
+  card.style.cssText =
+    'background:#13131E;border:1px solid #FF9900;border-radius:20px;' +
+    'padding:28px 24px;max-width:420px;width:100%;' +
+    'box-shadow:0 20px 60px rgba(0,0,0,0.7),0 0 30px rgba(255,153,0,0.15);' +
+    'font-family:var(--body,sans-serif);color:#FFFFFF;text-align:center';
+
+  card.innerHTML =
+    '<div style="font-size:44px;line-height:1;margin-bottom:14px">🎁</div>' +
+    '<div style="font-size:22px;font-weight:700;font-family:var(--sans,sans-serif);' +
+    'color:#FF9900;margin-bottom:14px;letter-spacing:0.5px">' +
+    escH(t('legacy_welcome_title')) + '</div>' +
+    '<div style="font-size:15px;line-height:1.55;color:#C8C8E8;margin-bottom:18px">' +
+    escH(t('legacy_welcome_body')) + '</div>' +
+    '<div style="background:rgba(255,153,0,0.12);border:1px solid rgba(255,153,0,0.4);' +
+    'border-radius:12px;padding:12px 14px;margin-bottom:22px;' +
+    'font-size:14px;color:#FFB740;font-weight:600">' +
+    escH(t('legacy_welcome_until').replace('{date}', endStr)) + '</div>' +
+    '<button id="legacyWelcomeOk" style="background:#FF9900;color:#0A0A12;' +
+    'border:none;border-radius:12px;padding:14px 32px;font-size:16px;' +
+    'font-weight:700;font-family:var(--sans,sans-serif);letter-spacing:1px;' +
+    'cursor:pointer;width:100%;text-transform:uppercase">' +
+    escH(t('legacy_welcome_ok')) + '</button>';
+
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+  // Fade-in on next frame
+  requestAnimationFrame(function() { overlay.style.opacity = '1'; });
+
+  function dismiss() {
+    try { localStorage.setItem('fr_legacy_welcome_seen', '1'); } catch (e) {}
+    overlay.style.opacity = '0';
+    setTimeout(function() { if (overlay.parentNode) overlay.remove(); }, 250);
+    if (typeof trackEvent === 'function') {
+      trackEvent('legacy_welcome_dismissed', {});
+    }
+  }
+  document.getElementById('legacyWelcomeOk').addEventListener('click', dismiss);
+  // Tap outside card to dismiss (parity with common modal UX)
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) dismiss();
+  });
+}
+
 window.addEventListener('load', () => {
   // ── Grandfathering check (runs once, before paywall logic) ─────────────
   // Anyone who already has evidence of using FlexRoute pre-paywall gets
@@ -883,6 +952,12 @@ window.addEventListener('load', () => {
       S.entitlement = 'legacy_free';
       localStorage.setItem('fr_entitlement', 'legacy_free');
     }
+  }
+
+  // Show the legacy welcome modal (once per device) if this user is
+  // grandfathered — whether granted just now or on a previous visit.
+  if (S.legacyFree === true) {
+    setTimeout(showLegacyWelcome, 400);
   }
 
   // ── Post-checkout redirect handling ─────────────────────────────────────
@@ -1369,6 +1444,10 @@ var LANGS = {
     scan_tap: '📷 Upload screenshots',
     scan_sub: 'Tap to select — pick multiple images at once',
     scan_tip: '▶ Tip: one full-list screenshot works best — multiple screenshots also work',
+    legacy_welcome_title: 'Thank you, early tester!',
+    legacy_welcome_body: 'You were using FlexRoute before we started charging. As a thank-you, your premium access stays free — no card, no signup — until the date below.',
+    legacy_welcome_until: '✨ Free until {date}',
+    legacy_welcome_ok: 'Got it — thanks!',
     scanning: 'Scanning image',
     of: 'of',
     images_scanned: 'images scanned',
@@ -1493,6 +1572,10 @@ var LANGS = {
     scan_tap: '📷 Télécharger des captures',
     scan_sub: 'Appuyez pour sélectionner — plusieurs images à la fois',
     scan_tip: '▶ Conseil : une seule capture de la liste complète fonctionne mieux — plusieurs captures marchent aussi',
+    legacy_welcome_title: 'Merci, testeur de la première heure !',
+    legacy_welcome_body: 'Vous utilisiez FlexRoute avant que nous commencions à facturer. En remerciement, votre accès premium reste gratuit — sans carte, sans inscription — jusqu\'à la date ci-dessous.',
+    legacy_welcome_until: '✨ Gratuit jusqu\'au {date}',
+    legacy_welcome_ok: 'Compris, merci !',
     scanning: 'Analyse image',
     of: 'sur',
     images_scanned: 'images analysées',
@@ -1617,6 +1700,10 @@ var LANGS = {
     scan_tap: '📷 Screenshots hochladen',
     scan_sub: 'Tippen zum Auswählen — mehrere Bilder gleichzeitig',
     scan_tip: '▶ Tipp: Ein Screenshot der ganzen Liste funktioniert am besten — mehrere Screenshots gehen auch',
+    legacy_welcome_title: 'Danke, Early Tester!',
+    legacy_welcome_body: 'Sie haben FlexRoute schon vor unserer Abo-Einführung genutzt. Als Dankeschön bleibt Ihr Premium-Zugang kostenlos — ohne Karte, ohne Anmeldung — bis zum unten genannten Datum.',
+    legacy_welcome_until: '✨ Kostenlos bis zum {date}',
+    legacy_welcome_ok: 'Verstanden, danke!',
     scanning: 'Bild wird analysiert',
     of: 'von',
     images_scanned: 'Bilder gescannt',
@@ -1741,6 +1828,10 @@ var LANGS = {
     scan_tap: '📷 Subir capturas de pantalla',
     scan_sub: 'Toca para seleccionar — varias imágenes a la vez',
     scan_tip: '▶ Consejo: una sola captura de toda la lista funciona mejor — varias capturas también sirven',
+    legacy_welcome_title: '¡Gracias, tester temprano!',
+    legacy_welcome_body: 'Usabas FlexRoute antes de que empezáramos a cobrar. Como agradecimiento, tu acceso premium sigue gratis — sin tarjeta, sin registro — hasta la fecha indicada abajo.',
+    legacy_welcome_until: '✨ Gratis hasta el {date}',
+    legacy_welcome_ok: '¡Listo, gracias!',
     scanning: 'Analizando imagen',
     of: 'de',
     images_scanned: 'imágenes analizadas',
