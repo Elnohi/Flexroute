@@ -5450,6 +5450,50 @@ function parseFlexOCR(rawText) {
 
   // Number stops by position in list — matches package loading order in car
   results.forEach(function(r, idx) { r.num = idx + 1; });
+
+  // ── Gap detection: find stop numbers that appear in annotations but not
+  // in parsed results. When OCR garbles an annotation line so badly that
+  // isScheduled() never fires, the stop block is silently swallowed as noise
+  // — it doesn't even reach _skippedBlocks. The driver gets no warning and
+  // only notices when they count stops or see a gap in the route map.
+  //
+  // Strategy: collect every stop number that extractStopNum found from
+  // ANY annotation line, compare against numbers that made it into results.
+  // Any gap (consecutive missing numbers from a run of ≥3 seen numbers)
+  // gets a synthetic _skippedDetails entry so the warning names the stop.
+  (function() {
+    var seenNums = [];
+    for (var _si = 0; _si < lines.length; _si++) {
+      var _n = extractStopNum(lines[_si]);
+      if (_n !== null && _n > 0 && _n < 200) seenNums.push(_n);
+    }
+    if (seenNums.length < 3) return; // too few to be meaningful
+    var minSeen = Math.min.apply(null, seenNums);
+    var maxSeen = Math.max.apply(null, seenNums);
+    var seenSet = {};
+    seenNums.forEach(function(n){ seenSet[n] = true; });
+    // Only flag gaps in the MIDDLE of the run (not at edges — driver may
+    // have only scrolled part of the list intentionally)
+    var parsedNums = {};
+    results.forEach(function(r){ if (r.num) parsedNums[r.num] = true; });
+    var alreadySkipped = {};
+    _skippedDetails.forEach(function(d){ if (d.num) alreadySkipped[d.num] = true; });
+    for (var _gn = minSeen + 1; _gn < maxSeen; _gn++) {
+      if (seenSet[_gn] && !alreadySkipped[_gn]) {
+        // This stop number appeared in an annotation line but its address
+        // never made it into results AND wasn't already in _skippedDetails.
+        var _inResults = results.some(function(r){ return r.flexNum === _gn; });
+        if (!_inResults) {
+          _skippedBlocks++;
+          _skippedDetails.push({
+            num: _gn,
+            raw: 'address could not be read — OCR may have garbled this stop\'s line'
+          });
+        }
+      }
+    }
+  })();
+
   results._skipped = _skippedBlocks;
   results._skippedDetails = _skippedDetails;
   return results;
