@@ -15,6 +15,7 @@
 
 const Stripe = require('stripe');
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
+const { logAuthEvent } = require('./_observability');
 
 // LIVE-mode Price IDs for FlexRoute Premium.
 // These live on FlexRoute's OWN dedicated Stripe account (migrated off the
@@ -123,6 +124,11 @@ exports.handler = async function(event) {
   const originHost = (event.headers.origin || event.headers.referer || 'flexrouteapp.com')
     .replace(/^https?:\/\//, '').split('/')[0];
   const result = await handleCreateCheckout(body, stripe, originHost, process.env.INTERNAL_TEST_SECRET);
+  await logAuthEvent(event, 'checkout_started', {
+    email: (body.email || '').trim().toLowerCase(),
+    plan: body.plan || '',
+    ok: result.statusCode === 200
+  });
   return { statusCode: result.statusCode, headers: cors, body: JSON.stringify(result.body) };
 };
 

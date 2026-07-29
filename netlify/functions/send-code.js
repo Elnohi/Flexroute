@@ -27,6 +27,7 @@ function blobOpts(name) {
 }
 
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
+const { logAuthEvent } = require('./_observability');
 
 const CODE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const RESEND_COOLDOWN_MS = 30 * 1000; // prevent rapid-fire resend spam
@@ -147,6 +148,11 @@ exports.handler = async function(event) {
 
   const store = getStore(blobOpts('otp'));
   const result = await handleSendCode(body, store);
+  // Observation only — captures IP + UA hash + email for later abuse review.
+  await logAuthEvent(event, 'code_sent', {
+    email: (body.email || '').trim().toLowerCase(),
+    ok: result.statusCode === 200
+  });
   return { statusCode: result.statusCode, headers: cors, body: JSON.stringify(result.body) };
 };
 

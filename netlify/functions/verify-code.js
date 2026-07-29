@@ -27,6 +27,7 @@ function blobOpts(name) {
 }
 
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
+const { logAuthEvent } = require('./_observability');
 
 const MAX_ATTEMPTS = 5;
 const SESSION_TTL_MS = 180 * 24 * 60 * 60 * 1000; // 180 days
@@ -127,6 +128,9 @@ exports.handler = async function(event) {
   const otpStore = getStore(blobOpts('otp'));
   const sessionStore = getStore(blobOpts('sessions'));
   const result = await handleVerifyCode(body, otpStore, sessionStore);
+  await logAuthEvent(event, result.statusCode === 200 ? 'code_verified' : 'code_failed', {
+    email: (body.email || '').trim().toLowerCase()
+  });
   return { statusCode: result.statusCode, headers: cors, body: JSON.stringify(result.body) };
 };
 
