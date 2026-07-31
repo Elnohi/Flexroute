@@ -2231,6 +2231,10 @@ function bindPaywall() {
       el.style.background = isSel ? 'var(--acc-d)' : 'transparent';
     });
   }
+  // Highlight the default plan immediately on render — without this,
+  // neither card looks selected until the driver taps one.
+  refreshCardStyles();
+
   document.querySelectorAll('.planCard').forEach(function(el) {
     el.addEventListener('click', function() {
       selected = el.getAttribute('data-plan'); refreshCardStyles();
@@ -2239,13 +2243,9 @@ function bindPaywall() {
   var backBtn = document.getElementById('paywallBackBtn');
   if (backBtn) backBtn.addEventListener('click', function() { S.phase = 'input'; render(); });
 
-  var checkoutBtn = document.getElementById('checkoutBtn');
-  if (checkoutBtn) checkoutBtn.addEventListener('click', async function() {
-    if (!S.userEmail) {
-      S._postAuthAction = function() { S.phase = 'paywall'; };
-      S.authStep = 'email'; S.phase = 'auth'; render(); return;
-    }
-    checkoutBtn.disabled = true; checkoutBtn.textContent = 'Redirecting…';
+  async function doCheckout() {
+    var checkoutBtn = document.getElementById('checkoutBtn');
+    if (checkoutBtn) { checkoutBtn.disabled = true; checkoutBtn.textContent = 'Redirecting…'; }
     try {
       var r = await fetch('/.netlify/functions/create-checkout-session', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2255,9 +2255,22 @@ function bindPaywall() {
       if (!r.ok || !d.url) throw new Error(d.error || 'checkout failed');
       window.location.href = d.url;
     } catch (e) {
-      checkoutBtn.disabled = false; checkoutBtn.textContent = 'Continue to payment';
+      if (checkoutBtn) { checkoutBtn.disabled = false; checkoutBtn.textContent = 'Continue to payment'; }
       toast("Couldn't start checkout — try again in a moment");
     }
+  }
+
+  var checkoutBtn = document.getElementById('checkoutBtn');
+  if (checkoutBtn) checkoutBtn.addEventListener('click', async function() {
+    if (!S.userEmail) {
+      // Driver hasn't verified email yet. After OTP verification completes,
+      // go straight to checkout — don't send them back to the paywall for
+      // a second tap. Most drivers were dropping off at this second tap,
+      // thinking nothing happened after the OTP flow.
+      S._postAuthAction = function() { S.phase = 'paywall'; render(); setTimeout(doCheckout, 100); };
+      S.authStep = 'email'; S.phase = 'auth'; render(); return;
+    }
+    await doCheckout();
   });
 }
 
