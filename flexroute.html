@@ -4047,6 +4047,60 @@ function _consumeTrialIfApplicable() {
 }
 
 async function optimize() {
+  // ── Email gate (before trial gate) ─────────────────────────────────────
+  // Require an email before the FIRST optimization so the server can track
+  // trial usage per email. Without this, clearing localStorage resets the
+  // local trial counter and the server has nothing to check against.
+  // No OTP at this stage — just collection + server reconciliation.
+  // OTP verification happens later at checkout time.
+  if (PREMIUM_LIVE && !S.userEmail && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid') {
+    // Show email prompt if not already visible
+    if (!document.getElementById('trialEmailOverlay')) {
+      var ov = document.createElement('div');
+      ov.id = 'trialEmailOverlay';
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)';
+      var cd = document.createElement('div');
+      cd.style.cssText = 'background:#13131E;border:1px solid var(--acc);border-radius:20px;padding:28px 24px;max-width:400px;width:100%;font-family:var(--body,sans-serif);color:#FFF;text-align:center';
+      cd.innerHTML =
+        '<div style="font-family:var(--sans);font-size:20px;font-weight:700;color:var(--acc);margin-bottom:10px">Enter your email to start</div>' +
+        '<div style="font-size:14px;color:var(--t2);line-height:1.5;margin-bottom:16px">Your email keeps your routes saved across sessions — no spam, ever.</div>' +
+        '<input id="trialEmailInput" type="email" placeholder="you@example.com" autocomplete="email" style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:12px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--t1);font-size:15px;outline:none;margin-bottom:12px">' +
+        '<div id="trialEmailErr" style="font-size:12px;color:var(--err);margin-bottom:10px;min-height:16px"></div>' +
+        '<button id="trialEmailBtn" class="btn bp" style="height:50px;width:100%;font-size:15px">Continue — optimize my route</button>';
+      ov.appendChild(cd);
+      document.body.appendChild(ov);
+      document.getElementById('trialEmailInput').focus();
+      document.getElementById('trialEmailBtn').addEventListener('click', async function() {
+        var inp = document.getElementById('trialEmailInput');
+        var errDiv = document.getElementById('trialEmailErr');
+        var email = (inp ? inp.value : '').trim().toLowerCase();
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          if (inp) inp.style.borderColor = 'var(--err)';
+          if (errDiv) errDiv.textContent = 'Enter a valid email address.';
+          return;
+        }
+        var btn = document.getElementById('trialEmailBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+        // Save email locally and reconcile with server
+        S._authEmail = email;
+        S.userEmail = email;
+        localStorage.setItem('fr_email', email);
+        try {
+          var serverUsed = await checkServerTrialStatus(email);
+          if (serverUsed === true && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid') {
+            S.entitlement = 'trial_used';
+            localStorage.setItem('fr_entitlement', 'trial_used');
+          }
+        } catch(e) {}
+        // Remove overlay and proceed to optimize
+        var overlay = document.getElementById('trialEmailOverlay');
+        if (overlay) overlay.remove();
+        optimize(); // re-enter — this time S.userEmail is set, skips this gate
+      });
+    }
+    return;
+  }
+
   // ── Trial gate ───────────────────────────────────────────────────────────
   // Checked BEFORE any geocoding/OCR cost is incurred. legacy_free and paid
   // users always pass. Everyone else gets FREE_TRIAL_ROUTE_LIMIT (3) free
@@ -5975,8 +6029,8 @@ async function osrmRoute(coords) {
 }
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
-const GMAPS_MAX_CHUNK = 3;
-const GMAPS_MIN_CHUNK = 2;
+const GMAPS_MAX_CHUNK = 10;
+const GMAPS_MIN_CHUNK = 5;
 
 // Splits the optimized route into Google Maps nav legs at genuine geographic
 // breaks rather than a rigid stop count, so a leg doesn't get cut mid-cluster
