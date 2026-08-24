@@ -5490,7 +5490,13 @@ function parseFlexOCR(rawText) {
         // "1050 Eastern Ave" and "1050 Eastern Avenue" compare as identical.
         // Without this, the prefix check fails because "ave," ≠ "avenue,".
         function _dedupNorm(s) {
-          return s.toLowerCase().replace(/\s+/g, ' ').trim()
+          // Strip city (after last comma) so "1060 Eastern Ave, LTE" matches
+          // "1060 Eastern Ave, Toronto". OCR sometimes picks up phone status
+          // bar text ("LTE") as the city, or reads it differently across
+          // overlapping screenshots. The street portion is what determines
+          // if two stops are at the same building.
+          var streetOnly = s.replace(/,\s*[^,]+$/, '');
+          return streetOnly.toLowerCase().replace(/\s+/g, ' ').trim()
             .replace(/\bave\b/g, 'avenue').replace(/\bst\b/g, 'street')
             .replace(/\brd\b/g, 'road').replace(/\bdr\b/g, 'drive')
             .replace(/\bblvd\b/g, 'boulevard').replace(/\bcres\b/g, 'crescent')
