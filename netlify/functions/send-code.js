@@ -83,8 +83,13 @@ async function sendEmail(email, code) {
   // Until a provider key is configured, this is a no-op so the rest of the
   // auth flow can still be built/tested end-to-end.
   if (!process.env.RESEND_API_KEY) {
-    console.warn('[FlexRoute] send-code: no email provider configured — code for ' + email + ' is ' + code + ' (visible only in function logs, not sent)');
-    return;
+    // Fail loudly. This used to return silently, which made send-code
+    // report { sent: true } to the client even though no email ever went
+    // out — every driver who reached checkout would enter a code that
+    // never arrived and quietly give up, with nothing in the UI or logs
+    // pointing at a misconfigured env var as the cause.
+    console.error('[FlexRoute] send-code: RESEND_API_KEY not configured — code NOT sent for ' + email);
+    throw new Error('EMAIL_NOT_CONFIGURED');
   }
   const resp = await fetch('https://api.resend.com/emails', {
     method: 'POST',

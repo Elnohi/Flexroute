@@ -534,6 +534,11 @@ if (!navigator.onLine) document.getElementById('offlineBar').classList.add('show
 // by vPaywall() (declared earlier in the script than this used to be
 // declared), so this must come before any code that could call vPaywall().
 const FREE_TRIAL_ROUTE_LIMIT = 5;
+// Rough US average fuel cost per km driven (~$3.50/gal, ~25 mpg), used only
+// to give drivers a ballpark $ figure alongside distance/time saved on the
+// results screen and paywall. Deliberately conservative — never claimed as
+// exact, always labeled "estimated" wherever it's shown.
+const EST_GAS_COST_PER_KM = 0.09;
 // ── PREMIUM MASTER SWITCH ────────────────────────────────────────────────────
 // false = silent mode: app is fully free, no trial counting, no paywall, no
 //         auth, no server entitlement calls. Grandfathering timestamps still
@@ -1987,7 +1992,6 @@ function render() {
   bind();
   if (S.phase === 'auth') bindAuth();
   if (S.phase === 'paywall') bindPaywall();
-  if (S.phase === 'result') bindGestures();
   if (S.phase === 'result') bindMap();
   // Apply route view zoom class only on result phase
   document.body.classList.remove('rzoom-1', 'rzoom-2');
@@ -2160,8 +2164,20 @@ function vPaywall() {
       <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
       <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">FlexRoute Premium</span>
     </div>
-    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">Keep every shift shorter.</div>
-    <div style="font-size:14px;color:var(--t2);line-height:1.55">You\'ve used your ${FREE_TRIAL_ROUTE_LIMIT} free routes. Unlock unlimited optimization for less than a tank of gas.</div>
+    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">You already know it works.</div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.55">You\'ve driven ${FREE_TRIAL_ROUTE_LIMIT} real optimized routes &mdash; not a demo. Keep going for less than a tank of gas.</div>
+  </div>
+
+  <!-- Trust bar — real numbers only, nothing this contradicts refund.html -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+    <div style="flex:1;min-width:130px;background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--sans);font-size:13px;font-weight:800;color:var(--t1)">300+ drivers</div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">already using FlexRoute</div>
+    </div>
+    <div style="flex:1;min-width:130px;background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--sans);font-size:13px;font-weight:800;color:var(--t1)">Cancel anytime</div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">access runs to period end</div>
+    </div>
   </div>
 
   <!-- Pricing cards -->
@@ -2183,6 +2199,15 @@ function vPaywall() {
 
   <!-- What you get -->
   <div style="background:var(--surf);border-radius:16px;overflow:hidden;margin-bottom:16px">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--brd)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--ok);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#128274;</div>
+        <div>
+          <div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--t1)">Never touches your Amazon account</div>
+          <div style="font-size:12px;color:var(--t3)">Screenshot only &mdash; no login, no ban risk</div>
+        </div>
+      </div>
+    </div>
     <div style="padding:10px 16px;border-bottom:1px solid var(--brd)">
       <div style="display:flex;align-items:center;gap:10px">
         <div style="width:28px;height:28px;border-radius:50%;background:var(--acc);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#9889;</div>
@@ -2411,6 +2436,20 @@ function vInput() {
       h += '<div style="font-size:12px;color:var(--t2);margin-top:2px">Subscribe to continue optimizing your routes.</div></div>';
       h += '</div>';
     }
+  }
+
+  // ── Trial progress banner ──
+  // Surfaces the free-route count from the first used route onward instead
+  // of only at the hard wall (FREE_TRIAL_ROUTE_LIMIT) — a driver who never
+  // sees the count coming has no reason to expect the paywall, and treats
+  // it as a bait-and-switch instead of an expected trial ending.
+  if (PREMIUM_LIVE && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid' &&
+      S.trialRoutesUsed > 0 && S.trialRoutesUsed < FREE_TRIAL_ROUTE_LIMIT) {
+    var _left = FREE_TRIAL_ROUTE_LIMIT - S.trialRoutesUsed;
+    h += '<div style="background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 16px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">';
+    h += '<div style="font-size:13px;color:var(--t2)"><strong style="color:var(--acc)">' + _left + ' free route' + (_left === 1 ? '' : 's') + '</strong> left this trial</div>';
+    h += '<div style="font-size:11px;color:var(--t3)">' + S.trialRoutesUsed + ' / ' + FREE_TRIAL_ROUTE_LIMIT + ' used</div>';
+    h += '</div>';
   }
 
   h += '<div class="scr" style="padding-top:16px">';
@@ -3377,7 +3416,10 @@ function vSavings(sv) {
           <div class="cbox-min">~${sv.optMin} min</div>
         </div>
       </div>
-      ${sv.manualEdit ? `<div class="sv-src" style="color:var(--acc);border-top:1px solid rgba(255,153,0,.25);padding-top:8px">&#9998; You've reordered stops by hand. These savings describe the original optimized order, not your current one.</div>` : ''}
+      <div style="text-align:center;font-size:13px;color:var(--ok);font-weight:700;font-family:var(--sans);margin-top:10px">
+        &#9679; ~$${(sv.savedKm * EST_GAS_COST_PER_KM).toFixed(2)} in gas saved this shift <span style="font-weight:400;color:var(--t3);font-size:11px">(estimated)</span>
+      </div>
+      ${sv.manualEdit ?`<div class="sv-src" style="color:var(--acc);border-top:1px solid rgba(255,153,0,.25);padding-top:8px">&#9998; You've reordered stops by hand. These savings describe the original optimized order, not your current one.</div>` : ''}
       <div class="sv-src">
         ${sv.realGPS
           ? `Real driving distances via <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a> &amp; OSRM. Times from actual route data.`
