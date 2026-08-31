@@ -5379,7 +5379,7 @@ function parseFlexOCR(rawText) {
     if (/if any more packages/i.test(l)) return true;
     if (/check for more stops/i.test(l)) return true;
     if (/slide to|swipe to|tap to/i.test(l)) return true;
-    if (/^locations\s+\d/i.test(l)) return true;  // 'Locations 2' dropdown
+    if (/^locations?\s*\d*/i.test(l)) return true;  // 'Locations 2' dropdown or bare 'Locations'
     if (/them in your|in your itinerary|you.ll see them/i.test(l)) return true; // Amazon bottom message
     if (/^(after you|assigned more|more stops)/i.test(l)) return true; // Amazon bottom message
     // Amazon Flex package/route tracking codes — never addresses:
@@ -5390,6 +5390,10 @@ function parseFlexOCR(rawText) {
     // Single-letter / symbol-only lines — OCR artifacts from Flex UI elements
     // (e.g. "i      -", "v", "[ ") that aren't caught by keyword checks above.
     if (line.replace(/[^a-zA-Z]/g, '').length <= 2 && !/\d/.test(line)) return true;
+    // Parenthesized stop numbers — Google Vision reads the green circled
+    // stop numbers (⑳, ㉔, ㉕) as "(20)", "(24)" etc. These waste j
+    // increments and push the parser past the lookahead window.
+    if (/^\(?\s*\d{1,3}\s*\)$/.test(line.trim())) return true;
     return /^(deliver|package|itinerary|current|next stop|map|summary|list|search|tracking|locations|after you|you.ll|location|locker|buzzer|pickup)/i.test(line)
       || /^\d+\s*v$/.test(line)   // "2 v" locations dropdown
       || line.length < 3;
@@ -5466,7 +5470,7 @@ function parseFlexOCR(rawText) {
       }
 
       var pendingCity = '';
-      while (j < lines.length && j < i + 12) {
+      while (j < lines.length && j < i + 18) {
         var ln = lines[j].replace(/^[|\[\]]+\s*/, '');  // strip OCR pipe/bracket artifacts from Flex UI columns
         if (isScheduled(ln)) break;
         // Parse package count from "Deliver N package(s)" BEFORE noise filter
