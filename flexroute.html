@@ -3930,7 +3930,7 @@ async function handleFiles(files) {
   if (!imgs.length) { S.errMsg = 'Please upload image or PDF files.'; render(); return; }
   S.sc = { done: 0, total: imgs.length, msg: 'Reading images...' };
   S.errMsg = ''; S._ocrWarn = null; render();
-  let added = 0, failed = 0, lastErr = '', unreadable = 0;
+  let added = 0, failed = 0, lastErr = '', unreadable = 0, possibleMissing = 0;
   let unreadableDetails = [];
   for (let i = 0; i < imgs.length; i++) {
     S.sc = { done: i, total: imgs.length, msg: `Scanning image ${i + 1} of ${imgs.length}...` };
@@ -3938,6 +3938,7 @@ async function handleFiles(files) {
     try {
       const items = await extractFromFile(imgs[i]);
       unreadable += items._skipped || 0;
+      possibleMissing += items._possibleMissing || 0;
       if (items._skippedDetails && items._skippedDetails.length) {
         unreadableDetails = unreadableDetails.concat(items._skippedDetails);
       }
@@ -4010,7 +4011,7 @@ async function handleFiles(files) {
   } else {
     S._showDebug = false;
     saveSession();
-    if (unreadable > 0) {
+    if (unreadable > 0 || possibleMissing > 0) {
       // Some stops were detected but couldn't be read — name WHICH ones so the
       // driver can jump straight to them instead of diffing 23 stops by hand.
       // This is NOT a failure state: `added` stops are already in S.stops and
@@ -4026,12 +4027,23 @@ async function handleFiles(files) {
         var detail = d.raw ? ` — "${d.raw}"` : '';
         return `${label}${detail}`;
       });
-      S._ocrWarn = {
-        summary: `${added} stop${added > 1 ? 's' : ''} added — ${unreadable} couldn't be read automatically`,
-        lines: _detailLines,
-        note: `You're good to optimize now with these ${added}. Add the missed ${unreadable > 1 ? 'ones' : 'one'} above, or from your Flex app, whenever you get a chance.`
-      };
-      trackEvent('ocr_stops_unreadable', { unreadable: unreadable, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
+      var _summary = unreadable > 0
+        ? `${added} stop${added > 1 ? 's' : ''} added — ${unreadable} couldn't be read automatically`
+        : `${added} stop${added > 1 ? 's' : ''} added`;
+      var _note = unreadable > 0
+        ? `You're good to optimize now with these ${added}. Add the missed ${unreadable > 1 ? 'ones' : 'one'} above, or from your Flex app, whenever you get a chance.`
+        : `You're good to optimize now with these ${added}.`;
+      // possibleMissing: a stop that vanished with NO trace at all — not
+      // added, not in the list above. We only know an unaccounted-for
+      // "Deliver N package(s)" line exists somewhere in the scan, not which
+      // stop it belongs to (that text is exactly what OCR failed to anchor).
+      // This is a different, more serious flag than unreadable — say so
+      // plainly rather than folding it into the same "couldn't be read" line.
+      if (possibleMissing > 0) {
+        _detailLines.push(`Possible missing stop${possibleMissing > 1 ? 's' : ''} — your screenshot may contain ${possibleMissing} more delivery${possibleMissing > 1 ? 'ies' : ''} than FlexRoute found. Double-check your Flex app's stop count before you start.`);
+      }
+      S._ocrWarn = { summary: _summary, lines: _detailLines, note: _note };
+      trackEvent('ocr_stops_unreadable', { unreadable: unreadable, possible_missing: possibleMissing, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
     }
@@ -5643,6 +5655,31 @@ function parseFlexOCR(rawText) {
   results.forEach(function(r, idx) { r.num = idx + 1; });
   results._skipped = _skippedBlocks;
   results._skippedDetails = _skippedDetails;
+
+  // ── Silent-drop safety net ──────────────────────────────────────────────
+  // Every real bug so far in this parser has an escape hatch: an address we
+  // can't fully parse still gets flagged via _skippedDetails, because it's
+  // ANCHORED to a line isScheduled() recognized. But if OCR mangles that
+  // anchor line badly enough that isScheduled() never matches it at all
+  // (garbled by a screenshot-overlap seam, blur, low contrast, etc.), the
+  // whole stop is invisible to this function — not added, not flagged,
+  // nothing. That's worse than a flagged failure: the driver has zero
+  // signal a stop existed at all. (Reported directly: "6 Liam Foudy Ct"
+  // never appeared anywhere in FlexRoute's output — added or unreadable —
+  // despite being a normal stop between two that scanned fine.)
+  //
+  // "Deliver one package" / "Deliver N packages" is a fixed phrase Amazon
+  // prints once per delivery stop, independent of the Scheduled/time/code
+  // line this parser actually anchors on — so counting it gives a rough,
+  // independent second opinion on how many stops SHOULD exist. It can't
+  // recover the missing address (we don't have the source text for it),
+  // but a mismatch is the only way to warn the driver a stop vanished
+  // instead of silently shipping a shorter route than what was scanned.
+  var _deliverMatches = rawText.match(/deliver\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+packages?/gi) || [];
+  var _accountedFor = results.length + _skippedBlocks;
+  if (_deliverMatches.length > _accountedFor) {
+    results._possibleMissing = _deliverMatches.length - _accountedFor;
+  }
   return results;
 }
 
