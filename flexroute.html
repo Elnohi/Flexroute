@@ -534,6 +534,11 @@ if (!navigator.onLine) document.getElementById('offlineBar').classList.add('show
 // by vPaywall() (declared earlier in the script than this used to be
 // declared), so this must come before any code that could call vPaywall().
 const FREE_TRIAL_ROUTE_LIMIT = 5;
+// Rough US average fuel cost per km driven (~$3.50/gal, ~25 mpg), used only
+// to give drivers a ballpark $ figure alongside distance/time saved on the
+// results screen and paywall. Deliberately conservative — never claimed as
+// exact, always labeled "estimated" wherever it's shown.
+const EST_GAS_COST_PER_KM = 0.09;
 // ── PREMIUM MASTER SWITCH ────────────────────────────────────────────────────
 // false = silent mode: app is fully free, no trial counting, no paywall, no
 //         auth, no server entitlement calls. Grandfathering timestamps still
@@ -1357,10 +1362,11 @@ function bind() {
       case 'clearStartBtn': S.startAddr=''; localStorage.removeItem('fr_sa'); localStorage.removeItem('fr_start'); toast('Starting address cleared'); render(); break;
       case 'clearHomeBtn':  S.home=''; localStorage.removeItem('fr_hm'); toast('Home address cleared'); render(); break;
       case 'retryOptBtn': S.errMsg=''; optimize(); break;
+      case 'ocrWarnDismiss': S._ocrWarn=null; render(); break;
       case 'newShiftBtn':
         if (!confirm('Start a new shift? This will clear all current stops.')) break;
         S.stops=[]; S.optimized=[]; S.savings=null;
-        S.lastId=null; S.errMsg=''; S.geoFailed=[];
+        S.lastId=null; S.errMsg=''; S._ocrWarn=null; S.geoFailed=[];
         clearSession(); S.phase='input'; render(); break;
       case 'startShiftBtn': startCompanion(); break;
       case 'dbgBtn':
@@ -1987,7 +1993,6 @@ function render() {
   bind();
   if (S.phase === 'auth') bindAuth();
   if (S.phase === 'paywall') bindPaywall();
-  if (S.phase === 'result') bindGestures();
   if (S.phase === 'result') bindMap();
   // Apply route view zoom class only on result phase
   document.body.classList.remove('rzoom-1', 'rzoom-2');
@@ -2160,8 +2165,20 @@ function vPaywall() {
       <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
       <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">FlexRoute Premium</span>
     </div>
-    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">Keep every shift shorter.</div>
-    <div style="font-size:14px;color:var(--t2);line-height:1.55">You\'ve used your ${FREE_TRIAL_ROUTE_LIMIT} free routes. Unlock unlimited optimization for less than a tank of gas.</div>
+    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">You already know it works.</div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.55">You\'ve driven ${FREE_TRIAL_ROUTE_LIMIT} real optimized routes &mdash; not a demo. Keep going for less than a tank of gas.</div>
+  </div>
+
+  <!-- Trust bar — real numbers only, nothing this contradicts refund.html -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+    <div style="flex:1;min-width:130px;background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--sans);font-size:13px;font-weight:800;color:var(--t1)">300+ drivers</div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">already using FlexRoute</div>
+    </div>
+    <div style="flex:1;min-width:130px;background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 12px;text-align:center">
+      <div style="font-family:var(--sans);font-size:13px;font-weight:800;color:var(--t1)">Cancel anytime</div>
+      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">access runs to period end</div>
+    </div>
   </div>
 
   <!-- Pricing cards -->
@@ -2183,6 +2200,15 @@ function vPaywall() {
 
   <!-- What you get -->
   <div style="background:var(--surf);border-radius:16px;overflow:hidden;margin-bottom:16px">
+    <div style="padding:10px 16px;border-bottom:1px solid var(--brd)">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--ok);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#128274;</div>
+        <div>
+          <div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--t1)">Never touches your Amazon account</div>
+          <div style="font-size:12px;color:var(--t3)">Screenshot only &mdash; no login, no ban risk</div>
+        </div>
+      </div>
+    </div>
     <div style="padding:10px 16px;border-bottom:1px solid var(--brd)">
       <div style="display:flex;align-items:center;gap:10px">
         <div style="width:28px;height:28px;border-radius:50%;background:var(--acc);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#9889;</div>
@@ -2413,6 +2439,20 @@ function vInput() {
     }
   }
 
+  // ── Trial progress banner ──
+  // Surfaces the free-route count from the first used route onward instead
+  // of only at the hard wall (FREE_TRIAL_ROUTE_LIMIT) — a driver who never
+  // sees the count coming has no reason to expect the paywall, and treats
+  // it as a bait-and-switch instead of an expected trial ending.
+  if (PREMIUM_LIVE && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid' &&
+      S.trialRoutesUsed > 0 && S.trialRoutesUsed < FREE_TRIAL_ROUTE_LIMIT) {
+    var _left = FREE_TRIAL_ROUTE_LIMIT - S.trialRoutesUsed;
+    h += '<div style="background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 16px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">';
+    h += '<div style="font-size:13px;color:var(--t2)"><strong style="color:var(--acc)">' + _left + ' free route' + (_left === 1 ? '' : 's') + '</strong> left this trial</div>';
+    h += '<div style="font-size:11px;color:var(--t3)">' + S.trialRoutesUsed + ' / ' + FREE_TRIAL_ROUTE_LIMIT + ' used</div>';
+    h += '</div>';
+  }
+
   h += '<div class="scr" style="padding-top:16px">';
 
   // Tweak mode banner
@@ -2572,6 +2612,22 @@ function vInput() {
 
   if (S.geoFailed && S.geoFailed.length > 0 && S.stops.length > 0) {
     h += '<div class="failed-float" id="failedFloat" onclick="document.getElementById(\'failedFloat\').style.display=\'none\'">&#9888; ' + S.geoFailed.length + ' stop' + (S.geoFailed.length > 1 ? 's' : '') + ' not found &mdash; tap to dismiss</div>';
+  }
+
+  // Non-blocking: some stops from a scan couldn't be read, but the rest are
+  // already added and ready to optimize. Styled as a dismissible warning
+  // (like the geo-warn / failedFloat patterns above) rather than the red
+  // blocking-error box below, since nothing here actually needs fixing
+  // before the driver can tap Optimize.
+  if (S._ocrWarn) {
+    h += '<div class="geo-warn" id="ocrWarnBox" style="margin-bottom:14px;position:relative;padding-right:32px">';
+    h += '<div style="font-weight:700;margin-bottom:4px">&#9888; ' + escH(S._ocrWarn.summary) + '</div>';
+    if (S._ocrWarn.lines.length) {
+      h += '<div style="margin:4px 0;opacity:.85">' + S._ocrWarn.lines.map(function(l){ return escH(l); }).join('<br>') + '</div>';
+    }
+    h += '<div style="margin-top:6px">' + escH(S._ocrWarn.note) + '</div>';
+    h += '<button id="ocrWarnDismiss" aria-label="Dismiss" style="position:absolute;top:8px;right:8px;background:transparent;border:none;color:inherit;opacity:.6;font-size:16px;line-height:1;cursor:pointer;padding:4px">&#10005;</button>';
+    h += '</div>';
   }
 
   if (S.errMsg) {
@@ -3377,7 +3433,10 @@ function vSavings(sv) {
           <div class="cbox-min">~${sv.optMin} min</div>
         </div>
       </div>
-      ${sv.manualEdit ? `<div class="sv-src" style="color:var(--acc);border-top:1px solid rgba(255,153,0,.25);padding-top:8px">&#9998; You've reordered stops by hand. These savings describe the original optimized order, not your current one.</div>` : ''}
+      <div style="text-align:center;font-size:13px;color:var(--ok);font-weight:700;font-family:var(--sans);margin-top:10px">
+        &#9679; ~$${(sv.savedKm * EST_GAS_COST_PER_KM).toFixed(2)} in gas saved this shift <span style="font-weight:400;color:var(--t3);font-size:11px">(estimated)</span>
+      </div>
+      ${sv.manualEdit ?`<div class="sv-src" style="color:var(--acc);border-top:1px solid rgba(255,153,0,.25);padding-top:8px">&#9998; You've reordered stops by hand. These savings describe the original optimized order, not your current one.</div>` : ''}
       <div class="sv-src">
         ${sv.realGPS
           ? `Real driving distances via <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a> &amp; OSRM. Times from actual route data.`
@@ -3652,7 +3711,7 @@ function mvStop(id, dir) {
 }
 function clrAll() {
   if (!confirm('Clear all stops?')) return;
-  S.stops = []; S.lastId = null; S.errMsg = '';
+  S.stops = []; S.lastId = null; S.errMsg = ''; S._ocrWarn = null;
   S.savings = null; S.optimized = []; S.geoFailed = [];
   clearSession(); render();
 }
@@ -3870,8 +3929,8 @@ async function handleFiles(files) {
   }
   if (!imgs.length) { S.errMsg = 'Please upload image or PDF files.'; render(); return; }
   S.sc = { done: 0, total: imgs.length, msg: 'Reading images...' };
-  S.errMsg = ''; render();
-  let added = 0, failed = 0, lastErr = '', unreadable = 0;
+  S.errMsg = ''; S._ocrWarn = null; render();
+  let added = 0, failed = 0, lastErr = '', unreadable = 0, possibleMissing = 0;
   let unreadableDetails = [];
   for (let i = 0; i < imgs.length; i++) {
     S.sc = { done: i, total: imgs.length, msg: `Scanning image ${i + 1} of ${imgs.length}...` };
@@ -3879,6 +3938,7 @@ async function handleFiles(files) {
     try {
       const items = await extractFromFile(imgs[i]);
       unreadable += items._skipped || 0;
+      possibleMissing += items._possibleMissing || 0;
       if (items._skippedDetails && items._skippedDetails.length) {
         unreadableDetails = unreadableDetails.concat(items._skippedDetails);
       }
@@ -3951,16 +4011,39 @@ async function handleFiles(files) {
   } else {
     S._showDebug = false;
     saveSession();
-    if (unreadable > 0) {
+    if (unreadable > 0 || possibleMissing > 0) {
       // Some stops were detected but couldn't be read — name WHICH ones so the
       // driver can jump straight to them instead of diffing 23 stops by hand.
+      // This is NOT a failure state: `added` stops are already in S.stops and
+      // ready to optimize. Using S._ocrWarn (not S.errMsg) keeps this out of
+      // the red blocking-error box with its "Try again" button — that button
+      // would just re-run optimize() on the SAME already-added stops (no
+      // rescan happens), so surfacing it here reads as "you must fix this
+      // before continuing" when the driver can already tap Optimize as-is.
+      // Mid-shift, that false alarm is exactly what pushes a driver to give
+      // up on the app entirely instead of losing 10 seconds to add 2 stops.
       var _detailLines = unreadableDetails.map(function(d, idx) {
         var label = d.num ? `Stop #${d.num}` : `stop ${idx + 1} of ${unreadableDetails.length}`;
         var detail = d.raw ? ` — "${d.raw}"` : '';
-        return `  • ${label}${detail} — number unclear, check your Flex app`;
+        return `${label}${detail}`;
       });
-      S.errMsg = `⚠ ${added} stop${added > 1 ? 's' : ''} added, but ${unreadable} stop${unreadable > 1 ? 's' : ''} couldn't be read:\n` + _detailLines.join('\n') + `\nAdd ${unreadable > 1 ? 'them' : 'it'} manually using the field above.`;
-      trackEvent('ocr_stops_unreadable', { unreadable: unreadable, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
+      var _summary = unreadable > 0
+        ? `${added} stop${added > 1 ? 's' : ''} added — ${unreadable} couldn't be read automatically`
+        : `${added} stop${added > 1 ? 's' : ''} added`;
+      var _note = unreadable > 0
+        ? `You're good to optimize now with these ${added}. Add the missed ${unreadable > 1 ? 'ones' : 'one'} above, or from your Flex app, whenever you get a chance.`
+        : `You're good to optimize now with these ${added}.`;
+      // possibleMissing: a stop that vanished with NO trace at all — not
+      // added, not in the list above. We only know an unaccounted-for
+      // "Deliver N package(s)" line exists somewhere in the scan, not which
+      // stop it belongs to (that text is exactly what OCR failed to anchor).
+      // This is a different, more serious flag than unreadable — say so
+      // plainly rather than folding it into the same "couldn't be read" line.
+      if (possibleMissing > 0) {
+        _detailLines.push(`Possible missing stop${possibleMissing > 1 ? 's' : ''} — your screenshot may contain ${possibleMissing} more delivery${possibleMissing > 1 ? 'ies' : ''} than FlexRoute found. Double-check your Flex app's stop count before you start.`);
+      }
+      S._ocrWarn = { summary: _summary, lines: _detailLines, note: _note };
+      trackEvent('ocr_stops_unreadable', { unreadable: unreadable, possible_missing: possibleMissing, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
     }
@@ -5572,6 +5655,31 @@ function parseFlexOCR(rawText) {
   results.forEach(function(r, idx) { r.num = idx + 1; });
   results._skipped = _skippedBlocks;
   results._skippedDetails = _skippedDetails;
+
+  // ── Silent-drop safety net ──────────────────────────────────────────────
+  // Every real bug so far in this parser has an escape hatch: an address we
+  // can't fully parse still gets flagged via _skippedDetails, because it's
+  // ANCHORED to a line isScheduled() recognized. But if OCR mangles that
+  // anchor line badly enough that isScheduled() never matches it at all
+  // (garbled by a screenshot-overlap seam, blur, low contrast, etc.), the
+  // whole stop is invisible to this function — not added, not flagged,
+  // nothing. That's worse than a flagged failure: the driver has zero
+  // signal a stop existed at all. (Reported directly: "6 Liam Foudy Ct"
+  // never appeared anywhere in FlexRoute's output — added or unreadable —
+  // despite being a normal stop between two that scanned fine.)
+  //
+  // "Deliver one package" / "Deliver N packages" is a fixed phrase Amazon
+  // prints once per delivery stop, independent of the Scheduled/time/code
+  // line this parser actually anchors on — so counting it gives a rough,
+  // independent second opinion on how many stops SHOULD exist. It can't
+  // recover the missing address (we don't have the source text for it),
+  // but a mismatch is the only way to warn the driver a stop vanished
+  // instead of silently shipping a shorter route than what was scanned.
+  var _deliverMatches = rawText.match(/deliver\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+packages?/gi) || [];
+  var _accountedFor = results.length + _skippedBlocks;
+  if (_deliverMatches.length > _accountedFor) {
+    results._possibleMissing = _deliverMatches.length - _accountedFor;
+  }
   return results;
 }
 
