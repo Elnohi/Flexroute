@@ -5644,10 +5644,20 @@ function parseFlexOCR(rawText) {
         for (var _k = i + 1; _k < j; _k++) {
           if (lines[_k] && !isNoise(lines[_k])) _rawLines.push(lines[_k]);
         }
-        _skippedDetails.push({
-          num: extractStopNum(lines[i]),
-          raw: _rawLines.join(' / ').substring(0, 80)
-        });
+        var _skipNum = extractStopNum(lines[i]);
+        var _skipRaw = _rawLines.join(' / ').substring(0, 80);
+        // Only report if we have a stop number OR raw text. An empty block
+        // (no number, no raw text) is a false isScheduled match on noise —
+        // flagging it tells the driver "1 stop missing" when nothing is
+        // actually missing, which is worse than not mentioning it.
+        if (_skipNum || _skipRaw) {
+          _skippedDetails.push({
+            num: _skipNum,
+            raw: _skipRaw
+          });
+        } else {
+          _skippedBlocks--; // undo the increment — not a real skip
+        }
       }
       i = j;
     } else {
