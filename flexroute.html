@@ -1362,10 +1362,11 @@ function bind() {
       case 'clearStartBtn': S.startAddr=''; localStorage.removeItem('fr_sa'); localStorage.removeItem('fr_start'); toast('Starting address cleared'); render(); break;
       case 'clearHomeBtn':  S.home=''; localStorage.removeItem('fr_hm'); toast('Home address cleared'); render(); break;
       case 'retryOptBtn': S.errMsg=''; optimize(); break;
+      case 'ocrWarnDismiss': S._ocrWarn=null; render(); break;
       case 'newShiftBtn':
         if (!confirm('Start a new shift? This will clear all current stops.')) break;
         S.stops=[]; S.optimized=[]; S.savings=null;
-        S.lastId=null; S.errMsg=''; S.geoFailed=[];
+        S.lastId=null; S.errMsg=''; S._ocrWarn=null; S.geoFailed=[];
         clearSession(); S.phase='input'; render(); break;
       case 'startShiftBtn': startCompanion(); break;
       case 'dbgBtn':
@@ -2613,6 +2614,22 @@ function vInput() {
     h += '<div class="failed-float" id="failedFloat" onclick="document.getElementById(\'failedFloat\').style.display=\'none\'">&#9888; ' + S.geoFailed.length + ' stop' + (S.geoFailed.length > 1 ? 's' : '') + ' not found &mdash; tap to dismiss</div>';
   }
 
+  // Non-blocking: some stops from a scan couldn't be read, but the rest are
+  // already added and ready to optimize. Styled as a dismissible warning
+  // (like the geo-warn / failedFloat patterns above) rather than the red
+  // blocking-error box below, since nothing here actually needs fixing
+  // before the driver can tap Optimize.
+  if (S._ocrWarn) {
+    h += '<div class="geo-warn" id="ocrWarnBox" style="margin-bottom:14px;position:relative;padding-right:32px">';
+    h += '<div style="font-weight:700;margin-bottom:4px">&#9888; ' + escH(S._ocrWarn.summary) + '</div>';
+    if (S._ocrWarn.lines.length) {
+      h += '<div style="margin:4px 0;opacity:.85">' + S._ocrWarn.lines.map(function(l){ return escH(l); }).join('<br>') + '</div>';
+    }
+    h += '<div style="margin-top:6px">' + escH(S._ocrWarn.note) + '</div>';
+    h += '<button id="ocrWarnDismiss" aria-label="Dismiss" style="position:absolute;top:8px;right:8px;background:transparent;border:none;color:inherit;opacity:.6;font-size:16px;line-height:1;cursor:pointer;padding:4px">&#10005;</button>';
+    h += '</div>';
+  }
+
   if (S.errMsg) {
     h += '<div style="background:rgba(255,68,85,.12);border:1px solid #FF4455;border-radius:10px;padding:12px 15px;margin-bottom:14px">';
     h += '<div style="font-size:14px;color:#FF4455;margin-bottom:10px;white-space:pre-line">' + escH(S.errMsg) + '</div>';
@@ -3694,7 +3711,7 @@ function mvStop(id, dir) {
 }
 function clrAll() {
   if (!confirm('Clear all stops?')) return;
-  S.stops = []; S.lastId = null; S.errMsg = '';
+  S.stops = []; S.lastId = null; S.errMsg = ''; S._ocrWarn = null;
   S.savings = null; S.optimized = []; S.geoFailed = [];
   clearSession(); render();
 }
@@ -3912,7 +3929,7 @@ async function handleFiles(files) {
   }
   if (!imgs.length) { S.errMsg = 'Please upload image or PDF files.'; render(); return; }
   S.sc = { done: 0, total: imgs.length, msg: 'Reading images...' };
-  S.errMsg = ''; render();
+  S.errMsg = ''; S._ocrWarn = null; render();
   let added = 0, failed = 0, lastErr = '', unreadable = 0;
   let unreadableDetails = [];
   for (let i = 0; i < imgs.length; i++) {
@@ -3996,12 +4013,24 @@ async function handleFiles(files) {
     if (unreadable > 0) {
       // Some stops were detected but couldn't be read — name WHICH ones so the
       // driver can jump straight to them instead of diffing 23 stops by hand.
+      // This is NOT a failure state: `added` stops are already in S.stops and
+      // ready to optimize. Using S._ocrWarn (not S.errMsg) keeps this out of
+      // the red blocking-error box with its "Try again" button — that button
+      // would just re-run optimize() on the SAME already-added stops (no
+      // rescan happens), so surfacing it here reads as "you must fix this
+      // before continuing" when the driver can already tap Optimize as-is.
+      // Mid-shift, that false alarm is exactly what pushes a driver to give
+      // up on the app entirely instead of losing 10 seconds to add 2 stops.
       var _detailLines = unreadableDetails.map(function(d, idx) {
         var label = d.num ? `Stop #${d.num}` : `stop ${idx + 1} of ${unreadableDetails.length}`;
         var detail = d.raw ? ` — "${d.raw}"` : '';
-        return `  • ${label}${detail} — number unclear, check your Flex app`;
+        return `${label}${detail}`;
       });
-      S.errMsg = `⚠ ${added} stop${added > 1 ? 's' : ''} added, but ${unreadable} stop${unreadable > 1 ? 's' : ''} couldn't be read:\n` + _detailLines.join('\n') + `\nAdd ${unreadable > 1 ? 'them' : 'it'} manually using the field above.`;
+      S._ocrWarn = {
+        summary: `${added} stop${added > 1 ? 's' : ''} added — ${unreadable} couldn't be read automatically`,
+        lines: _detailLines,
+        note: `You're good to optimize now with these ${added}. Add the missed ${unreadable > 1 ? 'ones' : 'one'} above, or from your Flex app, whenever you get a chance.`
+      };
       trackEvent('ocr_stops_unreadable', { unreadable: unreadable, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
