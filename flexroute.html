@@ -5392,7 +5392,7 @@ function parseFlexOCR(rawText) {
     if (/expected\s+b[yv]/i.test(line)) return true;   // Indiana "Expected by/bv"
     if (/estimated\s+(delivery|arrival)/i.test(line)) return true;
     if (/^[@©®]\s*\d{1,2}:\d{2}/.test(line)) return true;
-    if (/^[A-Z]\s*[\(©]/.test(line)) return true;
+    if (/^[A-Z]\s*\(\s*\d{1,3}\s*\)\s*[#@©®]/i.test(line)) return true;  // "C (14) # D-38.3D..."
     if (/[#@©®]\s*[A-Z]-\d+/i.test(line)) return true;  // E-34 Toronto, K-21 Indiana, D-36 Toronto
     if (/\d{1,2}:\d{2}\s*(AM|PM)/i.test(line) && line.length < 40) return true;
     return false;
@@ -5403,7 +5403,7 @@ function parseFlexOCR(rawText) {
     if (/if any more packages/i.test(l)) return true;
     if (/check for more stops/i.test(l)) return true;
     if (/slide to|swipe to|tap to/i.test(l)) return true;
-    if (/^locations\s+\d/i.test(l)) return true;  // 'Locations 2' dropdown
+    if (/^locations?\s*\d*/i.test(l)) return true;  // 'Locations 2' dropdown or bare 'Locations'
     if (/them in your|in your itinerary|you.ll see them/i.test(l)) return true; // Amazon bottom message
     if (/^(after you|assigned more|more stops)/i.test(l)) return true; // Amazon bottom message
     // Amazon Flex package/route tracking codes — never addresses:
@@ -5414,6 +5414,10 @@ function parseFlexOCR(rawText) {
     // Single-letter / symbol-only lines — OCR artifacts from Flex UI elements
     // (e.g. "i      -", "v", "[ ") that aren't caught by keyword checks above.
     if (line.replace(/[^a-zA-Z]/g, '').length <= 2 && !/\d/.test(line)) return true;
+    // Parenthesized stop numbers — Google Vision reads the green circled
+    // stop numbers (⑳, ㉔, ㉕) as "(20)", "(24)" etc. These waste j
+    // increments and push the parser past the lookahead window.
+    if (/^\(?\s*\d{1,3}\s*\)$/.test(line.trim())) return true;
     return /^(deliver|package|itinerary|current|next stop|map|summary|list|search|tracking|locations|after you|you.ll|location|locker|buzzer|pickup)/i.test(line)
       || /^\d+\s*v$/.test(line)   // "2 v" locations dropdown
       || line.length < 3;
@@ -5490,7 +5494,7 @@ function parseFlexOCR(rawText) {
       }
 
       var pendingCity = '';
-      while (j < lines.length && j < i + 12) {
+      while (j < lines.length && j < i + 18) {
         var ln = lines[j].replace(/^[|\[\]]+\s*/, '');  // strip OCR pipe/bracket artifacts from Flex UI columns
         if (isScheduled(ln)) break;
         // Parse package count from "Deliver N package(s)" BEFORE noise filter
@@ -5661,13 +5665,26 @@ function parseFlexOCR(rawText) {
         //     even when stop-number OCR also failed.
         _skippedBlocks++;
         var _rawLines = [];
+        // Include the annotation line itself — it contains the route code
+        // (e.g. "# D-37.1C") which the driver can match in their Flex app
+        // to identify the missed stop even when the address is garbled.
+        var _annotRaw = lines[i].replace(/scheduled\s+\d.*/i, '').replace(/^\W+/, '').trim();
+        if (_annotRaw && _annotRaw.length > 2) _rawLines.push(_annotRaw);
         for (var _k = i + 1; _k < j; _k++) {
-          if (lines[_k] && !isNoise(lines[_k])) _rawLines.push(lines[_k]);
+          if (lines[_k] && !isNoise(lines[_k]) && !isCity(lines[_k])) _rawLines.push(lines[_k]);
         }
-        _skippedDetails.push({
-          num: extractStopNum(lines[i]),
-          raw: _rawLines.join(' / ').substring(0, 80)
-        });
+        var _skipNum = extractStopNum(lines[i]);
+        var _skipRaw = _rawLines.join(' / ').substring(0, 120);
+        // Only report if we have a stop number OR meaningful raw text.
+        // An empty block is a false isScheduled match on noise.
+        if (_skipNum || _skipRaw) {
+          _skippedDetails.push({
+            num: _skipNum,
+            raw: _skipRaw
+          });
+        } else {
+          _skippedBlocks--; // undo the increment — not a real skip
+        }
       }
       i = j;
     } else {
@@ -5700,8 +5717,14 @@ function parseFlexOCR(rawText) {
   // but a mismatch is the only way to warn the driver a stop vanished
   // instead of silently shipping a shorter route than what was scanned.
   var _deliverMatches = rawText.match(/deliver\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+packages?/gi) || [];
-  var _accountedFor = results.length + _skippedBlocks;
-  if (_deliverMatches.length > _accountedFor) {
+  // Multi-package stops inflate the deliver count: "Deliver 2 packages"
+  // appears alongside individual "Deliver one package" lines for each
+  // sub-location. Count the extra deliver lines these multi-package
+  // stops produce so the comparison is fair.
+  var _multiPkgExtra = 0;
+  results.forEach(function(r) { if (r.pkgCount > 1) _multiPkgExtra += r.pkgCount; });
+  var _accountedFor = results.length + _skippedBlocks + _multiPkgExtra;
+  if (_deliverMatches.length > _accountedFor + 1) {  // +1 tolerance for OCR noise
     results._possibleMissing = _deliverMatches.length - _accountedFor;
   }
   return results;
