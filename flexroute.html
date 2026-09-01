@@ -597,8 +597,6 @@ const S = {
   // userEmail + sessionToken: set once the driver verifies a one-time code.
   userEmail:    localStorage.getItem('fr_email') || null,
   sessionToken: localStorage.getItem('fr_session_token') || null,
-  // entitlement: 'unknown' | 'trial_available' | 'trial_used' | 'paid' | 'legacy_free'
-  entitlement:      localStorage.getItem('fr_entitlement') || 'unknown',
   entitlementCheckedAt: parseInt(localStorage.getItem('fr_entitlement_checked_at') || '0', 10),
   // legacyFree: true if this device had real route history BEFORE the paywall
   // shipped AND the 30-day grandfathering window hasn't expired yet.
@@ -633,6 +631,14 @@ const S = {
     }
     return true;
   })(),
+  // Read AFTER legacyFree resolves — that IIFE can rewrite fr_entitlement to
+  // 'trial_available' in place (grace period just expired) or fr_trial_routes_used
+  // to '0' in the same tick. Reading entitlement/trialRoutesUsed earlier in this
+  // object literal (their previous position) meant this property still held the
+  // pre-expiry value for one extra page load — a stale-in-memory bug that let a
+  // just-expired legacy user keep bypassing the trial gate for one more session.
+  // entitlement: 'unknown' | 'trial_available' | 'trial_used' | 'paid' | 'legacy_free'
+  entitlement:      localStorage.getItem('fr_entitlement') || 'unknown',
   // Number of free optimized routes used so far (trial = 3 routes, per
   // updated plan — was 1, increased to 3).
   trialRoutesUsed: parseInt(localStorage.getItem('fr_trial_routes_used') || '0', 10),
@@ -945,7 +951,25 @@ window.addEventListener('load', () => {
   // standard 3-route trial like any new user. Stores a Unix timestamp (ms)
   // so the expiry check in S initialization above can enforce the window.
   // Only ever WRITES the timestamp once — subsequent loads just read it.
-  if (!parseInt(localStorage.getItem('fr_legacy_free') || '0', 10)) {
+  //
+  // Time-gated to the same 30-day window the expiry check (S.legacyFree,
+  // above) enforces. Without this, the check below can't tell "used the app
+  // before the paywall shipped" apart from "used the app for 30 seconds
+  // just now, then reloaded" — fr_sa/fr_hm/fr_session are all written during
+  // completely normal first-time setup, well before a driver ever hits a
+  // trial route. Any real user who reloads the page once after setup — an
+  // ordinary thing to do — matched this and got granted legacy_free today,
+  // outside the migration window entirely. Since the grant is stamped with
+  // whatever "now" is but checked against the fixed launch date, a grant
+  // made after the window already closed is immediately inconsistent: the
+  // very next load's expiry check unwinds it, but ALSO resets
+  // fr_trial_routes_used to 0 in the process — silently handing out a fresh
+  // trial, and bypassing the paywall entirely in the meantime. Gating the
+  // grant itself is the fix, not the unwind.
+  var _LAUNCH_DATE_MS = 1784952000000; // keep in sync with S.legacyFree above
+  var _THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  var _withinMigrationWindow = _LAUNCH_DATE_MS === 0 || (Date.now() - _LAUNCH_DATE_MS) <= _THIRTY_DAYS_MS;
+  if (_withinMigrationWindow && !parseInt(localStorage.getItem('fr_legacy_free') || '0', 10)) {
     var priorUsageSignals = [
       'fr_session', 'fr_nav_app', 'fr_route_zoom', 'fr_imperial', 'fr_sa', 'fr_hm',
     ];
