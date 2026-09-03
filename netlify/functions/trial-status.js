@@ -63,7 +63,7 @@ async function writeJSON(store, key, value) {
 // this automatically — if the frontend's limit ever changes, this constant
 // needs updating here too, or the server-side gate will disagree with what
 // the UI promises.
-const FREE_TRIAL_ROUTE_LIMIT = 3;
+const FREE_TRIAL_ROUTE_LIMIT = 5;
 
 function normalizeEmail(raw) {
   return (raw || '').trim().toLowerCase();

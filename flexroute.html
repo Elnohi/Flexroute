@@ -1087,6 +1087,28 @@ function bind() {
   if (!window._frBound) {
     window._frBound = true;
 
+    // Waze / Google Maps links anywhere outside Companion mode (the Google
+    // Maps + Waze accordion on the result screen, the map-preview marker
+    // popups, per-stop "verify" pins, "Navigate to Home") were left as plain
+    // <a target="_blank"> — the same TWA / Chrome Custom Tab issue already
+    // documented and fixed for Companion's own Waze/Maps buttons (see
+    // bindCompanion): target="_blank" is silently swallowed inside the
+    // installed Android app, so the Waze/Maps intent never fires and tapping
+    // the button does nothing. Companion got the window.location.href
+    // workaround; nothing else did. One delegated handler covers all of
+    // them by matching the destination host instead of one id at a time.
+    document.addEventListener('click', function(e) {
+      if (e.defaultPrevented) return; // an element-specific handler (Companion) already handled this
+      var a = e.target.closest && e.target.closest('a[target="_blank"]');
+      if (!a || !a.href) return;
+      if (a.href.indexOf('waze.com') === -1 && a.href.indexOf('google.com/maps') === -1) return;
+      e.preventDefault();
+      if (!a.hasAttribute('onclick')) {
+        trackEvent('maps_opened', { map_type: a.href.indexOf('waze.com') !== -1 ? 'waze' : 'google_maps' });
+      }
+      window.location.href = a.href;
+    });
+
     document.addEventListener('change', function(e) {
       if (e.target && e.target.id === 'fi' && e.target.files && e.target.files.length) {
         handleFiles(Array.from(e.target.files));
@@ -2614,7 +2636,7 @@ function vInput() {
     h += '<div style="margin-bottom:14px">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">';
     h += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:#FF9900;text-transform:uppercase;display:flex;align-items:center;gap:8px">Stops <span style="background:#FF9900;color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px">' + cnt + '</span></div>';
-    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + S.stops.filter(function(s){return s.flexNum!=null;}).length + ' scanned &middot; ' + S.stops.filter(function(s){return s.flexNum==null;}).length + ' manual</span>';
+    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + S.stops.filter(function(s){return s.flexNum!=null;}).length + ' scanned &middot; ' + S.stops.filter(function(s){return s.flexNum==null;}).length + ' manual &middot; <strong style="color:#FF9900">' + S.stops.reduce(function(sum,s){return sum+(s.pkgCount||1);},0) + '</strong> packages</span>';
     h += '</div>';
     h += '<div style="background:#13131E;border-radius:16px;overflow:hidden;padding:12px 14px">';
     h += '<div class="ir" style="margin-bottom:10px"><div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Add address manually" value="' + escH(S.manVal) + '" style="font-size:14px"/></div>';
@@ -2907,6 +2929,9 @@ function vResult() {
       <button class="rcp" id="cpBtn">Copy</button>
       <button class="rcp" id="shareBtn" style="color:var(--inf);border-color:rgba(74,158,255,.3)">&#8679; Share</button>
     </div>
+  </div>
+  <div style="font-size:11px;color:var(--t3);margin:-4px 0 12px 2px">
+    ${S.optimized.reduce(function(sum,s){return sum+(s.pkgCount||1);},0)} packages scanned &mdash; check this against your Flex app before you drive off
   </div>
 
   <div style="background:var(--surf);border-radius:16px;padding:10px 11px;margin-bottom:10px">
@@ -5416,8 +5441,13 @@ function parseFlexOCR(rawText) {
     if (line.replace(/[^a-zA-Z]/g, '').length <= 2 && !/\d/.test(line)) return true;
     // Parenthesized stop numbers — Google Vision reads the green circled
     // stop numbers (⑳, ㉔, ㉕) as "(20)", "(24)" etc. These waste j
-    // increments and push the parser past the lookahead window.
-    if (/^\(?\s*\d{1,3}\s*\)$/.test(line.trim())) return true;
+    // increments and push the parser past the lookahead window. OCR often
+    // drops the closing paren too ("(22" with nothing after it) — reported
+    // directly from a live scan, where that exact unbalanced form slipped
+    // through the original balanced-parens-only regex and got reported as
+    // the "raw" text of a falsely-skipped stop. Both the closing paren and
+    // the opening one are now optional so either truncation is caught.
+    if (/^\(?\s*\d{1,3}\s*\)?$/.test(line.trim())) return true;
     return /^(deliver|package|itinerary|current|next stop|map|summary|list|search|tracking|locations|after you|you.ll|location|locker|buzzer|pickup)/i.test(line)
       || /^\d+\s*v$/.test(line)   // "2 v" locations dropdown
       || line.length < 3;
