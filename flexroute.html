@@ -639,8 +639,7 @@ const S = {
   // just-expired legacy user keep bypassing the trial gate for one more session.
   // entitlement: 'unknown' | 'trial_available' | 'trial_used' | 'paid' | 'legacy_free'
   entitlement:      localStorage.getItem('fr_entitlement') || 'unknown',
-  // Number of free optimized routes used so far (trial = 3 routes, per
-  // updated plan — was 1, increased to 3).
+  // Number of free optimized routes used so far — see FREE_TRIAL_ROUTE_LIMIT.
   trialRoutesUsed: parseInt(localStorage.getItem('fr_trial_routes_used') || '0', 10),
   _mapOpen: false  // map preview collapsed by default
 };
@@ -948,7 +947,7 @@ window.addEventListener('load', () => {
   // ── Grandfathering check (runs once, before paywall logic) ─────────────
   // Anyone who already has evidence of using FlexRoute pre-paywall gets
   // grandfathered free for 30 days from launch. After that they receive the
-  // standard 3-route trial like any new user. Stores a Unix timestamp (ms)
+  // standard FREE_TRIAL_ROUTE_LIMIT-route trial like any new user. Stores a Unix timestamp (ms)
   // so the expiry check in S initialization above can enforce the window.
   // Only ever WRITES the timestamp once — subsequent loads just read it.
   //
@@ -2690,7 +2689,7 @@ function vInput() {
   } else {
     h += '<button class="btn bp" id="optBtn"' + (!cnt ? ' disabled' : '') + ' style="height:54px">&#9889; ' + (cnt ? t('optimize_btn') + ' &mdash; ' + cnt + ' stop' + (cnt > 1 ? 's' : '') : 'Optimize my route') + '</button>';
   }
-  h += '<div style="text-align:center;font-size:12px;color:#7878A0;margin-top:10px;letter-spacing:.3px">' + (PREMIUM_LIVE ? '3 free routes' : 'Free') + ' &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>';
+  h += '<div style="text-align:center;font-size:12px;color:#7878A0;margin-top:10px;letter-spacing:.3px">' + (PREMIUM_LIVE ? FREE_TRIAL_ROUTE_LIMIT + ' free routes' : 'Free') + ' &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>';
   h += '</div>';
 
   // ── STATS BAR ──
@@ -4258,7 +4257,7 @@ async function optimize() {
 
   // ── Trial gate ───────────────────────────────────────────────────────────
   // Checked BEFORE any geocoding/OCR cost is incurred. legacy_free and paid
-  // users always pass. Everyone else gets FREE_TRIAL_ROUTE_LIMIT (3) free
+  // users always pass. Everyone else gets FREE_TRIAL_ROUTE_LIMIT free
   // optimized routes, tracked by a counter rather than a single used/unused
   // flag (was 1 free route; increased to 3 per updated plan).
   if (PREMIUM_LIVE && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid' && S.trialRoutesUsed >= FREE_TRIAL_ROUTE_LIMIT) {
