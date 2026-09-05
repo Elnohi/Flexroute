@@ -4403,6 +4403,46 @@ async function optimize() {
     if (i < toGeocode.length - 1) await sleep(400);
   }
 
+  // Bulk-failure retry: when most of a route fails to geocode at once —
+  // reported directly, a route that geocoded fine minutes earlier came back
+  // with every single stop "ADDRESS NOT FOUND" — that pattern isn't 20
+  // individually bad addresses, it's Photon and/or the Nominatim proxy
+  // being slow or briefly unreachable and every request hitting the same
+  // 12s per-address timeout. There was no retry for that shared case: each
+  // stop went straight to the manual "Apply correction" fix screen. One
+  // automatic pass over just the failed stops, after a short pause for a
+  // transient blip to clear, costs nothing when the addresses were the
+  // real problem (they fail again, same as before) and saves the driver
+  // from correcting 20 stops by hand when the service was the problem.
+  var _nonHomeStartTotal = toGeocode.filter(function(x){ return x.key !== '__home__' && x.key !== '__start__'; }).length;
+  if (_nonHomeStartTotal >= 4 && S.geoFailed.length / _nonHomeStartTotal >= 0.5) {
+    console.log('[FlexRoute] Bulk geocode failure (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ') — retrying once after a pause');
+    if (typeof trackEvent === 'function') {
+      trackEvent('geocode_bulk_retry', { failed: S.geoFailed.length, total: _nonHomeStartTotal });
+    }
+    await sleep(2500);
+    var _retryStops = S.stops.filter(function(s){ return s.geoFailed; });
+    for (let ri = 0; ri < _retryStops.length; ri++) {
+      var rs = _retryStops[ri];
+      var rResult = await Promise.race([
+        geocode(rs.address, biasLat, biasLon),
+        new Promise(res => setTimeout(() => res(null), 12000))
+      ]);
+      if (rResult) {
+        rs.coords = rResult; rs.geoFailed = false;
+        coordMap[rs.id] = rResult;
+        var _gfIdx = S.geoFailed.indexOf(rs.address);
+        if (_gfIdx >= 0) S.geoFailed.splice(_gfIdx, 1);
+        biasLat = biasLat ? (biasLat * biasCount + rResult.lat) / (biasCount + 1) : rResult.lat;
+        biasLon = biasLon ? (biasLon * biasCount + rResult.lon) / (biasCount + 1) : rResult.lon;
+        biasCount++;
+      }
+      S.ldProg = Math.round((ri + 1) / _retryStops.length * 100);
+      render();
+      if (ri < _retryStops.length - 1) await sleep(400);
+    }
+  }
+
   // Store cluster centroid on S so fix screen handler can use it (it runs outside optimize() scope).
   S._biasLat = biasLat; S._biasLon = biasLon;
 
