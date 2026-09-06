@@ -639,8 +639,7 @@ const S = {
   // just-expired legacy user keep bypassing the trial gate for one more session.
   // entitlement: 'unknown' | 'trial_available' | 'trial_used' | 'paid' | 'legacy_free'
   entitlement:      localStorage.getItem('fr_entitlement') || 'unknown',
-  // Number of free optimized routes used so far (trial = 3 routes, per
-  // updated plan — was 1, increased to 3).
+  // Number of free optimized routes used so far — see FREE_TRIAL_ROUTE_LIMIT.
   trialRoutesUsed: parseInt(localStorage.getItem('fr_trial_routes_used') || '0', 10),
   _mapOpen: false  // map preview collapsed by default
 };
@@ -948,7 +947,7 @@ window.addEventListener('load', () => {
   // ── Grandfathering check (runs once, before paywall logic) ─────────────
   // Anyone who already has evidence of using FlexRoute pre-paywall gets
   // grandfathered free for 30 days from launch. After that they receive the
-  // standard 3-route trial like any new user. Stores a Unix timestamp (ms)
+  // standard FREE_TRIAL_ROUTE_LIMIT-route trial like any new user. Stores a Unix timestamp (ms)
   // so the expiry check in S initialization above can enforce the window.
   // Only ever WRITES the timestamp once — subsequent loads just read it.
   //
@@ -2172,6 +2171,40 @@ function bindAuth() {
   });
 }
 
+// Lightweight device fingerprint — NOT for identifying a person, only for
+// recognizing "this is probably the same phone" across a localStorage clear.
+// Deliberately built from stable hardware/browser signals rather than a
+// stored random token, so it comes back identical after a full storage
+// wipe (the whole point: clearing storage + typing a new email currently
+// resets the free trial, since nothing survives that clear to catch it).
+// Two different real drivers on the same shared WiFi still get two
+// different fingerprints — this doesn't key off network identity, so it
+// doesn't have the shared-station-WiFi false-positive problem an IP-based
+// check would. Not spoof-proof against someone deliberately trying to beat
+// it — the goal is raising the cost of the casual/cheap bypass, same as
+// the email check already does, not perfect fraud prevention.
+function _computeDeviceFp() {
+  try {
+    var parts = [
+      navigator.userAgent || '', navigator.language || '',
+      screen.width + 'x' + screen.height + 'x' + (screen.colorDepth || ''),
+      (Intl.DateTimeFormat().resolvedOptions().timeZone) || '',
+      navigator.hardwareConcurrency || '', navigator.platform || ''
+    ];
+    try {
+      var c = document.createElement('canvas');
+      var ctx = c.getContext('2d');
+      ctx.textBaseline = 'top'; ctx.font = '14px Arial';
+      ctx.fillText('FlexRoute-fp', 2, 2);
+      parts.push(c.toDataURL());
+    } catch (e) {}
+    var str = parts.join('|');
+    var hash = 5381;
+    for (var i = 0; i < str.length; i++) { hash = ((hash * 33) ^ str.charCodeAt(i)) >>> 0; }
+    return 'fp_' + hash.toString(16);
+  } catch (e) { return ''; }
+}
+
 // Checks server-side trial status for a verified email. Returns true if the
 // trial is already used (per the server record), false if available, null
 // if the check itself failed (caller should fall back to local state).
@@ -2180,7 +2213,7 @@ async function checkServerTrialStatus(email) {
     var r = await fetch('/.netlify/functions/trial-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, action: 'check' })
+      body: JSON.stringify({ email: email, action: 'check', deviceFp: _computeDeviceFp() })
     });
     var d = await r.json();
     // Reconcile the local route counter with the server's authoritative
@@ -2690,7 +2723,7 @@ function vInput() {
   } else {
     h += '<button class="btn bp" id="optBtn"' + (!cnt ? ' disabled' : '') + ' style="height:54px">&#9889; ' + (cnt ? t('optimize_btn') + ' &mdash; ' + cnt + ' stop' + (cnt > 1 ? 's' : '') : 'Optimize my route') + '</button>';
   }
-  h += '<div style="text-align:center;font-size:12px;color:#7878A0;margin-top:10px;letter-spacing:.3px">' + (PREMIUM_LIVE ? '3 free routes' : 'Free') + ' &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>';
+  h += '<div style="text-align:center;font-size:12px;color:#7878A0;margin-top:10px;letter-spacing:.3px">' + (PREMIUM_LIVE ? FREE_TRIAL_ROUTE_LIMIT + ' free routes' : 'Free') + ' &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>';
   h += '</div>';
 
   // ── STATS BAR ──
@@ -4196,7 +4229,7 @@ function _consumeTrialIfApplicable() {
     fetch('/.netlify/functions/trial-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: S.userEmail, action: 'consume' })
+      body: JSON.stringify({ email: S.userEmail, action: 'consume', deviceFp: _computeDeviceFp() })
     }).catch(function(){});
   }
 }
@@ -4258,7 +4291,7 @@ async function optimize() {
 
   // ── Trial gate ───────────────────────────────────────────────────────────
   // Checked BEFORE any geocoding/OCR cost is incurred. legacy_free and paid
-  // users always pass. Everyone else gets FREE_TRIAL_ROUTE_LIMIT (3) free
+  // users always pass. Everyone else gets FREE_TRIAL_ROUTE_LIMIT free
   // optimized routes, tracked by a counter rather than a single used/unused
   // flag (was 1 free route; increased to 3 per updated plan).
   if (PREMIUM_LIVE && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid' && S.trialRoutesUsed >= FREE_TRIAL_ROUTE_LIMIT) {
@@ -4407,39 +4440,52 @@ async function optimize() {
   // reported directly, a route that geocoded fine minutes earlier came back
   // with every single stop "ADDRESS NOT FOUND" — that pattern isn't 20
   // individually bad addresses, it's Photon and/or the Nominatim proxy
-  // being slow or briefly unreachable and every request hitting the same
-  // 12s per-address timeout. There was no retry for that shared case: each
-  // stop went straight to the manual "Apply correction" fix screen. One
-  // automatic pass over just the failed stops, after a short pause for a
-  // transient blip to clear, costs nothing when the addresses were the
-  // real problem (they fail again, same as before) and saves the driver
-  // from correcting 20 stops by hand when the service was the problem.
+  // being slow, rate-limiting, or briefly unreachable and every request
+  // hitting the same 12s per-address timeout. There was no retry for that
+  // shared case: each stop went straight to the manual "Apply correction"
+  // fix screen.
+  //
+  // A SINGLE retry after a fixed 2.5s pause (the first version of this fix)
+  // turned out not to be enough — reported as still recurring on the same
+  // route. A brief network blip clears in a couple seconds; an actual rate
+  // limit on a shared free service does not. So this now makes up to 3
+  // attempts total with real backoff (3s, then 8s, then 20s) — cheap when
+  // the addresses were the real problem (they keep failing, same as
+  // before, just ~30s slower to reach the fix screen) and gives an actual
+  // rate-limit window a realistic chance to clear when the service was
+  // the problem, instead of one token gesture at a retry.
   var _nonHomeStartTotal = toGeocode.filter(function(x){ return x.key !== '__home__' && x.key !== '__start__'; }).length;
   if (_nonHomeStartTotal >= 4 && S.geoFailed.length / _nonHomeStartTotal >= 0.5) {
-    console.log('[FlexRoute] Bulk geocode failure (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ') — retrying once after a pause');
-    if (typeof trackEvent === 'function') {
-      trackEvent('geocode_bulk_retry', { failed: S.geoFailed.length, total: _nonHomeStartTotal });
-    }
-    await sleep(2500);
-    var _retryStops = S.stops.filter(function(s){ return s.geoFailed; });
-    for (let ri = 0; ri < _retryStops.length; ri++) {
-      var rs = _retryStops[ri];
-      var rResult = await Promise.race([
-        geocode(rs.address, biasLat, biasLon),
-        new Promise(res => setTimeout(() => res(null), 12000))
-      ]);
-      if (rResult) {
-        rs.coords = rResult; rs.geoFailed = false;
-        coordMap[rs.id] = rResult;
-        var _gfIdx = S.geoFailed.indexOf(rs.address);
-        if (_gfIdx >= 0) S.geoFailed.splice(_gfIdx, 1);
-        biasLat = biasLat ? (biasLat * biasCount + rResult.lat) / (biasCount + 1) : rResult.lat;
-        biasLon = biasLon ? (biasLon * biasCount + rResult.lon) / (biasCount + 1) : rResult.lon;
-        biasCount++;
+    var _backoffs = [3000, 8000, 20000];
+    for (var _attempt = 0; _attempt < _backoffs.length && S.geoFailed.length > 0; _attempt++) {
+      console.log('[FlexRoute] Bulk geocode failure (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ') — retry ' + (_attempt + 1) + '/' + _backoffs.length + ' after ' + _backoffs[_attempt] + 'ms');
+      if (typeof trackEvent === 'function') {
+        trackEvent('geocode_bulk_retry', { failed: S.geoFailed.length, total: _nonHomeStartTotal, attempt: _attempt + 1 });
       }
-      S.ldProg = Math.round((ri + 1) / _retryStops.length * 100);
-      render();
-      if (ri < _retryStops.length - 1) await sleep(400);
+      await sleep(_backoffs[_attempt]);
+      var _retryStops = S.stops.filter(function(s){ return s.geoFailed; });
+      for (let ri = 0; ri < _retryStops.length; ri++) {
+        var rs = _retryStops[ri];
+        var rResult = await Promise.race([
+          geocode(rs.address, biasLat, biasLon),
+          new Promise(res => setTimeout(() => res(null), 12000))
+        ]);
+        if (rResult) {
+          rs.coords = rResult; rs.geoFailed = false;
+          coordMap[rs.id] = rResult;
+          var _gfIdx = S.geoFailed.indexOf(rs.address);
+          if (_gfIdx >= 0) S.geoFailed.splice(_gfIdx, 1);
+          biasLat = biasLat ? (biasLat * biasCount + rResult.lat) / (biasCount + 1) : rResult.lat;
+          biasLon = biasLon ? (biasLon * biasCount + rResult.lon) / (biasCount + 1) : rResult.lon;
+          biasCount++;
+        }
+        S.ldProg = Math.round((ri + 1) / _retryStops.length * 100);
+        render();
+        if (ri < _retryStops.length - 1) await sleep(400);
+      }
+    }
+    if (S.geoFailed.length > 0) {
+      console.warn('[FlexRoute] Bulk geocode failure persisted after ' + _backoffs.length + ' retries (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ' still failing) — likely a sustained rate limit or outage, not a blip');
     }
   }
 
@@ -5484,10 +5530,19 @@ function parseFlexOCR(rawText) {
     // increments and push the parser past the lookahead window. OCR often
     // drops the closing paren too ("(22" with nothing after it) — reported
     // directly from a live scan, where that exact unbalanced form slipped
-    // through the original balanced-parens-only regex and got reported as
-    // the "raw" text of a falsely-skipped stop. Both the closing paren and
-    // the opening one are now optional so either truncation is caught.
-    if (/^\(?\s*\d{1,3}\s*\)?$/.test(line.trim())) return true;
+    // through the original balanced-parens-only regex.
+    //
+    // Making BOTH parens optional (a since-reverted version of this line)
+    // was wrong: it also matched a bare short house number — "8", "10" —
+    // sitting alone on its own OCR line, which happens whenever a scan
+    // wraps between the number and the street name. That silently ate the
+    // house number and corrupted or dropped the stop entirely ("8 Olympic
+    // Garden Drive" lost its "8" and mangled the rest; "10 Fontainbleau
+    // Dr" lost its "10" and got dropped as unparseable) — reported
+    // directly, traced to this exact line, confirmed by reproducing it.
+    // A parenthesis character must actually be present; a plain bare
+    // number never matches this check.
+    if (/[()]/.test(line) && /^\(?\s*\d{1,3}\s*\)?$/.test(line.trim())) return true;
     return /^(deliver|package|itinerary|current|next stop|map|summary|list|search|tracking|locations|after you|you.ll|location|locker|buzzer|pickup)/i.test(line)
       || /^\d+\s*v$/.test(line)   // "2 v" locations dropdown
       || line.length < 3;
@@ -5951,7 +6006,7 @@ async function fetchCandidates(q, limit) {
         var url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(q) + '&limit=' + limit + '&lang=en';
         if (biasLat && biasLon) url += '&lat=' + biasLat.toFixed(5) + '&lon=' + biasLon.toFixed(5);
         var r = await fetch(url, { signal: _ac(5000).signal });
-        if (!r.ok) return [];
+        if (!r.ok) { console.warn('[FlexRoute] Photon failed:', r.status, q); return []; }
         var d = await r.json();
         return (d.features || []).map(f => ({
           lon: f.geometry.coordinates[0],
@@ -5959,7 +6014,7 @@ async function fetchCandidates(q, limit) {
           state:   (f.properties && f.properties.state) || '',
           country: (f.properties && f.properties.country) || ''
         }));
-      } catch { return []; }
+      } catch (e) { console.warn('[FlexRoute] Photon error:', e && e.name, q); return []; }
     })();
     var nominatimP = (async () => {
       try {
@@ -5984,7 +6039,11 @@ async function fetchCandidates(q, limit) {
           }),
           signal: _ac(8000).signal
         });
-        if (!nr.ok) return [];
+        if (!nr.ok) {
+          var _nBody = null; try { _nBody = await nr.json(); } catch(e2) {}
+          console.warn('[FlexRoute] Nominatim proxy failed:', nr.status, (_nBody && _nBody.code) || '', q);
+          return [];
+        }
         var nd = await nr.json();
         return (nd.results || []).map(f => ({
           lon: f.lon, lat: f.lat,
@@ -5992,7 +6051,7 @@ async function fetchCandidates(q, limit) {
           country:      f.country || '',
           country_code: f.country_code || ''
         }));
-      } catch { return []; }
+      } catch (e) { console.warn('[FlexRoute] Nominatim proxy error:', e && e.name, q); return []; }
     })();
     var photonHits = await photonP;
     if (photonHits.length > 0) {
