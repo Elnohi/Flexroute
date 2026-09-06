@@ -5530,10 +5530,19 @@ function parseFlexOCR(rawText) {
     // increments and push the parser past the lookahead window. OCR often
     // drops the closing paren too ("(22" with nothing after it) — reported
     // directly from a live scan, where that exact unbalanced form slipped
-    // through the original balanced-parens-only regex and got reported as
-    // the "raw" text of a falsely-skipped stop. Both the closing paren and
-    // the opening one are now optional so either truncation is caught.
-    if (/^\(?\s*\d{1,3}\s*\)?$/.test(line.trim())) return true;
+    // through the original balanced-parens-only regex.
+    //
+    // Making BOTH parens optional (a since-reverted version of this line)
+    // was wrong: it also matched a bare short house number — "8", "10" —
+    // sitting alone on its own OCR line, which happens whenever a scan
+    // wraps between the number and the street name. That silently ate the
+    // house number and corrupted or dropped the stop entirely ("8 Olympic
+    // Garden Drive" lost its "8" and mangled the rest; "10 Fontainbleau
+    // Dr" lost its "10" and got dropped as unparseable) — reported
+    // directly, traced to this exact line, confirmed by reproducing it.
+    // A parenthesis character must actually be present; a plain bare
+    // number never matches this check.
+    if (/[()]/.test(line) && /^\(?\s*\d{1,3}\s*\)?$/.test(line.trim())) return true;
     return /^(deliver|package|itinerary|current|next stop|map|summary|list|search|tracking|locations|after you|you.ll|location|locker|buzzer|pickup)/i.test(line)
       || /^\d+\s*v$/.test(line)   // "2 v" locations dropdown
       || line.length < 3;
