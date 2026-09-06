@@ -6234,7 +6234,14 @@ async function fetchCandidates(q, limit) {
   var _pace = function() { return new Promise(function(r){ setTimeout(r, 180); }); };
 
   // Pre-process 1: handle "apt-street" format: "1109-125 Lawton Blvd" → "125 Lawton Blvd"
-  var aptStreetMatch = address.match(/^\w{0,2}\d{2,4}-(\d+\s+.+)$/);
+  // Also handles letter-suffix house numbers common in Toronto/Ontario:
+  // "201-6030A Yonge Street" → strip unit prefix, try "6030A Yonge Street".
+  // Without the optional [A-Za-z] the regex bailed on any lettered house
+  // number after the dash (real bug: 201-6030A was failing every geocode
+  // attempt because this pre-check silently didn't match and the raw
+  // "201-6030A" got sent to Photon/Nominatim, which parse it as a
+  // garbled/range value).
+  var aptStreetMatch = address.match(/^\w{0,2}\d{2,4}-(\d+[A-Za-z]?\s+.+)$/);
   if (aptStreetMatch) {
     var streetOnly = aptStreetMatch[1].trim();
     var aptCandidates = await fetchCandidates(streetOnly, 5);
@@ -6242,6 +6249,24 @@ async function fetchCandidates(q, limit) {
     if (aptResult) {
       console.log('[FlexRoute] Apt-street:', address, '→', streetOnly);
       return aptResult;
+    }
+    // Letter-suffix insurance: if "6030A Yonge Street" itself didn't
+    // resolve (some geocoders are inconsistent about accepting the
+    // suffix), try "6030 Yonge Street". 6030A and 6030 are typically
+    // within a few metres of each other on the same street (adjacent
+    // townhouse unit, split lot, or the same building) so a near-
+    // neighbour pin is much better than dropping the stop entirely or
+    // pinning at the cluster centroid, and the driver will physically
+    // see both numbers on arrival.
+    var streetOnlyNoSuffix = streetOnly.replace(/^(\d+)[A-Za-z](\s+)/, '$1$2');
+    if (streetOnlyNoSuffix !== streetOnly) {
+      await _pace();
+      var aptCandidates2 = await fetchCandidates(streetOnlyNoSuffix, 5);
+      var aptResult2 = bestCandidate(aptCandidates2);
+      if (aptResult2) {
+        console.log('[FlexRoute] Apt-street letter-suffix stripped:', address, '→', streetOnlyNoSuffix);
+        return aptResult2;
+      }
     }
     await _pace();
   }
