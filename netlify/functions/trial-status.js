@@ -1,5 +1,5 @@
 // /netlify/functions/trial-status.js
-// FlexRoute — server-side trial tracking, keyed by EMAIL, not device.
+// FlexRoute — server-side trial tracking, keyed by EMAIL and (optionally) DEVICE.
 //
 // Why this exists:
 //   The original trial gate only checked localStorage ('fr_entitlement').
@@ -14,17 +14,29 @@
 //   aliases on one inbox), which is the realistic threat model for a
 //   $9-15/month product, not state-level fraud prevention.
 //
+//   The device fingerprint (optional `deviceFp` in the request body, see
+//   _computeDeviceFp() in flexroute.html) closes the remaining gap: clear
+//   storage AND type a genuinely new email, on the SAME device, and the
+//   fingerprint — derived from stable hardware/browser signals, not a
+//   stored token — comes back identical, so the server still recognizes
+//   it. Deliberately NOT IP-based: this driver base clusters on shared
+//   station WiFi, where an IP-based check would misflag several different
+//   real drivers as one abuser. A device fingerprint doesn't have that
+//   failure mode — two phones on the same WiFi still fingerprint
+//   differently.
+//
 // Contract:
 //   POST /.netlify/functions/trial-status
-//   Body: { email: "<verified email>", action: "check" | "consume" }
+//   Body: { email: "<verified email>", action: "check" | "consume", deviceFp?: "<fp_...>" }
 //   Response (200): { trialUsed: boolean, routesUsed: number, limit: number }
 //   Response (4xx/5xx): { error, code }
 //
-// Storage: Netlify Blobs, store name "trials", one key per normalized email,
-// value tracks a COUNT (routesUsed), not a single used/unused boolean —
-// this must stay in sync with FREE_TRIAL_ROUTE_LIMIT in flexroute.html.
-// Updated from a binary flag to a count when the trial allowance increased
-// from 1 to 3 routes; a boolean couldn't express "used 2 of 3."
+// Storage: Netlify Blobs, two stores — "trials" (key = normalized email) and
+// "device_trials" (key = deviceFp, only written when the client sent one).
+// Both track a COUNT (routesUsed), not a used/unused boolean, and both must
+// stay in sync with FREE_TRIAL_ROUTE_LIMIT in flexroute.html. The effective
+// count for any request is max(emailCount, deviceCount) — whichever
+// identifier has seen more usage wins, so neither one alone can reset it.
 
 const { getStore, connectLambda } = require('@netlify/blobs');
 
@@ -75,13 +87,30 @@ function isPlausibleEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
 }
 
-// Core logic, store passed in — this separation exists so the actual
+// Device fingerprint: an optional, opaque client-computed string (see
+// _computeDeviceFp() in flexroute.html) built from stable hardware/browser
+// signals rather than a stored token, so it survives a localStorage clear.
+// Not a person identifier and not validated beyond shape here — the
+// server's only job is to remember "this fingerprint has used N routes"
+// the same way it remembers "this email has used N routes", and let
+// whichever one has used MORE win, so clearing storage and typing a new
+// email doesn't reset a device back to zero. A driver willing to spoof or
+// omit the fingerprint (or use a genuinely different device) still gets a
+// fresh trial — this raises the cost of the casual bypass, it doesn't
+// close it completely, same posture as the email check itself (see the
+// file header).
+function isPlausibleDeviceFp(fp) {
+  return typeof fp === 'string' && /^fp_[0-9a-f]{1,16}$/.test(fp);
+}
+
+// Core logic, stores passed in — this separation exists so the actual
 // business logic (validation, normalization, idempotency) can be unit
-// tested with a fake in-memory store, without needing a live Netlify Blobs
+// tested with fake in-memory stores, without needing a live Netlify Blobs
 // environment or fighting the module's read-only export bindings.
-async function handleTrialRequest(body, store) {
+async function handleTrialRequest(body, store, deviceStore) {
   const email = normalizeEmail(body.email);
   const action = body.action;
+  const deviceFp = isPlausibleDeviceFp(body.deviceFp) ? body.deviceFp : null;
   if (!email || !isPlausibleEmail(email)) {
     return { statusCode: 400, body: { error: 'Invalid email', code: 'BAD_EMAIL' } };
   }
@@ -90,34 +119,43 @@ async function handleTrialRequest(body, store) {
   }
 
   try {
+    const emailRecord = await readJSON(store, email);
+    const emailCount = (emailRecord && typeof emailRecord.routesUsed === 'number') ? emailRecord.routesUsed : 0;
+    let deviceCount = 0;
+    if (deviceFp && deviceStore) {
+      const deviceRecord = await readJSON(deviceStore, deviceFp);
+      deviceCount = (deviceRecord && typeof deviceRecord.routesUsed === 'number') ? deviceRecord.routesUsed : 0;
+    }
+    const effectiveCount = Math.max(emailCount, deviceCount);
+
     if (action === 'check') {
-      const existing = await readJSON(store, email);
-      const routesUsed = (existing && typeof existing.routesUsed === 'number') ? existing.routesUsed : 0;
       return { statusCode: 200, body: {
-        trialUsed: routesUsed >= FREE_TRIAL_ROUTE_LIMIT,
-        routesUsed: routesUsed,
+        trialUsed: effectiveCount >= FREE_TRIAL_ROUTE_LIMIT,
+        routesUsed: effectiveCount,
         limit: FREE_TRIAL_ROUTE_LIMIT,
       } };
     }
     // action === 'consume'
-    const existing = await readJSON(store, email);
-    const currentCount = (existing && typeof existing.routesUsed === 'number') ? existing.routesUsed : 0;
-    if (currentCount >= FREE_TRIAL_ROUTE_LIMIT) {
+    if (effectiveCount >= FREE_TRIAL_ROUTE_LIMIT) {
       // Already at/over the limit — idempotent, not an error. Lets the
       // client safely call this even if it's not 100% sure whether a prior
       // request already went through (e.g. after a flaky connection), and
       // also correctly refuses to let a 4th+ consume call increment further.
-      return { statusCode: 200, body: { trialUsed: true, routesUsed: currentCount, limit: FREE_TRIAL_ROUTE_LIMIT } };
+      return { statusCode: 200, body: { trialUsed: true, routesUsed: effectiveCount, limit: FREE_TRIAL_ROUTE_LIMIT } };
     }
-    const newCount = currentCount + 1;
+    const newCount = effectiveCount + 1;
+    const now = new Date().toISOString();
     await writeJSON(store, email, {
       routesUsed: newCount,
-      lastConsumedAt: new Date().toISOString(),
+      lastConsumedAt: now,
       // Kept for one release as a transitional read-compat field in case
       // any older deployed frontend code still checks `.used` directly —
       // safe to remove once we're confident nothing reads it anymore.
       used: newCount >= FREE_TRIAL_ROUTE_LIMIT,
     });
+    if (deviceFp && deviceStore) {
+      await writeJSON(deviceStore, deviceFp, { routesUsed: newCount, lastConsumedAt: now });
+    }
     return { statusCode: 200, body: {
       trialUsed: newCount >= FREE_TRIAL_ROUTE_LIMIT,
       routesUsed: newCount,
@@ -161,7 +199,8 @@ exports.handler = async function(event) {
   // after a 'consume' write. The cost is a slightly slower read, which is
   // fine here — this isn't a hot path called many times per second.
   const store = getStore(blobOpts('trials'));
-  const result = await handleTrialRequest(body, store);
+  const deviceStore = getStore(blobOpts('device_trials'));
+  const result = await handleTrialRequest(body, store, deviceStore);
   return { statusCode: result.statusCode, headers: cors, body: JSON.stringify(result.body) };
 };
 
