@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="description" content="Free route optimizer for delivery drivers. Scan your itinerary, get the shortest order in seconds. Real GPS routing. No login required.">
-<meta name="robots" content="noindex, follow">
-<link rel="canonical" href="https://flexrouteapp.com/">
+<link rel="canonical" href="https://flexrouteapp.com/flexroute">
 <link rel="manifest" href="/manifest.json">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <meta property="og:title" content="FlexRoute — Delivery Route Optimizer">
@@ -18,22 +17,84 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="FlexRoute">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#08080F">
 <title>FlexRoute</title>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js" onerror="window._tesseractCdnFailed=true"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* ─────────────────────────────────────────────────────────────────
-   Legacy base rules kept from an earlier stylesheet iteration.
-   Selectors here are UNIQUE to this section; the main stylesheet
-   below defines everything else. Do not add to this block —
-   add new rules to the main section.
-   ───────────────────────────────────────────────────────────────── */
+/* ── Dark theme ── */
+:root{
+  --bg:#0A0A12;--surf:#13131E;--surf2:#1A1A28;--surf3:#222235;
+  --brd:#2A2A40;--brd2:#3A3A55;
+  --acc:#FF9900;--acc2:#FFB740;--acc-d:rgba(255,153,0,.12);
+  --ok:#22D98A;--ok-d:rgba(34,217,138,.12);
+  --err:#FF4455;--err-d:rgba(255,68,85,.12);
+  --inf:#4A9EFF;--inf-d:rgba(74,158,255,.12);
+  --warn:#FFD600;--warn-d:rgba(255,214,0,.1);
+  --t1:#FFFFFF;--t2:#C8C8E8;--t3:#7878A0;
+  --sans:'Barlow Condensed',sans-serif;
+  --body:'DM Sans',sans-serif;
+  --mono:'IBM Plex Mono',monospace;
+  --r:12px;--rs:8px
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{overflow-x:hidden;max-width:100vw}
+body{height:100%;background:var(--bg);color:var(--t1);font-family:var(--body);overscroll-behavior:none;overflow-x:hidden;max-width:100vw}
+body{padding-bottom:env(safe-area-inset-bottom)}
+#app{max-width:560px;width:100%;margin:0 auto;height:100vh;max-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+.scr{flex:1;display:flex;flex-direction:column;padding:0 12px 32px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.scr>*{flex-shrink:0}
+
+/* ── Header ── */
+.hdr{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1.5px solid var(--brd);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.hbrand{display:flex;align-items:center;gap:11px}
 .hhex{width:32px;height:32px;background:var(--acc);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%)}
 .htitle{font-size:24px;font-weight:800;letter-spacing:2px;color:var(--acc);font-family:var(--sans)}
 .hsub{font-size:10px;letter-spacing:3px;color:var(--t3);margin-top:-3px;font-family:var(--sans)}
 .hlogo{height:36px;width:auto;display:block}
+.hbtns{display:flex;gap:8px}
+.ib{background:transparent;border:1.5px solid var(--brd2);border-radius:var(--rs);width:40px;height:40px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--t2);font-size:16px}
+.ib:active{background:var(--surf2)}
+
+/* ── Cards ── */
+.card{background:var(--surf);border:1.5px solid var(--brd);border-radius:var(--r);padding:15px 16px;margin-top:13px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.ct{font-size:11px;font-weight:700;letter-spacing:3px;color:var(--t3);margin-bottom:13px;text-transform:uppercase;font-family:var(--sans);display:flex;align-items:center;gap:6px}
+
+/* ── Free badge ── */
+.free-badge{display:inline-flex;align-items:center;gap:5px;background:var(--ok-d);border:1.5px solid var(--ok);color:var(--ok);font-size:11px;font-weight:700;letter-spacing:1px;padding:4px 10px;border-radius:20px;margin-bottom:10px;font-family:var(--sans)}
+
+/* ── Savings Card ── */
+.sv-card{background:var(--surf);border:1.5px solid var(--ok);border-radius:var(--r);margin-top:14px;overflow:hidden}
+.sv-head{background:var(--ok-d);border-bottom:1.5px solid var(--ok);padding:12px 16px;display:flex;align-items:center;gap:8px}
+.sv-hl{font-size:18px;font-weight:800;color:var(--ok);letter-spacing:.3px;flex:1;font-family:var(--sans)}
+.sv-body{padding:14px 16px}
+.sv-big{display:flex;gap:10px;margin-bottom:13px}
+.sv-stat{flex:1;background:var(--surf2);border-radius:var(--rs);padding:12px 8px;text-align:center;border:1.5px solid var(--brd)}
+.sv-val{font-size:28px;font-weight:800;color:var(--ok);line-height:1;font-family:var(--sans)}
+.sv-unit{font-size:11px;font-weight:700;color:var(--ok);opacity:.85;font-family:var(--sans)}
+.sv-lbl{font-size:10px;color:var(--t3);margin-top:5px;letter-spacing:.8px;text-transform:uppercase;font-family:var(--sans)}
+.sv-cmp{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
+.cbox{background:var(--surf2);border-radius:var(--rs);padding:10px 12px;border:1.5px solid var(--brd)}
+.cbox.orig{border-color:var(--err)}
+.cbox.opt{border-color:var(--ok)}
+.cbox-lbl{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--t3);margin-bottom:5px;font-family:var(--sans)}
+.cbox-km{font-size:20px;font-weight:700;color:var(--t1);font-family:var(--sans)}
+.cbox-min{font-size:14px;color:var(--t2);margin-top:3px}
+.sv-arr{text-align:center;font-size:22px;color:var(--ok)}
+.sv-src{font-size:13px;color:var(--t3);margin-top:11px;text-align:center;line-height:1.5}
+.sv-src a{color:var(--t3)}
+.warn-card{background:var(--surf);border:1.5px solid var(--warn);border-radius:var(--r);padding:13px 16px;margin-top:14px;display:flex;gap:10px;align-items:flex-start}
+.warn-txt{font-size:14px;color:var(--warn);line-height:1.5}
+.geo-warn{background:var(--warn-d);border:1.5px solid var(--warn);border-radius:var(--rs);padding:10px 13px;font-size:14px;color:var(--warn);margin-top:10px;line-height:1.5}
+
+/* ── Tags ── */
+.tag{font-size:10px;padding:3px 7px;border-radius:5px;font-weight:700;letter-spacing:.5px;flex-shrink:0;font-family:var(--sans)}
+.tag-gps{background:var(--ok-d);color:var(--ok);border:1.5px solid var(--ok)}
+.tag-est{background:var(--acc-d);color:var(--acc);border:1.5px solid var(--acc)}
+
 /* ── Inputs ── */
 input[type=text],input[type=password]{
   width:100%;background:var(--surf2);border:1.5px solid var(--brd);
@@ -41,8 +102,88 @@ input[type=text],input[type=password]{
   font-size:15px;font-family:var(--body);outline:none;-webkit-appearance:none;
   letter-spacing:.01em
 }
+input::placeholder{color:var(--t3)}
+input:focus{border-color:var(--brd2);background:var(--surf3)}
+.ir{display:flex;gap:8px}.ir input{flex:1}
+
+/* ── Buttons ── */
+.btn{font-family:var(--sans);font-weight:700;letter-spacing:1px;cursor:pointer;border:none;border-radius:var(--rs)}
+.btn:active{transform:scale(.98)}
+.bp{background:var(--acc);color:#000;padding:15px 20px;font-size:17px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
+.bp:disabled{background:var(--surf2);color:var(--t3);cursor:not-allowed;transform:none}
+.bg{background:transparent;border:1.5px solid var(--brd2);color:var(--t2);padding:12px 16px;font-size:15px;width:100%}
+.badd{background:var(--acc);color:#000;padding:0 18px;font-size:24px;font-weight:700;height:48px;flex-shrink:0;border-radius:var(--rs);border:none;cursor:pointer;min-width:48px}
+.bmaps{display:block;background:#1565C0;color:#fff;padding:15px 20px;font-size:17px;font-weight:700;letter-spacing:.5px;text-align:center;text-decoration:none;border-radius:var(--rs);width:100%;font-family:var(--sans)}
+.bwaze{display:block;background:#0099DD;color:#fff;padding:15px 20px;font-size:17px;font-weight:700;letter-spacing:.5px;text-align:center;text-decoration:none;border-radius:var(--rs);width:100%;font-family:var(--sans)}
+
+/* ── Drop zone ── */
+.dz{display:block;cursor:pointer;border:2px dashed var(--brd2);border-radius:var(--r);padding:20px 16px;text-align:center;cursor:pointer;transition:.15s}
+.dz:active,.dz.over,.dz.scanning{border-color:var(--acc);background:var(--acc-d)}
 .dz.locked{border-color:var(--brd);background:transparent;cursor:default}
+.dz.scanning{border-style:solid}
+.dz-t{font-size:16px;font-weight:600;color:var(--t2)}
+.dz-s{font-size:12px;color:var(--t3);margin-top:4px}
+.dz-tip{font-size:12px;color:var(--acc);margin-top:8px;font-weight:600;line-height:1.5}
+.pb{height:4px;background:var(--brd);border-radius:2px;overflow:hidden;margin-top:10px}
+.pf{height:100%;background:var(--acc);transition:width .4s;border-radius:2px}
+.pl{font-size:12px;color:var(--t3);margin-top:5px}
+
+/* ── Stop list ── */
+.slist{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.sscr{max-height:360px;overflow-y:auto;padding-right:2px}
+.sscr::-webkit-scrollbar{width:4px}
+.sscr::-webkit-scrollbar-thumb{background:var(--brd2);border-radius:2px}
+
+/* Stop item — high contrast for night driving */
+.si{display:flex;align-items:center;gap:10px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);padding:11px 12px;transition:border-color .15s}
+.si.islast{border-color:var(--ok);background:var(--ok-d)}
+
+/* Package number — large and unmistakable */
+.fn{flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--surf);border:2px solid var(--acc);color:var(--acc);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:var(--sans)}
+.fn.nnum{border-color:var(--brd2);color:var(--t3)}
+
+.sb{flex:1;min-width:0}
+/* Address — bright, large, easy to read in the dark */
+.sa{font-size:15px;font-family:var(--body);color:var(--t1);line-height:1.35;word-break:break-word;font-weight:500}
+.sm{font-size:13px;color:var(--t3);margin-top:3px;font-family:var(--body)}
+
+.sbtns{display:flex;gap:5px;flex-shrink:0}
+.sbtn{width:36px;height:44px;background:transparent;border:1.5px solid var(--brd);border-radius:6px;cursor:pointer;color:var(--t3);font-size:14px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.sbtn.del{width:44px;height:44px;border-color:rgba(255,68,85,.3);color:var(--err);font-size:16px}
 .sbtn.del:active{background:rgba(255,68,85,.1)}
+.sbtn:active{background:var(--surf)}
+.sbtn.lon{border-color:var(--ok);color:var(--ok);background:var(--ok-d)}
+.sbtn.del{color:var(--err);border-color:var(--err-d)}
+.lbdg{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--ok);border:1.5px solid var(--ok);padding:3px 7px;border-radius:5px;flex-shrink:0;font-family:var(--sans)}
+.empty{text-align:center;padding:20px 0;color:var(--t3);font-size:14px}
+
+/* ── Alerts ── */
+.al{border-radius:var(--rs);padding:11px 14px;font-size:14px;margin-top:10px;line-height:1.5}
+.ae{background:var(--err-d);border:1.5px solid var(--err);color:#FF9999}
+.ai{background:var(--inf-d);border:1.5px solid var(--inf);color:var(--inf)}
+
+/* ── Loading ── */
+.ldw{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:20px}
+.ldh{width:50px;height:50px;background:var(--acc);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.3;transform:scale(.9)}50%{opacity:1;transform:scale(1)}}
+.ldt{font-size:20px;font-weight:700;color:var(--t2);letter-spacing:1px;font-family:var(--sans)}
+.ld-steps{display:flex;flex-direction:column;gap:12px;margin-top:4px;width:100%;max-width:280px}
+.ld-step{display:flex;align-items:center;gap:12px}
+.ld-dot{width:24px;height:24px;border-radius:50%;border:2px solid var(--brd2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-family:var(--sans)}
+.ld-step.done .ld-dot{background:var(--ok);border-color:var(--ok);color:#000}
+.ld-step.active .ld-dot{border-color:var(--acc);animation:pulse 1s ease-in-out infinite}
+.ld-label{font-size:14px}
+.ld-step.done .ld-label{color:var(--ok)}
+.ld-step.active .ld-label{color:var(--acc)}
+.ld-step.waiting .ld-label{color:var(--t3)}
+.ld-sub{font-size:12px;color:var(--t3);margin-top:2px}
+.ld-prog{width:100%;max-width:280px}
+.ld-pbar{height:3px;background:var(--brd);border-radius:2px;overflow:hidden;margin-top:8px}
+.ld-pfill{height:100%;background:var(--acc);border-radius:2px;transition:width .3s}
+
+/* ── Result rows ── */
+.ri-active{outline:2px solid var(--acc)!important;background:var(--acc-d)!important}
+.ri{display:flex;align-items:flex-start;gap:14px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:var(--rs);padding:16px 15px}
 .ri-mv{display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-left:auto;align-self:center}
 .rbtn{width:34px;height:30px;background:transparent;border:1.5px solid var(--brd);border-radius:6px;cursor:pointer;color:var(--t3);font-size:13px;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .rbtn:active{background:rgba(255,153,0,.12);border-color:var(--acc);color:var(--acc)}
@@ -50,11 +191,69 @@ input[type=text],input[type=password]{
 .rbtn-del{border-color:rgba(255,68,85,.35);color:var(--err);font-size:11px}
 .rbtn-del:active{background:rgba(255,68,85,.12);border-color:var(--err);color:var(--err)}
 .ri-manual{display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:1px;color:var(--acc);border:1px solid rgba(255,153,0,.4);border-radius:8px;padding:2px 7px;margin-top:6px}
+
+/* Route zoom levels — applied to body when on route view */
+body.rzoom-1 .rlist .ri{padding:18px 17px;gap:16px}
+body.rzoom-1 .rlist .ri-addr{font-size:20px;line-height:1.5;font-weight:600}
+body.rzoom-1 .rlist .rn{width:42px;height:42px;font-size:18px}
+body.rzoom-1 .rlist .ri-l{min-width:48px}
+body.rzoom-1 .rlist .rpkg{min-width:42px;padding:4px 7px}
+body.rzoom-1 .rlist .rpkg-v{font-size:18px}
+/* Secondary row elements now scale WITH the address text instead of staying
+   frozen at their original tiny size — previously only the address line and
+   stop-number circle grew, leaving labels/links/notes stuck at ~9-12px,
+   which made the zoom feel broken/inconsistent rather than making the row
+   genuinely easier to read as a whole. */
+body.rzoom-1 .rlist .ri a[href*="google.com/maps"]{font-size:14px;padding:5px 10px}
+body.rzoom-1 .rlist .ri .ri-l > div:last-child{font-size:11px}
+body.rzoom-1 .rlist .ri-manual{font-size:12px;padding:3px 9px}
+body.rzoom-2 .rlist .ri{padding:22px 19px;gap:18px}
+body.rzoom-2 .rlist .ri-addr{font-size:24px;line-height:1.4;font-weight:600}
+body.rzoom-2 .rlist .rn{width:50px;height:50px;font-size:22px;font-weight:900}
+body.rzoom-2 .rlist .ri-l{min-width:56px}
+body.rzoom-2 .rlist .rpkg{min-width:48px;padding:5px 9px}
+body.rzoom-2 .rlist .rpkg-v{font-size:22px}
+body.rzoom-2 .rlist .ri{border-width:2px}
+body.rzoom-2 .rlist .ri a[href*="google.com/maps"]{font-size:16px;padding:6px 12px}
+body.rzoom-2 .rlist .ri .ri-l > div:last-child{font-size:13px}
+body.rzoom-2 .rlist .ri-manual{font-size:13px;padding:4px 10px}
+/* Higher contrast borders in zoom mode for visual separation */
+body.rzoom-1 .rlist .ri,body.rzoom-2 .rlist .ri{border-color:var(--t3)}
+
+/* Zoom toggle button */
+.zoom-btn{background:var(--surf);border:1.5px solid var(--brd2);border-radius:8px;padding:0 12px;height:44px;font-size:15px;font-weight:700;color:var(--t1);cursor:pointer;font-family:var(--sans);display:flex;align-items:center;gap:4px;line-height:1}
 .zoom-btn:active{background:var(--surf2)}
+.zoom-btn.active{border-color:var(--acc);color:var(--acc)}
+.ri.rl{border-color:var(--ok);background:var(--ok-d)}
+.ri.rh{border-color:var(--ok);background:var(--ok-d)}
+.ri-l{display:flex;flex-direction:column;align-items:center;gap:5px;flex-shrink:0;min-width:40px}
+.rn{width:34px;height:34px;border-radius:50%;background:var(--acc);color:#000;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:var(--sans)}
+.rpkg{display:flex;flex-direction:column;align-items:center;background:var(--surf);border:1.5px solid var(--acc);border-radius:6px;padding:3px 6px;min-width:38px}
+.rpkg-l{font-size:9px;color:var(--t3);line-height:1;font-family:var(--sans)}
+.rpkg-v{font-size:16px;font-weight:900;color:var(--acc);line-height:1.2;font-family:var(--sans)}
+/* Address in result — bright and large */
+.ri-addr{flex:1;font-size:17px;font-family:var(--body);color:var(--t1);line-height:1.55;word-break:break-word;padding-top:5px;font-weight:500}
+.ri-flag{font-size:10px;color:var(--warn);background:var(--warn-d);border:1px solid var(--warn);border-radius:4px;padding:2px 6px;flex-shrink:0;margin-top:6px;font-family:var(--sans);font-weight:700}
+.ri-tag{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--ok);border:1.5px solid var(--ok);padding:3px 7px;border-radius:5px;flex-shrink:0;margin-top:6px;font-family:var(--sans)}
+.rlist{display:flex;flex-direction:column;gap:8px}
+.rmeta{display:flex;justify-content:space-between;align-items:center;margin-top:14px;margin-bottom:4px}
+.rcnt{font-size:14px;color:var(--t3)}
+.rcp{font-size:14px;color:var(--acc);background:transparent;border:1.5px solid var(--brd);border-radius:6px;padding:5px 12px;cursor:pointer;font-family:var(--sans);font-weight:600}
 .lgd{display:flex;gap:14px;margin-top:11px;padding:10px 13px;background:var(--surf);border-radius:var(--rs);border:1.5px solid var(--brd);flex-wrap:wrap}
 .li{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--t2)}
+.cb{background:var(--acc);color:#000;font-size:11px;font-weight:800;padding:2px 7px;border-radius:10px;margin-left:5px;font-family:var(--sans)}
+hr.dv{border:none;border-top:1.5px solid var(--brd);margin:13px 0}
+
+/* ── Setup steps ── */
+.setup-step{display:flex;gap:13px;padding:13px 0;border-bottom:1px solid var(--brd)}
+.setup-step:last-child{border-bottom:none}
+.setup-num{width:26px;height:26px;border-radius:50%;background:var(--acc);color:#000;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-family:var(--sans)}
+.setup-txt{font-size:15px;color:var(--t2);line-height:1.55}
+.setup-txt a{color:var(--acc);text-decoration:none;font-weight:700}
+.setup-txt strong{color:var(--t1)}
 .slbl{font-size:13px;color:var(--t3);letter-spacing:2px;margin-bottom:7px;text-transform:uppercase;font-family:var(--sans)}
 .kh{font-size:12px;color:var(--t3);margin-top:6px;line-height:1.5}
+
 /* ── Cost table ── */
 .cost-table{width:100%;border-collapse:collapse;margin-top:11px;font-size:14px}
 .cost-table th{text-align:left;font-size:10px;letter-spacing:2px;color:var(--t3);text-transform:uppercase;padding:7px 9px;border-bottom:1.5px solid var(--brd);font-family:var(--sans)}
@@ -62,6 +261,22 @@ input[type=text],input[type=password]{
 .cost-table tr:last-child td{border-bottom:none}
 .cost-table .free{color:var(--ok);font-weight:700}
 
+/* ── Toast ── */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--ok);color:#000;font-family:var(--sans);font-weight:700;font-size:14px;padding:12px 22px;border-radius:24px;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:100}
+.toast.show{opacity:1}
+
+ang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#08080F">
+<title>FlexRoute</title>
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js" onerror="window._tesseractCdnFailed=true"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
 :root{
   --bg:#0A0A12;--surf:#13131E;--surf2:#1A1A28;--surf3:#222235;
   --brd:#2A2A40;--brd2:#3A3A55;
@@ -533,12 +748,7 @@ if (!navigator.onLine) document.getElementById('offlineBar').classList.add('show
 // Number of free optimized routes allowed before the paywall — referenced
 // by vPaywall() (declared earlier in the script than this used to be
 // declared), so this must come before any code that could call vPaywall().
-const FREE_TRIAL_ROUTE_LIMIT = 5;
-// Rough US average fuel cost per km driven (~$3.50/gal, ~25 mpg), used only
-// to give drivers a ballpark $ figure alongside distance/time saved on the
-// results screen and paywall. Deliberately conservative — never claimed as
-// exact, always labeled "estimated" wherever it's shown.
-const EST_GAS_COST_PER_KM = 0.09;
+const FREE_TRIAL_ROUTE_LIMIT = 3;
 // ── PREMIUM MASTER SWITCH ────────────────────────────────────────────────────
 // false = silent mode: app is fully free, no trial counting, no paywall, no
 //         auth, no server entitlement calls. Grandfathering timestamps still
@@ -597,6 +807,8 @@ const S = {
   // userEmail + sessionToken: set once the driver verifies a one-time code.
   userEmail:    localStorage.getItem('fr_email') || null,
   sessionToken: localStorage.getItem('fr_session_token') || null,
+  // entitlement: 'unknown' | 'trial_available' | 'trial_used' | 'paid' | 'legacy_free'
+  entitlement:      localStorage.getItem('fr_entitlement') || 'unknown',
   entitlementCheckedAt: parseInt(localStorage.getItem('fr_entitlement_checked_at') || '0', 10),
   // legacyFree: true if this device had real route history BEFORE the paywall
   // shipped AND the 30-day grandfathering window hasn't expired yet.
@@ -631,15 +843,8 @@ const S = {
     }
     return true;
   })(),
-  // Read AFTER legacyFree resolves — that IIFE can rewrite fr_entitlement to
-  // 'trial_available' in place (grace period just expired) or fr_trial_routes_used
-  // to '0' in the same tick. Reading entitlement/trialRoutesUsed earlier in this
-  // object literal (their previous position) meant this property still held the
-  // pre-expiry value for one extra page load — a stale-in-memory bug that let a
-  // just-expired legacy user keep bypassing the trial gate for one more session.
-  // entitlement: 'unknown' | 'trial_available' | 'trial_used' | 'paid' | 'legacy_free'
-  entitlement:      localStorage.getItem('fr_entitlement') || 'unknown',
-  // Number of free optimized routes used so far — see FREE_TRIAL_ROUTE_LIMIT.
+  // Number of free optimized routes used so far (trial = 3 routes, per
+  // updated plan — was 1, increased to 3).
   trialRoutesUsed: parseInt(localStorage.getItem('fr_trial_routes_used') || '0', 10),
   _mapOpen: false  // map preview collapsed by default
 };
@@ -874,101 +1079,14 @@ window.addEventListener('unhandledrejection', function(e) {
   }
 });
 
-// Legacy-user welcome modal. Shown ONCE to any user whose device was
-// grandfathered (S.legacyFree === true) and who hasn't dismissed the
-// modal before (localStorage 'fr_legacy_welcome_seen'). Non-blocking:
-// runs after the main render so the app UI is visible behind it.
-function showLegacyWelcome() {
-  // Guard: don't stack modals if called twice, don't show if already dismissed
-  if (document.getElementById('legacyWelcome')) return;
-  if (localStorage.getItem('fr_legacy_welcome_seen')) return;
-
-  // Compute grandfathering end date from launch anchor. Keep the constant
-  // in sync with the LAUNCH_DATE_MS in legacyFree's init above.
-  var LAUNCH_DATE_MS = 1784952000000;
-  var endMs = LAUNCH_DATE_MS + 30 * 24 * 60 * 60 * 1000;
-  var endStr = new Date(endMs).toLocaleDateString(undefined, {
-    year: 'numeric', month: 'long', day: 'numeric'
-  });
-
-  var overlay = document.createElement('div');
-  overlay.id = 'legacyWelcome';
-  overlay.style.cssText =
-    'position:fixed;inset:0;background:rgba(0,0,0,0.82);' +
-    'display:flex;align-items:center;justify-content:center;' +
-    'z-index:9999;padding:20px;backdrop-filter:blur(4px);' +
-    '-webkit-backdrop-filter:blur(4px);opacity:0;transition:opacity 0.25s ease-out';
-
-  var card = document.createElement('div');
-  card.style.cssText =
-    'background:#13131E;border:1px solid #FF9900;border-radius:20px;' +
-    'padding:28px 24px;max-width:420px;width:100%;' +
-    'box-shadow:0 20px 60px rgba(0,0,0,0.7),0 0 30px rgba(255,153,0,0.15);' +
-    'font-family:var(--body,sans-serif);color:#FFFFFF;text-align:center';
-
-  card.innerHTML =
-    '<div style="font-size:44px;line-height:1;margin-bottom:14px">🎁</div>' +
-    '<div style="font-size:22px;font-weight:700;font-family:var(--sans,sans-serif);' +
-    'color:#FF9900;margin-bottom:14px;letter-spacing:0.5px">' +
-    escH(t('legacy_welcome_title')) + '</div>' +
-    '<div style="font-size:15px;line-height:1.55;color:#C8C8E8;margin-bottom:18px">' +
-    escH(t('legacy_welcome_body')) + '</div>' +
-    '<div style="background:rgba(255,153,0,0.12);border:1px solid rgba(255,153,0,0.4);' +
-    'border-radius:12px;padding:12px 14px;margin-bottom:22px;' +
-    'font-size:14px;color:#FFB740;font-weight:600">' +
-    escH(t('legacy_welcome_until').replace('{date}', endStr)) + '</div>' +
-    '<button id="legacyWelcomeOk" style="background:#FF9900;color:#0A0A12;' +
-    'border:none;border-radius:12px;padding:14px 32px;font-size:16px;' +
-    'font-weight:700;font-family:var(--sans,sans-serif);letter-spacing:1px;' +
-    'cursor:pointer;width:100%;text-transform:uppercase">' +
-    escH(t('legacy_welcome_ok')) + '</button>';
-
-  overlay.appendChild(card);
-  document.body.appendChild(overlay);
-  // Fade-in on next frame
-  requestAnimationFrame(function() { overlay.style.opacity = '1'; });
-
-  function dismiss() {
-    try { localStorage.setItem('fr_legacy_welcome_seen', '1'); } catch (e) {}
-    overlay.style.opacity = '0';
-    setTimeout(function() { if (overlay.parentNode) overlay.remove(); }, 250);
-    if (typeof trackEvent === 'function') {
-      trackEvent('legacy_welcome_dismissed', {});
-    }
-  }
-  document.getElementById('legacyWelcomeOk').addEventListener('click', dismiss);
-  // Tap outside card to dismiss (parity with common modal UX)
-  overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) dismiss();
-  });
-}
-
 window.addEventListener('load', () => {
   // ── Grandfathering check (runs once, before paywall logic) ─────────────
   // Anyone who already has evidence of using FlexRoute pre-paywall gets
   // grandfathered free for 30 days from launch. After that they receive the
-  // standard FREE_TRIAL_ROUTE_LIMIT-route trial like any new user. Stores a Unix timestamp (ms)
+  // standard 3-route trial like any new user. Stores a Unix timestamp (ms)
   // so the expiry check in S initialization above can enforce the window.
   // Only ever WRITES the timestamp once — subsequent loads just read it.
-  //
-  // Time-gated to the same 30-day window the expiry check (S.legacyFree,
-  // above) enforces. Without this, the check below can't tell "used the app
-  // before the paywall shipped" apart from "used the app for 30 seconds
-  // just now, then reloaded" — fr_sa/fr_hm/fr_session are all written during
-  // completely normal first-time setup, well before a driver ever hits a
-  // trial route. Any real user who reloads the page once after setup — an
-  // ordinary thing to do — matched this and got granted legacy_free today,
-  // outside the migration window entirely. Since the grant is stamped with
-  // whatever "now" is but checked against the fixed launch date, a grant
-  // made after the window already closed is immediately inconsistent: the
-  // very next load's expiry check unwinds it, but ALSO resets
-  // fr_trial_routes_used to 0 in the process — silently handing out a fresh
-  // trial, and bypassing the paywall entirely in the meantime. Gating the
-  // grant itself is the fix, not the unwind.
-  var _LAUNCH_DATE_MS = 1784952000000; // keep in sync with S.legacyFree above
-  var _THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-  var _withinMigrationWindow = _LAUNCH_DATE_MS === 0 || (Date.now() - _LAUNCH_DATE_MS) <= _THIRTY_DAYS_MS;
-  if (_withinMigrationWindow && !parseInt(localStorage.getItem('fr_legacy_free') || '0', 10)) {
+  if (!parseInt(localStorage.getItem('fr_legacy_free') || '0', 10)) {
     var priorUsageSignals = [
       'fr_session', 'fr_nav_app', 'fr_route_zoom', 'fr_imperial', 'fr_sa', 'fr_hm',
     ];
@@ -980,12 +1098,6 @@ window.addEventListener('load', () => {
       S.entitlement = 'legacy_free';
       localStorage.setItem('fr_entitlement', 'legacy_free');
     }
-  }
-
-  // Show the legacy welcome modal (once per device) if this user is
-  // grandfathered — whether granted just now or on a previous visit.
-  if (S.legacyFree === true) {
-    setTimeout(showLegacyWelcome, 400);
   }
 
   // ── Post-checkout redirect handling ─────────────────────────────────────
@@ -1085,28 +1197,6 @@ function bind() {
   // Document-level listeners — added ONCE only (guard prevents accumulation on each render)
   if (!window._frBound) {
     window._frBound = true;
-
-    // Waze / Google Maps links anywhere outside Companion mode (the Google
-    // Maps + Waze accordion on the result screen, the map-preview marker
-    // popups, per-stop "verify" pins, "Navigate to Home") were left as plain
-    // <a target="_blank"> — the same TWA / Chrome Custom Tab issue already
-    // documented and fixed for Companion's own Waze/Maps buttons (see
-    // bindCompanion): target="_blank" is silently swallowed inside the
-    // installed Android app, so the Waze/Maps intent never fires and tapping
-    // the button does nothing. Companion got the window.location.href
-    // workaround; nothing else did. One delegated handler covers all of
-    // them by matching the destination host instead of one id at a time.
-    document.addEventListener('click', function(e) {
-      if (e.defaultPrevented) return; // an element-specific handler (Companion) already handled this
-      var a = e.target.closest && e.target.closest('a[target="_blank"]');
-      if (!a || !a.href) return;
-      if (a.href.indexOf('waze.com') === -1 && a.href.indexOf('google.com/maps') === -1) return;
-      e.preventDefault();
-      if (!a.hasAttribute('onclick')) {
-        trackEvent('maps_opened', { map_type: a.href.indexOf('waze.com') !== -1 ? 'waze' : 'google_maps' });
-      }
-      window.location.href = a.href;
-    });
 
     document.addEventListener('change', function(e) {
       if (e.target && e.target.id === 'fi' && e.target.files && e.target.files.length) {
@@ -1407,11 +1497,10 @@ function bind() {
       case 'clearStartBtn': S.startAddr=''; localStorage.removeItem('fr_sa'); localStorage.removeItem('fr_start'); toast('Starting address cleared'); render(); break;
       case 'clearHomeBtn':  S.home=''; localStorage.removeItem('fr_hm'); toast('Home address cleared'); render(); break;
       case 'retryOptBtn': S.errMsg=''; optimize(); break;
-      case 'ocrWarnDismiss': S._ocrWarn=null; render(); break;
       case 'newShiftBtn':
         if (!confirm('Start a new shift? This will clear all current stops.')) break;
         S.stops=[]; S.optimized=[]; S.savings=null;
-        S.lastId=null; S.errMsg=''; S._ocrWarn=null; S.geoFailed=[];
+        S.lastId=null; S.errMsg=''; S.geoFailed=[];
         clearSession(); S.phase='input'; render(); break;
       case 'startShiftBtn': startCompanion(); break;
       case 'dbgBtn':
@@ -1494,11 +1583,7 @@ var LANGS = {
     scan_title: 'Scan Flex screenshots',
     scan_tap: '📷 Upload screenshots',
     scan_sub: 'Tap to select — pick multiple images at once',
-    scan_tip: '▶ Tip: one full-list screenshot works best — multiple screenshots also work',
-    legacy_welcome_title: 'Thank you, early tester!',
-    legacy_welcome_body: 'You were using FlexRoute before we started charging. As a thank-you, your premium access stays free — no card, no signup — until the date below.',
-    legacy_welcome_until: '✨ Free until {date}',
-    legacy_welcome_ok: 'Got it — thanks!',
+    scan_tip: '▶ Tip: upload multiple screenshots scrolling through your list for best accuracy',
     scanning: 'Scanning image',
     of: 'of',
     images_scanned: 'images scanned',
@@ -1622,11 +1707,7 @@ var LANGS = {
     scan_title: 'Scanner vos captures Flex',
     scan_tap: '📷 Télécharger des captures',
     scan_sub: 'Appuyez pour sélectionner — plusieurs images à la fois',
-    scan_tip: '▶ Conseil : une seule capture de la liste complète fonctionne mieux — plusieurs captures marchent aussi',
-    legacy_welcome_title: 'Merci, testeur de la première heure !',
-    legacy_welcome_body: 'Vous utilisiez FlexRoute avant que nous commencions à facturer. En remerciement, votre accès premium reste gratuit — sans carte, sans inscription — jusqu\'à la date ci-dessous.',
-    legacy_welcome_until: '✨ Gratuit jusqu\'au {date}',
-    legacy_welcome_ok: 'Compris, merci !',
+    scan_tip: '▶ Conseil : téléchargez plusieurs captures en faisant défiler votre liste',
     scanning: 'Analyse image',
     of: 'sur',
     images_scanned: 'images analysées',
@@ -1750,11 +1831,7 @@ var LANGS = {
     scan_title: 'Flex-Screenshots scannen',
     scan_tap: '📷 Screenshots hochladen',
     scan_sub: 'Tippen zum Auswählen — mehrere Bilder gleichzeitig',
-    scan_tip: '▶ Tipp: Ein Screenshot der ganzen Liste funktioniert am besten — mehrere Screenshots gehen auch',
-    legacy_welcome_title: 'Danke, Early Tester!',
-    legacy_welcome_body: 'Sie haben FlexRoute schon vor unserer Abo-Einführung genutzt. Als Dankeschön bleibt Ihr Premium-Zugang kostenlos — ohne Karte, ohne Anmeldung — bis zum unten genannten Datum.',
-    legacy_welcome_until: '✨ Kostenlos bis zum {date}',
-    legacy_welcome_ok: 'Verstanden, danke!',
+    scan_tip: '▶ Tipp: Laden Sie mehrere Screenshots beim Scrollen durch Ihre Liste hoch',
     scanning: 'Bild wird analysiert',
     of: 'von',
     images_scanned: 'Bilder gescannt',
@@ -1878,11 +1955,7 @@ var LANGS = {
     scan_title: 'Escanear capturas de Flex',
     scan_tap: '📷 Subir capturas de pantalla',
     scan_sub: 'Toca para seleccionar — varias imágenes a la vez',
-    scan_tip: '▶ Consejo: una sola captura de toda la lista funciona mejor — varias capturas también sirven',
-    legacy_welcome_title: '¡Gracias, tester temprano!',
-    legacy_welcome_body: 'Usabas FlexRoute antes de que empezáramos a cobrar. Como agradecimiento, tu acceso premium sigue gratis — sin tarjeta, sin registro — hasta la fecha indicada abajo.',
-    legacy_welcome_until: '✨ Gratis hasta el {date}',
-    legacy_welcome_ok: '¡Listo, gracias!',
+    scan_tip: '▶ Consejo: sube varias capturas desplazándote por tu lista para mejores resultados',
     scanning: 'Analizando imagen',
     of: 'de',
     images_scanned: 'imágenes analizadas',
@@ -2038,6 +2111,7 @@ function render() {
   bind();
   if (S.phase === 'auth') bindAuth();
   if (S.phase === 'paywall') bindPaywall();
+  if (S.phase === 'result') bindGestures();
   if (S.phase === 'result') bindMap();
   // Apply route view zoom class only on result phase
   document.body.classList.remove('rzoom-1', 'rzoom-2');
@@ -2171,40 +2245,6 @@ function bindAuth() {
   });
 }
 
-// Lightweight device fingerprint — NOT for identifying a person, only for
-// recognizing "this is probably the same phone" across a localStorage clear.
-// Deliberately built from stable hardware/browser signals rather than a
-// stored random token, so it comes back identical after a full storage
-// wipe (the whole point: clearing storage + typing a new email currently
-// resets the free trial, since nothing survives that clear to catch it).
-// Two different real drivers on the same shared WiFi still get two
-// different fingerprints — this doesn't key off network identity, so it
-// doesn't have the shared-station-WiFi false-positive problem an IP-based
-// check would. Not spoof-proof against someone deliberately trying to beat
-// it — the goal is raising the cost of the casual/cheap bypass, same as
-// the email check already does, not perfect fraud prevention.
-function _computeDeviceFp() {
-  try {
-    var parts = [
-      navigator.userAgent || '', navigator.language || '',
-      screen.width + 'x' + screen.height + 'x' + (screen.colorDepth || ''),
-      (Intl.DateTimeFormat().resolvedOptions().timeZone) || '',
-      navigator.hardwareConcurrency || '', navigator.platform || ''
-    ];
-    try {
-      var c = document.createElement('canvas');
-      var ctx = c.getContext('2d');
-      ctx.textBaseline = 'top'; ctx.font = '14px Arial';
-      ctx.fillText('FlexRoute-fp', 2, 2);
-      parts.push(c.toDataURL());
-    } catch (e) {}
-    var str = parts.join('|');
-    var hash = 5381;
-    for (var i = 0; i < str.length; i++) { hash = ((hash * 33) ^ str.charCodeAt(i)) >>> 0; }
-    return 'fp_' + hash.toString(16);
-  } catch (e) { return ''; }
-}
-
 // Checks server-side trial status for a verified email. Returns true if the
 // trial is already used (per the server record), false if available, null
 // if the check itself failed (caller should fall back to local state).
@@ -2213,7 +2253,7 @@ async function checkServerTrialStatus(email) {
     var r = await fetch('/.netlify/functions/trial-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email, action: 'check', deviceFp: _computeDeviceFp() })
+      body: JSON.stringify({ email: email, action: 'check' })
     });
     var d = await r.json();
     // Reconcile the local route counter with the server's authoritative
@@ -2244,20 +2284,8 @@ function vPaywall() {
       <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
       <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">FlexRoute Premium</span>
     </div>
-    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">You already know it works.</div>
-    <div style="font-size:14px;color:var(--t2);line-height:1.55">You\'ve driven ${FREE_TRIAL_ROUTE_LIMIT} real optimized routes &mdash; not a demo. Keep going for less than a tank of gas.</div>
-  </div>
-
-  <!-- Trust bar — real numbers only, nothing this contradicts refund.html -->
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
-    <div style="flex:1;min-width:130px;background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 12px;text-align:center">
-      <div style="font-family:var(--sans);font-size:13px;font-weight:800;color:var(--t1)">300+ drivers</div>
-      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">already using FlexRoute</div>
-    </div>
-    <div style="flex:1;min-width:130px;background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 12px;text-align:center">
-      <div style="font-family:var(--sans);font-size:13px;font-weight:800;color:var(--t1)">Cancel anytime</div>
-      <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">access runs to period end</div>
-    </div>
+    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">Keep every shift shorter.</div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.55">You\'ve used your ${FREE_TRIAL_ROUTE_LIMIT} free routes. Unlock unlimited optimization for less than a tank of gas.</div>
   </div>
 
   <!-- Pricing cards -->
@@ -2279,15 +2307,6 @@ function vPaywall() {
 
   <!-- What you get -->
   <div style="background:var(--surf);border-radius:16px;overflow:hidden;margin-bottom:16px">
-    <div style="padding:10px 16px;border-bottom:1px solid var(--brd)">
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:28px;height:28px;border-radius:50%;background:var(--ok);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#128274;</div>
-        <div>
-          <div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--t1)">Never touches your Amazon account</div>
-          <div style="font-size:12px;color:var(--t3)">Screenshot only &mdash; no login, no ban risk</div>
-        </div>
-      </div>
-    </div>
     <div style="padding:10px 16px;border-bottom:1px solid var(--brd)">
       <div style="display:flex;align-items:center;gap:10px">
         <div style="width:28px;height:28px;border-radius:50%;background:var(--acc);color:#000;font-family:var(--sans);font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">&#9889;</div>
@@ -2336,10 +2355,6 @@ function bindPaywall() {
       el.style.background = isSel ? 'var(--acc-d)' : 'transparent';
     });
   }
-  // Highlight the default plan immediately on render — without this,
-  // neither card looks selected until the driver taps one.
-  refreshCardStyles();
-
   document.querySelectorAll('.planCard').forEach(function(el) {
     el.addEventListener('click', function() {
       selected = el.getAttribute('data-plan'); refreshCardStyles();
@@ -2348,9 +2363,13 @@ function bindPaywall() {
   var backBtn = document.getElementById('paywallBackBtn');
   if (backBtn) backBtn.addEventListener('click', function() { S.phase = 'input'; render(); });
 
-  async function doCheckout() {
-    var checkoutBtn = document.getElementById('checkoutBtn');
-    if (checkoutBtn) { checkoutBtn.disabled = true; checkoutBtn.textContent = 'Redirecting…'; }
+  var checkoutBtn = document.getElementById('checkoutBtn');
+  if (checkoutBtn) checkoutBtn.addEventListener('click', async function() {
+    if (!S.userEmail) {
+      S._postAuthAction = function() { S.phase = 'paywall'; };
+      S.authStep = 'email'; S.phase = 'auth'; render(); return;
+    }
+    checkoutBtn.disabled = true; checkoutBtn.textContent = 'Redirecting…';
     try {
       var r = await fetch('/.netlify/functions/create-checkout-session', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2360,22 +2379,9 @@ function bindPaywall() {
       if (!r.ok || !d.url) throw new Error(d.error || 'checkout failed');
       window.location.href = d.url;
     } catch (e) {
-      if (checkoutBtn) { checkoutBtn.disabled = false; checkoutBtn.textContent = 'Continue to payment'; }
+      checkoutBtn.disabled = false; checkoutBtn.textContent = 'Continue to payment';
       toast("Couldn't start checkout — try again in a moment");
     }
-  }
-
-  var checkoutBtn = document.getElementById('checkoutBtn');
-  if (checkoutBtn) checkoutBtn.addEventListener('click', async function() {
-    if (!S.userEmail) {
-      // Driver hasn't verified email yet. After OTP verification completes,
-      // go straight to checkout — don't send them back to the paywall for
-      // a second tap. Most drivers were dropping off at this second tap,
-      // thinking nothing happened after the OTP flow.
-      S._postAuthAction = function() { S.phase = 'paywall'; render(); setTimeout(doCheckout, 100); };
-      S.authStep = 'email'; S.phase = 'auth'; render(); return;
-    }
-    await doCheckout();
   });
 }
 
@@ -2495,42 +2501,6 @@ function vInput() {
   h += '<div class="hbtns" style="gap:8px">' + langPill() + unitPill();
   if (cnt) h += '<button class="ib" id="clrBtn" style="color:var(--err);border-color:rgba(255,68,85,.25)" title="Clear all stops">&#10005;</button>';
   h += '</div></div>';
-
-  // ── Grandfathering countdown banner ──
-  // Shows only for legacy_free users in the last 7 days before expiry.
-  // Non-dismissable — they need to see this every session.
-  if (S.legacyFree === true) {
-    var _LAUNCH_MS = 1784952000000;
-    var _expiryMs = _LAUNCH_MS + 30 * 24 * 60 * 60 * 1000;
-    var _daysLeft = Math.ceil((_expiryMs - Date.now()) / (24 * 60 * 60 * 1000));
-    if (_daysLeft <= 7 && _daysLeft > 0) {
-      h += '<div style="background:linear-gradient(135deg,rgba(255,153,0,0.15),rgba(255,68,85,0.10));border:1px solid rgba(255,153,0,0.4);border-radius:12px;padding:12px 16px;margin-top:8px;display:flex;align-items:center;gap:12px">';
-      h += '<div style="font-size:24px;line-height:1">⏳</div>';
-      h += '<div><div style="font-family:var(--sans);font-size:14px;font-weight:700;color:var(--acc)">' + _daysLeft + ' day' + (_daysLeft === 1 ? '' : 's') + ' of free premium left</div>';
-      h += '<div style="font-size:12px;color:var(--t2);margin-top:2px">Subscribe to keep your optimized routes after ' + new Date(_expiryMs).toLocaleDateString(undefined, {month:'short', day:'numeric'}) + '.</div></div>';
-      h += '</div>';
-    } else if (_daysLeft <= 0) {
-      h += '<div style="background:rgba(255,68,85,0.12);border:1px solid rgba(255,68,85,0.4);border-radius:12px;padding:12px 16px;margin-top:8px;display:flex;align-items:center;gap:12px">';
-      h += '<div style="font-size:24px;line-height:1">🔒</div>';
-      h += '<div><div style="font-family:var(--sans);font-size:14px;font-weight:700;color:var(--err)">Free premium has ended</div>';
-      h += '<div style="font-size:12px;color:var(--t2);margin-top:2px">Subscribe to continue optimizing your routes.</div></div>';
-      h += '</div>';
-    }
-  }
-
-  // ── Trial progress banner ──
-  // Surfaces the free-route count from the first used route onward instead
-  // of only at the hard wall (FREE_TRIAL_ROUTE_LIMIT) — a driver who never
-  // sees the count coming has no reason to expect the paywall, and treats
-  // it as a bait-and-switch instead of an expected trial ending.
-  if (PREMIUM_LIVE && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid' &&
-      S.trialRoutesUsed > 0 && S.trialRoutesUsed < FREE_TRIAL_ROUTE_LIMIT) {
-    var _left = FREE_TRIAL_ROUTE_LIMIT - S.trialRoutesUsed;
-    h += '<div style="background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 16px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">';
-    h += '<div style="font-size:13px;color:var(--t2)"><strong style="color:var(--acc)">' + _left + ' free route' + (_left === 1 ? '' : 's') + '</strong> left this trial</div>';
-    h += '<div style="font-size:11px;color:var(--t3)">' + S.trialRoutesUsed + ' / ' + FREE_TRIAL_ROUTE_LIMIT + ' used</div>';
-    h += '</div>';
-  }
 
   h += '<div class="scr" style="padding-top:16px">';
 
@@ -2669,7 +2639,7 @@ function vInput() {
     h += '<div style="margin-bottom:14px">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">';
     h += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:#FF9900;text-transform:uppercase;display:flex;align-items:center;gap:8px">Stops <span style="background:#FF9900;color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px">' + cnt + '</span></div>';
-    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + S.stops.filter(function(s){return s.flexNum!=null;}).length + ' scanned &middot; ' + S.stops.filter(function(s){return s.flexNum==null;}).length + ' manual &middot; <strong style="color:#FF9900">' + S.stops.reduce(function(sum,s){return sum+(s.pkgCount||1);},0) + '</strong> packages</span>';
+    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + S.stops.filter(function(s){return s.flexNum!=null;}).length + ' scanned &middot; ' + S.stops.filter(function(s){return s.flexNum==null;}).length + ' manual</span>';
     h += '</div>';
     h += '<div style="background:#13131E;border-radius:16px;overflow:hidden;padding:12px 14px">';
     h += '<div class="ir" style="margin-bottom:10px"><div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Add address manually" value="' + escH(S.manVal) + '" style="font-size:14px"/></div>';
@@ -2693,22 +2663,6 @@ function vInput() {
     h += '<div class="failed-float" id="failedFloat" onclick="document.getElementById(\'failedFloat\').style.display=\'none\'">&#9888; ' + S.geoFailed.length + ' stop' + (S.geoFailed.length > 1 ? 's' : '') + ' not found &mdash; tap to dismiss</div>';
   }
 
-  // Non-blocking: some stops from a scan couldn't be read, but the rest are
-  // already added and ready to optimize. Styled as a dismissible warning
-  // (like the geo-warn / failedFloat patterns above) rather than the red
-  // blocking-error box below, since nothing here actually needs fixing
-  // before the driver can tap Optimize.
-  if (S._ocrWarn) {
-    h += '<div class="geo-warn" id="ocrWarnBox" style="margin-bottom:14px;position:relative;padding-right:32px">';
-    h += '<div style="font-weight:700;margin-bottom:4px">&#9888; ' + escH(S._ocrWarn.summary) + '</div>';
-    if (S._ocrWarn.lines.length) {
-      h += '<div style="margin:4px 0;opacity:.85">' + S._ocrWarn.lines.map(function(l){ return escH(l); }).join('<br>') + '</div>';
-    }
-    h += '<div style="margin-top:6px">' + escH(S._ocrWarn.note) + '</div>';
-    h += '<button id="ocrWarnDismiss" aria-label="Dismiss" style="position:absolute;top:8px;right:8px;background:transparent;border:none;color:inherit;opacity:.6;font-size:16px;line-height:1;cursor:pointer;padding:4px">&#10005;</button>';
-    h += '</div>';
-  }
-
   if (S.errMsg) {
     h += '<div style="background:rgba(255,68,85,.12);border:1px solid #FF4455;border-radius:10px;padding:12px 15px;margin-bottom:14px">';
     h += '<div style="font-size:14px;color:#FF4455;margin-bottom:10px;white-space:pre-line">' + escH(S.errMsg) + '</div>';
@@ -2723,7 +2677,7 @@ function vInput() {
   } else {
     h += '<button class="btn bp" id="optBtn"' + (!cnt ? ' disabled' : '') + ' style="height:54px">&#9889; ' + (cnt ? t('optimize_btn') + ' &mdash; ' + cnt + ' stop' + (cnt > 1 ? 's' : '') : 'Optimize my route') + '</button>';
   }
-  h += '<div style="text-align:center;font-size:12px;color:#7878A0;margin-top:10px;letter-spacing:.3px">' + (PREMIUM_LIVE ? FREE_TRIAL_ROUTE_LIMIT + ' free routes' : 'Free') + ' &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>';
+  h += '<div style="text-align:center;font-size:12px;color:#7878A0;margin-top:10px;letter-spacing:.3px">' + (PREMIUM_LIVE ? '3 free routes' : 'Free') + ' &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>';
   h += '</div>';
 
   // ── STATS BAR ──
@@ -2897,7 +2851,7 @@ function vResult() {
   </div>
   <div class="hbtns" style="gap:8px">
     <button class="zoom-btn ${S.routeZoom > 0 ? 'active' : ''}" id="zoomBtn" title="${t('zoom_title')||'Increase text size'}" aria-label="${t('zoom_title')||'Increase text size'}">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;pointer-events:none"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg>
       ${S.routeZoom > 0 ? `<span style="margin-left:3px;font-size:12px;font-weight:700">${S.routeZoom === 1 ? '+' : '++'}</span>` : ''}
     </button>
     <button id="bkBtn" style="background:transparent;border:1px solid var(--brd);border-radius:var(--rs);padding:0 12px;height:36px;font-size:14px;font-weight:700;color:var(--t2);cursor:pointer;font-family:var(--sans);display:flex;align-items:center;gap:5px">&#8592; ${t('edit_btn')||'Edit'}</button>
@@ -2962,9 +2916,6 @@ function vResult() {
       <button class="rcp" id="cpBtn">Copy</button>
       <button class="rcp" id="shareBtn" style="color:var(--inf);border-color:rgba(74,158,255,.3)">&#8679; Share</button>
     </div>
-  </div>
-  <div style="font-size:11px;color:var(--t3);margin:-4px 0 12px 2px">
-    ${S.optimized.reduce(function(sum,s){return sum+(s.pkgCount||1);},0)} packages scanned &mdash; check this against your Flex app before you drive off
   </div>
 
   <div style="background:var(--surf);border-radius:16px;padding:10px 11px;margin-bottom:10px">
@@ -3049,35 +3000,6 @@ function vResult() {
 
 </div>`;}
 
-// ── Nav URL builder ─────────────────────────────────────────────────────────
-// TWA / Chrome Custom Tab silently drops cross-origin navigations to
-// waze.com and google.com/maps even from a click-handler window.location.href.
-// intent:// URLs bypass the app-link resolution step by naming the target
-// package directly; Android hands the click straight to Waze / Maps.
-// If the app isn't installed, the browser_fallback_url opens the same https
-// URL the non-Android platforms use. iOS and desktop don't understand intent://
-// so they keep the https path — Waze / Maps universal links handle the rest.
-var _IS_ANDROID = /Android/i.test(navigator.userAgent);
-
-function buildNavURL(app, address) {
-  var q = encodeURIComponent(address);
-  var httpsWaze = 'https://waze.com/ul?q=' + q + '&navigate=yes';
-  var httpsMaps = 'https://www.google.com/maps/search/?api=1&query=' + q;
-  if (!_IS_ANDROID) {
-    return app === 'waze' ? httpsWaze : httpsMaps;
-  }
-  if (app === 'waze') {
-    return 'intent://waze.com/ul?q=' + q + '&navigate=yes' +
-      '#Intent;scheme=https;package=com.waze' +
-      ';S.browser_fallback_url=' + encodeURIComponent(httpsWaze) +
-      ';end';
-  }
-  return 'intent://www.google.com/maps/search/?api=1&query=' + q +
-    '#Intent;scheme=https;package=com.google.android.apps.maps' +
-    ';S.browser_fallback_url=' + encodeURIComponent(httpsMaps) +
-    ';end';
-}
-
 function vCompanion() {
   var stops = S.optimized.filter(function(s){ return !s.geoFailed; });
   var idx   = Math.min(S.cIdx, stops.length);
@@ -3107,8 +3029,8 @@ function vCompanion() {
       '<button id="compFinishBtn" class="btn bp" style="font-size:18px;padding:16px 32px">&#10003; Done &mdash; Back to route</button>' +
       '</div></div>';
   }
-  var wazeURL = buildNavURL('waze', stop.address);
-  var mapsURL = buildNavURL('maps', stop.address);
+  var wazeURL = 'https://waze.com/ul?q=' + encodeURIComponent(stop.address) + '&navigate=yes';
+  var mapsURL = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(stop.address);
   return '<div class="comp-wrap">' +
     '<div class="comp-hdr">' +
       '<button id="compBkBtn" style="background:transparent;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:4px 10px">&#8592;</button>' +
@@ -3207,11 +3129,11 @@ function markDelivered() {
   if (!wasLast && S.cNavApp && S.cAutoNav) {
     var nextStop = stops[S.cIdx];
     if (nextStop && nextStop.address) {
-      var url = buildNavURL(S.cNavApp, nextStop.address);
-      // Same TWA rationale as the manual Waze/Maps buttons above:
-      // window.open(_,'_blank') is silently swallowed in Chrome Custom Tabs.
+      var url = S.cNavApp === 'waze'
+        ? 'https://waze.com/ul?q=' + encodeURIComponent(nextStop.address) + '&navigate=yes'
+        : 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(nextStop.address);
+      window.open(url, '_blank');
       trackEvent('maps_opened', { map_type: 'companion_autonav_' + S.cNavApp });
-      window.location.href = url;
     }
   }
 }
@@ -3433,27 +3355,17 @@ function bindCompanion() {
     try { localStorage.setItem('fr_auto_nav', S.cAutoNav ? '1' : '0'); } catch(e) {}
     render();
   });
-  // Waze / Maps buttons: intercept the anchor's default and do a top-level
-  // navigation. target="_blank" is silently swallowed inside a TWA / Chrome
-  // Custom Tab, so the app-link intent to Waze / Google Maps never fires.
-  // Setting window.location.href from a click handler triggers the Android
-  // intent-filter chain reliably on Pixel WebView, Samsung Internet, and
-  // Chrome-Android; on desktop it just navigates the tab, which is fine.
   var wBtn = document.getElementById('compWazeBtn');
-  if (wBtn) wBtn.addEventListener('click', function(e){
-    e.preventDefault();
+  if (wBtn) wBtn.addEventListener('click', function(){
     S.cNavApp = 'waze';
-    try { localStorage.setItem('fr_nav_app', 'waze'); } catch(e2) {}
+    try { localStorage.setItem('fr_nav_app', 'waze'); } catch(e) {}
     trackEvent('maps_opened', { map_type: 'companion_waze' });
-    window.location.href = wBtn.href;
   });
   var mBtn = document.getElementById('compMapsBtn');
-  if (mBtn) mBtn.addEventListener('click', function(e){
-    e.preventDefault();
+  if (mBtn) mBtn.addEventListener('click', function(){
     S.cNavApp = 'maps';
-    try { localStorage.setItem('fr_nav_app', 'maps'); } catch(e2) {}
+    try { localStorage.setItem('fr_nav_app', 'maps'); } catch(e) {}
     trackEvent('maps_opened', { map_type: 'companion_maps' });
-    window.location.href = mBtn.href;
   });
 }
 
@@ -3515,10 +3427,7 @@ function vSavings(sv) {
           <div class="cbox-min">~${sv.optMin} min</div>
         </div>
       </div>
-      <div style="text-align:center;font-size:13px;color:var(--ok);font-weight:700;font-family:var(--sans);margin-top:10px">
-        &#9679; ~$${(sv.savedKm * EST_GAS_COST_PER_KM).toFixed(2)} in gas saved this shift <span style="font-weight:400;color:var(--t3);font-size:11px">(estimated)</span>
-      </div>
-      ${sv.manualEdit ?`<div class="sv-src" style="color:var(--acc);border-top:1px solid rgba(255,153,0,.25);padding-top:8px">&#9998; You've reordered stops by hand. These savings describe the original optimized order, not your current one.</div>` : ''}
+      ${sv.manualEdit ? `<div class="sv-src" style="color:var(--acc);border-top:1px solid rgba(255,153,0,.25);padding-top:8px">&#9998; You've reordered stops by hand. These savings describe the original optimized order, not your current one.</div>` : ''}
       <div class="sv-src">
         ${sv.realGPS
           ? `Real driving distances via <a href="https://www.openstreetmap.org" target="_blank">OpenStreetMap</a> &amp; OSRM. Times from actual route data.`
@@ -3793,63 +3702,42 @@ function mvStop(id, dir) {
 }
 function clrAll() {
   if (!confirm('Clear all stops?')) return;
-  S.stops = []; S.lastId = null; S.errMsg = ''; S._ocrWarn = null;
+  S.stops = []; S.lastId = null; S.errMsg = '';
   S.savings = null; S.optimized = []; S.geoFailed = [];
   clearSession(); render();
 }
-// Full-name → 2-letter code map. Shared between stateFromPhoton() and the
-// candidate-state filter in bestCandidate() (which uses the same info to
-// prefer geocoder candidates matching S.userState).
-var _STATE_NAME_TO_CODE = {
-  'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
-  'Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA',
-  'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA',
-  'Kansas':'KS','Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD',
-  'Massachusetts':'MA','Michigan':'MI','Minnesota':'MN','Mississippi':'MS',
-  'Missouri':'MO','Montana':'MT','Nebraska':'NE','Nevada':'NV',
-  'New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY',
-  'North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK',
-  'Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC',
-  'South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT',
-  'Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI',
-  'Wyoming':'WY','District of Columbia':'DC',
-  'Ontario':'ON','British Columbia':'BC','Alberta':'AB','Quebec':'QC',
-  'Manitoba':'MB','Saskatchewan':'SK','Nova Scotia':'NS','New Brunswick':'NB',
-  'Newfoundland and Labrador':'NL','Prince Edward Island':'PE',
-  'Northwest Territories':'NT','Yukon':'YT','Nunavut':'NU',
-  'United Kingdom':'GB','Germany':'DE','France':'FR','Spain':'ES','Italy':'IT',
-  'Netherlands':'NL','Belgium':'BE','Sweden':'SE','Poland':'PL',
-  'Australia':'AU','Japan':'JP','India':'IND','Mexico':'MX','Brazil':'BR',
-  'Singapore':'SG'
-};
-var _CC_TO_CODE = {
-  'gb':'GB','de':'DE','fr':'FR','es':'ES','it':'IT','nl':'NL','be':'BE',
-  'se':'SE','pl':'PL','au':'AU','jp':'JP','in':'IND','mx':'MX','br':'BR','sg':'SG'
-};
-// Extract a canonical 2-letter state/region code from a fetchCandidates
-// candidate. Handles three input shapes:
-//   Photon:   full name in .state (e.g. "Idaho"), full name in .country
-//   Nominatim (via proxy w/ addressdetails=1): same as Photon
-//   Census:   2-letter .state already (e.g. "ID"), .country_code = "us"
-// Returns '' when state can't be determined — bestCandidate() then falls
-// back to bias-centroid picking so we never do worse than today.
-function _candidateStateCode(c) {
-  if (!c) return '';
-  if (c.state) {
-    if (/^[A-Z]{2}$/.test(c.state)) return c.state;           // Census: already a code
-    if (_STATE_NAME_TO_CODE[c.state]) return _STATE_NAME_TO_CODE[c.state];
-  }
-  if (c.country && _STATE_NAME_TO_CODE[c.country]) return _STATE_NAME_TO_CODE[c.country];
-  if (c.country_code && _CC_TO_CODE[c.country_code.toLowerCase()]) return _CC_TO_CODE[c.country_code.toLowerCase()];
-  return '';
-}
-
 // Map Photon reverse-geocode response → selector value (e.g. 'Michigan' → 'MI')
 function stateFromPhoton(p) {
   if (!p) return '';
-  if (p.state && _STATE_NAME_TO_CODE[p.state]) return _STATE_NAME_TO_CODE[p.state];
-  if (p.country && _STATE_NAME_TO_CODE[p.country]) return _STATE_NAME_TO_CODE[p.country];
-  if (p.countrycode && _CC_TO_CODE[p.countrycode.toLowerCase()]) return _CC_TO_CODE[p.countrycode.toLowerCase()];
+  var STATE_NAME_MAP = {
+    'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
+    'Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA',
+    'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA',
+    'Kansas':'KS','Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD',
+    'Massachusetts':'MA','Michigan':'MI','Minnesota':'MN','Mississippi':'MS',
+    'Missouri':'MO','Montana':'MT','Nebraska':'NE','Nevada':'NV',
+    'New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM','New York':'NY',
+    'North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK',
+    'Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC',
+    'South Dakota':'SD','Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT',
+    'Virginia':'VA','Washington':'WA','West Virginia':'WV','Wisconsin':'WI',
+    'Wyoming':'WY','District of Columbia':'DC',
+    'Ontario':'ON','British Columbia':'BC','Alberta':'AB','Quebec':'QC',
+    'Manitoba':'MB','Saskatchewan':'SK','Nova Scotia':'NS','New Brunswick':'NB',
+    'Newfoundland and Labrador':'NL','Prince Edward Island':'PE',
+    'Northwest Territories':'NT','Yukon':'YT','Nunavut':'NU',
+    'United Kingdom':'GB','Germany':'DE','France':'FR','Spain':'ES','Italy':'IT',
+    'Netherlands':'NL','Belgium':'BE','Sweden':'SE','Poland':'PL',
+    'Australia':'AU','Japan':'JP','India':'IND','Mexico':'MX','Brazil':'BR',
+    'Singapore':'SG',
+  };
+  var CC_MAP = {
+    'gb':'GB','de':'DE','fr':'FR','es':'ES','it':'IT','nl':'NL','be':'BE',
+    'se':'SE','pl':'PL','au':'AU','jp':'JP','in':'IND','mx':'MX','br':'BR','sg':'SG'
+  };
+  if (p.state && STATE_NAME_MAP[p.state]) return STATE_NAME_MAP[p.state];
+  if (p.country && STATE_NAME_MAP[p.country]) return STATE_NAME_MAP[p.country];
+  if (p.countrycode && CC_MAP[p.countrycode.toLowerCase()]) return CC_MAP[p.countrycode.toLowerCase()];
   return '';
 }
 
@@ -4011,8 +3899,8 @@ async function handleFiles(files) {
   }
   if (!imgs.length) { S.errMsg = 'Please upload image or PDF files.'; render(); return; }
   S.sc = { done: 0, total: imgs.length, msg: 'Reading images...' };
-  S.errMsg = ''; S._ocrWarn = null; render();
-  let added = 0, failed = 0, lastErr = '', unreadable = 0, possibleMissing = 0;
+  S.errMsg = ''; render();
+  let added = 0, failed = 0, lastErr = '', unreadable = 0;
   let unreadableDetails = [];
   for (let i = 0; i < imgs.length; i++) {
     S.sc = { done: i, total: imgs.length, msg: `Scanning image ${i + 1} of ${imgs.length}...` };
@@ -4020,7 +3908,6 @@ async function handleFiles(files) {
     try {
       const items = await extractFromFile(imgs[i]);
       unreadable += items._skipped || 0;
-      possibleMissing += items._possibleMissing || 0;
       if (items._skippedDetails && items._skippedDetails.length) {
         unreadableDetails = unreadableDetails.concat(items._skippedDetails);
       }
@@ -4088,44 +3975,20 @@ async function handleFiles(files) {
   } else if (added === 0) {
     // Show debug info — what did Tesseract actually read?
     const rawLines = (S._lastOCR || '').split('\n').filter(l => l.trim()).length;
-    S.errMsg = `OCR read ${rawLines} lines but found no delivery addresses. Tip: try one long screenshot of your full list (scroll / rolldown capture). If that doesn't work, take 3-4 overlapping screenshots and upload them all at once.`;
+    S.errMsg = `OCR read ${rawLines} lines but found no delivery addresses. Tip: take 3-4 overlapping screenshots scrolling through your Flex list and upload them all at once — works better than one long scrolling shot.`;
     S._showDebug = true;
   } else {
     S._showDebug = false;
     saveSession();
-    if (unreadable > 0 || possibleMissing > 0) {
+    if (unreadable > 0) {
       // Some stops were detected but couldn't be read — name WHICH ones so the
       // driver can jump straight to them instead of diffing 23 stops by hand.
-      // This is NOT a failure state: `added` stops are already in S.stops and
-      // ready to optimize. Using S._ocrWarn (not S.errMsg) keeps this out of
-      // the red blocking-error box with its "Try again" button — that button
-      // would just re-run optimize() on the SAME already-added stops (no
-      // rescan happens), so surfacing it here reads as "you must fix this
-      // before continuing" when the driver can already tap Optimize as-is.
-      // Mid-shift, that false alarm is exactly what pushes a driver to give
-      // up on the app entirely instead of losing 10 seconds to add 2 stops.
-      var _detailLines = unreadableDetails.map(function(d, idx) {
-        var label = d.num ? `Stop #${d.num}` : `stop ${idx + 1} of ${unreadableDetails.length}`;
-        var detail = d.raw ? ` — "${d.raw}"` : '';
-        return `${label}${detail}`;
+      var _detailLines = unreadableDetails.map(function(d) {
+        if (d.num) return `  • Stop #${d.num}` + (d.raw ? ` — "${d.raw}"` : ' — check your Flex app for this stop');
+        return `  • ` + (d.raw ? `"${d.raw}"` : 'one stop') + ` — number unclear, check your Flex app`;
       });
-      var _summary = unreadable > 0
-        ? `${added} stop${added > 1 ? 's' : ''} added — ${unreadable} couldn't be read automatically`
-        : `${added} stop${added > 1 ? 's' : ''} added`;
-      var _note = unreadable > 0
-        ? `You're good to optimize now with these ${added}. Add the missed ${unreadable > 1 ? 'ones' : 'one'} above, or from your Flex app, whenever you get a chance.`
-        : `You're good to optimize now with these ${added}.`;
-      // possibleMissing: a stop that vanished with NO trace at all — not
-      // added, not in the list above. We only know an unaccounted-for
-      // "Deliver N package(s)" line exists somewhere in the scan, not which
-      // stop it belongs to (that text is exactly what OCR failed to anchor).
-      // This is a different, more serious flag than unreadable — say so
-      // plainly rather than folding it into the same "couldn't be read" line.
-      if (possibleMissing > 0) {
-        _detailLines.push(`Possible missing stop${possibleMissing > 1 ? 's' : ''} — your screenshot may contain ${possibleMissing} more delivery${possibleMissing > 1 ? 'ies' : ''} than FlexRoute found. Double-check your Flex app's stop count before you start.`);
-      }
-      S._ocrWarn = { summary: _summary, lines: _detailLines, note: _note };
-      trackEvent('ocr_stops_unreadable', { unreadable: unreadable, possible_missing: possibleMissing, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
+      S.errMsg = `⚠ ${added} stop${added > 1 ? 's' : ''} added, but ${unreadable} stop${unreadable > 1 ? 's' : ''} couldn't be read:\n` + _detailLines.join('\n') + `\nAdd ${unreadable > 1 ? 'them' : 'it'} manually using the field above.`;
+      trackEvent('ocr_stops_unreadable', { unreadable: unreadable, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
     }
@@ -4229,69 +4092,15 @@ function _consumeTrialIfApplicable() {
     fetch('/.netlify/functions/trial-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: S.userEmail, action: 'consume', deviceFp: _computeDeviceFp() })
+      body: JSON.stringify({ email: S.userEmail, action: 'consume' })
     }).catch(function(){});
   }
 }
 
 async function optimize() {
-  // ── Email gate (before trial gate) ─────────────────────────────────────
-  // Require an email before the FIRST optimization so the server can track
-  // trial usage per email. Without this, clearing localStorage resets the
-  // local trial counter and the server has nothing to check against.
-  // No OTP at this stage — just collection + server reconciliation.
-  // OTP verification happens later at checkout time.
-  if (PREMIUM_LIVE && !S.userEmail && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid') {
-    // Show email prompt if not already visible
-    if (!document.getElementById('trialEmailOverlay')) {
-      var ov = document.createElement('div');
-      ov.id = 'trialEmailOverlay';
-      ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.82);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)';
-      var cd = document.createElement('div');
-      cd.style.cssText = 'background:#13131E;border:1px solid var(--acc);border-radius:20px;padding:28px 24px;max-width:400px;width:100%;font-family:var(--body,sans-serif);color:#FFF;text-align:center';
-      cd.innerHTML =
-        '<div style="font-family:var(--sans);font-size:20px;font-weight:700;color:var(--acc);margin-bottom:10px">Enter your email to start</div>' +
-        '<div style="font-size:14px;color:var(--t2);line-height:1.5;margin-bottom:16px">Your email keeps your routes saved across sessions — no spam, ever.</div>' +
-        '<input id="trialEmailInput" type="email" placeholder="you@example.com" autocomplete="email" style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:12px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--t1);font-size:15px;outline:none;margin-bottom:12px">' +
-        '<div id="trialEmailErr" style="font-size:12px;color:var(--err);margin-bottom:10px;min-height:16px"></div>' +
-        '<button id="trialEmailBtn" class="btn bp" style="height:50px;width:100%;font-size:15px">Continue — optimize my route</button>';
-      ov.appendChild(cd);
-      document.body.appendChild(ov);
-      document.getElementById('trialEmailInput').focus();
-      document.getElementById('trialEmailBtn').addEventListener('click', async function() {
-        var inp = document.getElementById('trialEmailInput');
-        var errDiv = document.getElementById('trialEmailErr');
-        var email = (inp ? inp.value : '').trim().toLowerCase();
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-          if (inp) inp.style.borderColor = 'var(--err)';
-          if (errDiv) errDiv.textContent = 'Enter a valid email address.';
-          return;
-        }
-        var btn = document.getElementById('trialEmailBtn');
-        if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
-        // Save email locally and reconcile with server
-        S._authEmail = email;
-        S.userEmail = email;
-        localStorage.setItem('fr_email', email);
-        try {
-          var serverUsed = await checkServerTrialStatus(email);
-          if (serverUsed === true && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid') {
-            S.entitlement = 'trial_used';
-            localStorage.setItem('fr_entitlement', 'trial_used');
-          }
-        } catch(e) {}
-        // Remove overlay and proceed to optimize
-        var overlay = document.getElementById('trialEmailOverlay');
-        if (overlay) overlay.remove();
-        optimize(); // re-enter — this time S.userEmail is set, skips this gate
-      });
-    }
-    return;
-  }
-
   // ── Trial gate ───────────────────────────────────────────────────────────
   // Checked BEFORE any geocoding/OCR cost is incurred. legacy_free and paid
-  // users always pass. Everyone else gets FREE_TRIAL_ROUTE_LIMIT free
+  // users always pass. Everyone else gets FREE_TRIAL_ROUTE_LIMIT (3) free
   // optimized routes, tracked by a counter rather than a single used/unused
   // flag (was 1 free route; increased to 3 per updated plan).
   if (PREMIUM_LIVE && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid' && S.trialRoutesUsed >= FREE_TRIAL_ROUTE_LIMIT) {
@@ -4355,20 +4164,10 @@ async function optimize() {
   for (let i = 0; i < toGeocode.length; i++) {
     const x = toGeocode[i];
     var addr = x.address;
-    // Only force-append the driver's region when the address has NO state /
-    // province code anywhere. Two problems with the old check:
-    //   1. Force-appending the user's state to any address that doesn't END
-    //      with ", ID" (etc.) broke cross-state routes — an Idaho driver
-    //      with an "Ontario, OR" stop got ", ID" tacked on, producing
-    //      "Ontario, OR, ID" which geocoders can't resolve.
-    //   2. The old check used new RegExp(',\\s*' + S.userState + '\\s*$')
-    //      built from a single-quoted string, where '\s' evaluates to 's'
-    //      (unrecognized escape). The actual regex ran was ,s*IDs*$ which
-    //      matched no realistic address format, so the append fired every
-    //      time — even for same-state stops like "Boise, ID" which became
-    //      "Boise, ID, ID". Geocoder leniency masked this until now.
-    var _addrHasRegion = /,\s*[A-Z]{2}\b/.test(addr);
-    if (S.userState && addr && !_addrHasRegion) {
+    // \s in a plain string literal collapses to literal 's', so the previous
+    // regex tested for ',s*ONs*$' — never matched, meaning the "already has
+    // state" check silently always failed and the append ran regardless.
+    if (S.userState && addr && !new RegExp(',\\s*' + S.userState + '\\s*$', 'i').test(addr)) {
       addr = addr.replace(/,\s*(ON|Canada)\s*$/i, '') + ', ' + S.userState;
     }
     const result = await Promise.race([
@@ -4436,56 +4235,40 @@ async function optimize() {
     if (i < toGeocode.length - 1) await sleep(400);
   }
 
-  // Bulk-failure retry: when most of a route fails to geocode at once —
-  // reported directly, a route that geocoded fine minutes earlier came back
-  // with every single stop "ADDRESS NOT FOUND" — that pattern isn't 20
-  // individually bad addresses, it's Photon and/or the Nominatim proxy
-  // being slow, rate-limiting, or briefly unreachable and every request
-  // hitting the same 12s per-address timeout. There was no retry for that
-  // shared case: each stop went straight to the manual "Apply correction"
-  // fix screen.
-  //
-  // A SINGLE retry after a fixed 2.5s pause (the first version of this fix)
-  // turned out not to be enough — reported as still recurring on the same
-  // route. A brief network blip clears in a couple seconds; an actual rate
-  // limit on a shared free service does not. So this now makes up to 3
-  // attempts total with real backoff (3s, then 8s, then 20s) — cheap when
-  // the addresses were the real problem (they keep failing, same as
-  // before, just ~30s slower to reach the fix screen) and gives an actual
-  // rate-limit window a realistic chance to clear when the service was
-  // the problem, instead of one token gesture at a retry.
-  var _nonHomeStartTotal = toGeocode.filter(function(x){ return x.key !== '__home__' && x.key !== '__start__'; }).length;
-  if (_nonHomeStartTotal >= 4 && S.geoFailed.length / _nonHomeStartTotal >= 0.5) {
-    var _backoffs = [3000, 8000, 20000];
-    for (var _attempt = 0; _attempt < _backoffs.length && S.geoFailed.length > 0; _attempt++) {
-      console.log('[FlexRoute] Bulk geocode failure (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ') — retry ' + (_attempt + 1) + '/' + _backoffs.length + ' after ' + _backoffs[_attempt] + 'ms');
-      if (typeof trackEvent === 'function') {
-        trackEvent('geocode_bulk_retry', { failed: S.geoFailed.length, total: _nonHomeStartTotal, attempt: _attempt + 1 });
-      }
-      await sleep(_backoffs[_attempt]);
-      var _retryStops = S.stops.filter(function(s){ return s.geoFailed; });
-      for (let ri = 0; ri < _retryStops.length; ri++) {
-        var rs = _retryStops[ri];
-        var rResult = await Promise.race([
-          geocode(rs.address, biasLat, biasLon),
-          new Promise(res => setTimeout(() => res(null), 12000))
-        ]);
-        if (rResult) {
-          rs.coords = rResult; rs.geoFailed = false;
-          coordMap[rs.id] = rResult;
-          var _gfIdx = S.geoFailed.indexOf(rs.address);
-          if (_gfIdx >= 0) S.geoFailed.splice(_gfIdx, 1);
-          biasLat = biasLat ? (biasLat * biasCount + rResult.lat) / (biasCount + 1) : rResult.lat;
-          biasLon = biasLon ? (biasLon * biasCount + rResult.lon) / (biasCount + 1) : rResult.lon;
-          biasCount++;
-        }
-        S.ldProg = Math.round((ri + 1) / _retryStops.length * 100);
-        render();
-        if (ri < _retryStops.length - 1) await sleep(400);
-      }
+  // ─── Delayed retry pass for failed stops ──────────────────────────────────
+  // On big routes (20+ stops, esp. condo addresses that fire multiple sub-
+  // requests each), the free Photon/Nominatim endpoints throttle bursts and
+  // return empty results that look like "address not found" but are really
+  // just rate-limiting. Wait for the window to clear, then re-try any stop
+  // that failed the first sweep, using the cluster centroid we now have as a
+  // strong bias. Before this pass existed, drivers saw "20 stops not found"
+  // for a route where 19 were perfectly valid Yonge St addresses.
+  var _retryTargets = [];
+  for (var _rk in coordMap) {
+    if (!coordMap[_rk] && _rk !== '__home__' && _rk !== '__start__') {
+      var _rst = S.stops.find(function(s){ return s.id === _rk; });
+      if (_rst) _retryTargets.push({ key: _rk, address: _rst.address, stop: _rst });
     }
-    if (S.geoFailed.length > 0) {
-      console.warn('[FlexRoute] Bulk geocode failure persisted after ' + _backoffs.length + ' retries (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ' still failing) — likely a sustained rate limit or outage, not a blip');
+  }
+  if (_retryTargets.length > 0 && biasLat && biasLon) {
+    console.log('[FlexRoute] Delayed retry pass for', _retryTargets.length, 'failed stops');
+    await sleep(2500);  // let the rate-limit window clear
+    for (var _ri = 0; _ri < _retryTargets.length; _ri++) {
+      var _rt = _retryTargets[_ri];
+      var _rres = await Promise.race([
+        geocode(_rt.address, biasLat, biasLon),
+        new Promise(function(res){ setTimeout(function(){ res(null); }, 12000); })
+      ]);
+      if (_rres) {
+        coordMap[_rt.key] = _rres;
+        _rt.stop.geoFailed = false;
+        S.geoFailed = S.geoFailed.filter(function(a){ return a !== _rt.address; });
+        console.log('[FlexRoute] Retry pass rescued:', _rt.address);
+        if (typeof trackEvent === 'function') {
+          trackEvent('geocode_rescued_retry', {});
+        }
+      }
+      if (_ri < _retryTargets.length - 1) await sleep(600);
     }
   }
 
@@ -5307,18 +5090,13 @@ function parseFlexOCR(rawText) {
   var STREET_KW = [' ave',' avenue',' st',' street',' rd',' road',' dr',' drive',
     ' blvd',' boulevard',' cres',' crescent',' court',' way',' place',' park',
     ' lane',' terrace',' trail',' pkwy',' parkway',' gate',' grove',' path',
-    ' square',' sq',' circle',' cir',' close',' bend',' mews',' heights',' gardens',' glen',
+    ' square',' circle',' close',' bend',' mews',' heights',' gardens',' glen',
     ' ln',' ct',' pl',' hwy',' highway',' pike',' run',' loop',' pass',
-    ' ridge',' rdg',' crossing',' hollow',' holw',' creek',' crk',' meadow',' meadows',' mdw',' mdws',' pointe',' point',' pt',
-    ' commons',' cmn',' landing',' bridge',' brg',' mill',' ml',' pond',' lake',' lk',' valley',' vly',
-    ' hills',' hls',' hill',' hl',' wood',' woods',' forest',' frst',' view',' vista',' vis',' manor',' mnr',
-    ' estates',' est',' ests',' acres',' farms',' branch',' br',' cove',' bay',' cv',
-    ' broadway',' plaza',' plz',' promenade',
-    ' row',' oval',' walk',' mall',' spur',' rte',' route',
-    ' grn',' green',' ter',' terr',' trl',' trail',' mtn',' mountain',' mt',
-    ' vlg',' village',' ctr',' center',' centre',' jct',' junction',
-    ' ext',' expy',' fwy',' tpke',' sta',' prt',' port',' via',
-    ' knl',' knls',' knoll',' rdgs',' blf',' bluff',' spg',' spring',' spgs',' springs',' trce',' trace',
+    ' ridge',' crossing',' hollow',' creek',' meadow',' pointe',' point',
+    ' commons',' landing',' bridge',' mill',' pond',' lake',' valley',
+    ' hills',' wood',' woods',' forest',' view',' vista',' manor',
+    ' estates',' acres',' farms',' branch',' cove',' bay',' cv',
+    ' broadway',' plaza',' promenade',
     // Canadian abbreviations
     ' crt',' cour',' court',' cove',' cv',' cres',' crescent',
     ' hts',' heights',' terr',' terrace',' trl',' trail',
@@ -5503,7 +5281,7 @@ function parseFlexOCR(rawText) {
     if (/expected\s+b[yv]/i.test(line)) return true;   // Indiana "Expected by/bv"
     if (/estimated\s+(delivery|arrival)/i.test(line)) return true;
     if (/^[@©®]\s*\d{1,2}:\d{2}/.test(line)) return true;
-    if (/^[A-Z]\s*\(\s*\d{1,3}\s*\)\s*[#@©®]/i.test(line)) return true;  // "C (14) # D-38.3D..."
+    if (/^[A-Z]\s*[\(©]/.test(line)) return true;
     if (/[#@©®]\s*[A-Z]-\d+/i.test(line)) return true;  // E-34 Toronto, K-21 Indiana, D-36 Toronto
     if (/\d{1,2}:\d{2}\s*(AM|PM)/i.test(line) && line.length < 40) return true;
     return false;
@@ -5514,7 +5292,13 @@ function parseFlexOCR(rawText) {
     if (/if any more packages/i.test(l)) return true;
     if (/check for more stops/i.test(l)) return true;
     if (/slide to|swipe to|tap to/i.test(l)) return true;
-    if (/^locations?\s*\d*/i.test(l)) return true;  // 'Locations 2' dropdown or bare 'Locations'
+    if (/^locations\s+\d/i.test(l)) return true;  // 'Locations 2' dropdown
+    // Phone status-bar artifacts captured near the top of a scrolled screenshot.
+    // isCity's 3–35 char fallback would otherwise treat "LTE" / "5G" / "Wi-Fi"
+    // as a valid city (real bug: "213 Connaught Avenue, LTE" — LTE was the
+    // network indicator above the itinerary list). Match short standalone
+    // tokens only so real streets like "Wifi Way" aren't affected.
+    if (/^(lte|5g|4g|3g|lte\+|5g\+|wifi|wi-fi|gps|vpn|sos|hd|volte|no\s*service)$/i.test(l)) return true;
     if (/them in your|in your itinerary|you.ll see them/i.test(l)) return true; // Amazon bottom message
     if (/^(after you|assigned more|more stops)/i.test(l)) return true; // Amazon bottom message
     // Amazon Flex package/route tracking codes — never addresses:
@@ -5525,24 +5309,6 @@ function parseFlexOCR(rawText) {
     // Single-letter / symbol-only lines — OCR artifacts from Flex UI elements
     // (e.g. "i      -", "v", "[ ") that aren't caught by keyword checks above.
     if (line.replace(/[^a-zA-Z]/g, '').length <= 2 && !/\d/.test(line)) return true;
-    // Parenthesized stop numbers — Google Vision reads the green circled
-    // stop numbers (⑳, ㉔, ㉕) as "(20)", "(24)" etc. These waste j
-    // increments and push the parser past the lookahead window. OCR often
-    // drops the closing paren too ("(22" with nothing after it) — reported
-    // directly from a live scan, where that exact unbalanced form slipped
-    // through the original balanced-parens-only regex.
-    //
-    // Making BOTH parens optional (a since-reverted version of this line)
-    // was wrong: it also matched a bare short house number — "8", "10" —
-    // sitting alone on its own OCR line, which happens whenever a scan
-    // wraps between the number and the street name. That silently ate the
-    // house number and corrupted or dropped the stop entirely ("8 Olympic
-    // Garden Drive" lost its "8" and mangled the rest; "10 Fontainbleau
-    // Dr" lost its "10" and got dropped as unparseable) — reported
-    // directly, traced to this exact line, confirmed by reproducing it.
-    // A parenthesis character must actually be present; a plain bare
-    // number never matches this check.
-    if (/[()]/.test(line) && /^\(?\s*\d{1,3}\s*\)?$/.test(line.trim())) return true;
     return /^(deliver|package|itinerary|current|next stop|map|summary|list|search|tracking|locations|after you|you.ll|location|locker|buzzer|pickup)/i.test(line)
       || /^\d+\s*v$/.test(line)   // "2 v" locations dropdown
       || line.length < 3;
@@ -5619,7 +5385,7 @@ function parseFlexOCR(rawText) {
       }
 
       var pendingCity = '';
-      while (j < lines.length && j < i + 18) {
+      while (j < lines.length && j < i + 12) {
         var ln = lines[j].replace(/^[|\[\]]+\s*/, '');  // strip OCR pipe/bracket artifacts from Flex UI columns
         if (isScheduled(ln)) break;
         // Parse package count from "Deliver N package(s)" BEFORE noise filter
@@ -5722,35 +5488,10 @@ function parseFlexOCR(rawText) {
         // address, and only treat a prefix-match as the same stop when the
         // shorter one isn't simply missing a unit/suite/apartment number
         // (which would mean it's actually a different sub-address).
-        // Normalize for dedup: expand common street type abbreviations so
-        // "1050 Eastern Ave" and "1050 Eastern Avenue" compare as identical.
-        // Without this, the prefix check fails because "ave," ≠ "avenue,".
-        function _dedupNorm(s) {
-          // Strip city (after last comma) so "1060 Eastern Ave, LTE" matches
-          // "1060 Eastern Ave, Toronto". OCR sometimes picks up phone status
-          // bar text ("LTE") as the city, or reads it differently across
-          // overlapping screenshots. The street portion is what determines
-          // if two stops are at the same building.
-          var streetOnly = s.replace(/,\s*[^,]+$/, '');
-          return streetOnly.toLowerCase().replace(/\s+/g, ' ').trim()
-            .replace(/\bave\b/g, 'avenue').replace(/\bst\b/g, 'street')
-            .replace(/\brd\b/g, 'road').replace(/\bdr\b/g, 'drive')
-            .replace(/\bblvd\b/g, 'boulevard').replace(/\bcres\b/g, 'crescent')
-            .replace(/\bct\b/g, 'court').replace(/\bcrt\b/g, 'court')
-            .replace(/\bln\b/g, 'lane').replace(/\bpl\b/g, 'place')
-            .replace(/\bpkwy\b/g, 'parkway').replace(/\bhwy\b/g, 'highway')
-            .replace(/\btrl\b/g, 'trail').replace(/\bter\b/g, 'terrace')
-            .replace(/\bterr\b/g, 'terrace').replace(/\bsq\b/g, 'square')
-            .replace(/\bcir\b/g, 'circle').replace(/\brdg\b/g, 'ridge')
-            .replace(/\bpt\b/g, 'point').replace(/\bgrv\b/g, 'grove')
-            .replace(/\bhts\b/g, 'heights').replace(/\bgdns\b/g, 'gardens')
-            .replace(/\bvw\b/g, 'view').replace(/\bmnr\b/g, 'manor')
-            .replace(/\bplz\b/g, 'plaza').replace(/\bvlg\b/g, 'village');
-        }
-        var normAddr = _dedupNorm(fullAddr);
+        var normAddr = fullAddr.toLowerCase().replace(/\s+/g, ' ').trim();
         var hasUnitInfo = /\b(unit|apt|apartment|suite|ste|#)\.?\s*\d/i.test(fullAddr);
         var _existingResult = results.find(function(r) {
-          var rNorm = _dedupNorm(r.address);
+          var rNorm = r.address.toLowerCase().replace(/\s+/g, ' ').trim();
           if (rNorm === normAddr) return true; // exact match, always same stop
           // Prefix relationship (one is a truncated OCR read of the other) —
           // only treat as the same stop if NEITHER side carries unit/suite
@@ -5790,26 +5531,13 @@ function parseFlexOCR(rawText) {
         //     even when stop-number OCR also failed.
         _skippedBlocks++;
         var _rawLines = [];
-        // Include the annotation line itself — it contains the route code
-        // (e.g. "# D-37.1C") which the driver can match in their Flex app
-        // to identify the missed stop even when the address is garbled.
-        var _annotRaw = lines[i].replace(/scheduled\s+\d.*/i, '').replace(/^\W+/, '').trim();
-        if (_annotRaw && _annotRaw.length > 2) _rawLines.push(_annotRaw);
         for (var _k = i + 1; _k < j; _k++) {
-          if (lines[_k] && !isNoise(lines[_k]) && !isCity(lines[_k])) _rawLines.push(lines[_k]);
+          if (lines[_k] && !isNoise(lines[_k])) _rawLines.push(lines[_k]);
         }
-        var _skipNum = extractStopNum(lines[i]);
-        var _skipRaw = _rawLines.join(' / ').substring(0, 120);
-        // Only report if we have a stop number OR meaningful raw text.
-        // An empty block is a false isScheduled match on noise.
-        if (_skipNum || _skipRaw) {
-          _skippedDetails.push({
-            num: _skipNum,
-            raw: _skipRaw
-          });
-        } else {
-          _skippedBlocks--; // undo the increment — not a real skip
-        }
+        _skippedDetails.push({
+          num: extractStopNum(lines[i]),
+          raw: _rawLines.join(' / ').substring(0, 80)
+        });
       }
       i = j;
     } else {
@@ -5821,37 +5549,6 @@ function parseFlexOCR(rawText) {
   results.forEach(function(r, idx) { r.num = idx + 1; });
   results._skipped = _skippedBlocks;
   results._skippedDetails = _skippedDetails;
-
-  // ── Silent-drop safety net ──────────────────────────────────────────────
-  // Every real bug so far in this parser has an escape hatch: an address we
-  // can't fully parse still gets flagged via _skippedDetails, because it's
-  // ANCHORED to a line isScheduled() recognized. But if OCR mangles that
-  // anchor line badly enough that isScheduled() never matches it at all
-  // (garbled by a screenshot-overlap seam, blur, low contrast, etc.), the
-  // whole stop is invisible to this function — not added, not flagged,
-  // nothing. That's worse than a flagged failure: the driver has zero
-  // signal a stop existed at all. (Reported directly: "6 Liam Foudy Ct"
-  // never appeared anywhere in FlexRoute's output — added or unreadable —
-  // despite being a normal stop between two that scanned fine.)
-  //
-  // "Deliver one package" / "Deliver N packages" is a fixed phrase Amazon
-  // prints once per delivery stop, independent of the Scheduled/time/code
-  // line this parser actually anchors on — so counting it gives a rough,
-  // independent second opinion on how many stops SHOULD exist. It can't
-  // recover the missing address (we don't have the source text for it),
-  // but a mismatch is the only way to warn the driver a stop vanished
-  // instead of silently shipping a shorter route than what was scanned.
-  var _deliverMatches = rawText.match(/deliver\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+packages?/gi) || [];
-  // Multi-package stops inflate the deliver count: "Deliver 2 packages"
-  // appears alongside individual "Deliver one package" lines for each
-  // sub-location. Count the extra deliver lines these multi-package
-  // stops produce so the comparison is fair.
-  var _multiPkgExtra = 0;
-  results.forEach(function(r) { if (r.pkgCount > 1) _multiPkgExtra += r.pkgCount; });
-  var _accountedFor = results.length + _skippedBlocks + _multiPkgExtra;
-  if (_deliverMatches.length > _accountedFor + 1) {  // +1 tolerance for OCR noise
-    results._possibleMissing = _deliverMatches.length - _accountedFor;
-  }
   return results;
 }
 
@@ -6006,15 +5703,10 @@ async function fetchCandidates(q, limit) {
         var url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(q) + '&limit=' + limit + '&lang=en';
         if (biasLat && biasLon) url += '&lat=' + biasLat.toFixed(5) + '&lon=' + biasLon.toFixed(5);
         var r = await fetch(url, { signal: _ac(5000).signal });
-        if (!r.ok) { console.warn('[FlexRoute] Photon failed:', r.status, q); return []; }
+        if (!r.ok) return [];
         var d = await r.json();
-        return (d.features || []).map(f => ({
-          lon: f.geometry.coordinates[0],
-          lat: f.geometry.coordinates[1],
-          state:   (f.properties && f.properties.state) || '',
-          country: (f.properties && f.properties.country) || ''
-        }));
-      } catch (e) { console.warn('[FlexRoute] Photon error:', e && e.name, q); return []; }
+        return (d.features || []).map(f => ({ lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] }));
+      } catch { return []; }
     })();
     var nominatimP = (async () => {
       try {
@@ -6039,19 +5731,10 @@ async function fetchCandidates(q, limit) {
           }),
           signal: _ac(8000).signal
         });
-        if (!nr.ok) {
-          var _nBody = null; try { _nBody = await nr.json(); } catch(e2) {}
-          console.warn('[FlexRoute] Nominatim proxy failed:', nr.status, (_nBody && _nBody.code) || '', q);
-          return [];
-        }
+        if (!nr.ok) return [];
         var nd = await nr.json();
-        return (nd.results || []).map(f => ({
-          lon: f.lon, lat: f.lat,
-          state:        f.state || '',
-          country:      f.country || '',
-          country_code: f.country_code || ''
-        }));
-      } catch (e) { console.warn('[FlexRoute] Nominatim proxy error:', e && e.name, q); return []; }
+        return (nd.results || []).map(f => ({ lon: f.lon, lat: f.lat }));
+      } catch { return []; }
     })();
     var photonHits = await photonP;
     if (photonHits.length > 0) {
@@ -6073,29 +5756,6 @@ async function fetchCandidates(q, limit) {
 
   function bestCandidate(candidates) {
     if (!candidates.length) return null;
-
-    // When the driver has a region set, prefer candidates whose state matches.
-    // This is what stops "Idaho stop → Ontario, OR" — Photon returns both
-    // Boise, ID and Ontario, OR candidates for an ambiguous address, and
-    // without this filter bestCandidate picks whichever is geographically
-    // closer to the bias centroid, which for Treasure Valley drivers is
-    // usually Ontario, OR. Safety valve below: fall back to the full list
-    // if the filter would leave nothing, so we never do worse than before.
-    if (S.userState) {
-      var _matches = candidates.filter(function(c) {
-        var code = _candidateStateCode(c);
-        return code && code === S.userState;
-      });
-      if (_matches.length > 0) {
-        candidates = _matches;
-      } else if (candidates.some(function(c){ return _candidateStateCode(c); })) {
-        // We had state info on some candidates but none matched userState.
-        // Log so we notice legitimate cross-state cases vs. wrong userState.
-        console.warn('[FlexRoute] No candidates match userState=' + S.userState +
-                     ' — using full list. Address may be genuinely cross-region.');
-      }
-    }
-
     if (!biasLat || !biasLon) return candidates[0];
     // Pick candidate closest to cluster centroid
     return candidates.reduce(function(best, c) {
@@ -6103,6 +5763,14 @@ async function fetchCandidates(q, limit) {
              haversineKm(best.lat, best.lon, biasLat, biasLon) ? c : best;
     });
   }
+
+  // Small pacing helper — one geocode() call can fire up to 6 photon+nominatim
+  // pairs (pre-checks + main + 2 outlier retries + no-result retry). Firing them
+  // back-to-back with zero delay is what triggers the free public API's burst
+  // throttling (root cause of the 20-of-23-stops-not-found incident, real Yonge
+  // Street addresses returning "not found" from both providers simultaneously).
+  // Pace only when we're actually about to hit the network — cache hits skip it.
+  var _pace = function() { return new Promise(function(r){ setTimeout(r, 180); }); };
 
   // Pre-process 1: handle "apt-street" format: "1109-125 Lawton Blvd" → "125 Lawton Blvd"
   var aptStreetMatch = address.match(/^\w{0,2}\d{2,4}-(\d+\s+.+)$/);
@@ -6114,6 +5782,7 @@ async function fetchCandidates(q, limit) {
       console.log('[FlexRoute] Apt-street:', address, '→', streetOnly);
       return aptResult;
     }
+    await _pace();
   }
 
   // Pre-process 2: strip trailing unit number: "252 Church St 2715" → "252 Church St"
@@ -6127,6 +5796,7 @@ async function fetchCandidates(q, limit) {
       console.log('[FlexRoute] Trailing unit stripped:', address, '→', withoutUnit);
       return tuResult;
     }
+    await _pace();
   }
 
   // Pre-geocode: include city in query if present in address
@@ -6158,6 +5828,7 @@ async function fetchCandidates(q, limit) {
         .replace(/\s+/g, ' ').trim();
 
       if (stripped !== address) {
+        await _pace();
         var c2 = await fetchCandidates(stripped, 5);
         var r2 = bestCandidate(c2);
         if (r2 && haversineKm(r2.lat, r2.lon, biasLat, biasLon) < dist - 1) {
@@ -6172,6 +5843,7 @@ async function fetchCandidates(q, limit) {
     if (dist > 10) {
       var streetOnly = address.replace(/,.*$/, '').trim();
       if (streetOnly !== address) {
+        await _pace();
         var c3 = await fetchCandidates(streetOnly, 8);
         var r3 = bestCandidate(c3);
         if (r3 && haversineKm(r3.lat, r3.lon, biasLat, biasLon) < dist - 1) {
@@ -6194,6 +5866,7 @@ async function fetchCandidates(q, limit) {
       .replace(/\s+\d{3,4}\s*,/, ',').replace(/\s+\d{3,4}\s*$/, '')
       .replace(/\s+/g, ' ').trim();
     if (stripped2 !== address) {
+      await _pace();
       var c4 = await fetchCandidates(stripped2, 3);
       result = bestCandidate(c4);
     }
@@ -6366,8 +6039,8 @@ async function osrmRoute(coords) {
 }
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
-const GMAPS_MAX_CHUNK = 10;
-const GMAPS_MIN_CHUNK = 5;
+const GMAPS_MAX_CHUNK = 3;
+const GMAPS_MIN_CHUNK = 2;
 
 // Splits the optimized route into Google Maps nav legs at genuine geographic
 // breaks rather than a rigid stop count, so a leg doesn't get cut mid-cluster
@@ -6528,7 +6201,8 @@ function normalizeAddress(addr) {
     .replace(/\s+,/g, ',').replace(/,\s*,/g, ',').replace(/,\s*$/g, '').replace(/\s{2,}/g, ' ').trim();
   return truncateAfterStreetTypeG(a, true);
 }
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+// sleep() is defined once earlier (~line 6142). Duplicate removed to avoid the
+// "duplicate block silently wins" pattern (same as the old rzoom CSS bug).
 function escH(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 </script>
 </body>
