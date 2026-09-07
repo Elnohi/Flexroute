@@ -1405,6 +1405,31 @@ function bind() {
     var id = btn.id;
     switch(id) {
       case 'clrBtn':       clrAll(); break;
+      case 'acctBtn':
+        if (S.userEmail) {
+          if (confirm('Sign out of ' + S.userEmail + '?\n\nYour subscription and trial status are safe on the server — signing out just forgets this device\'s session, sign back in anytime with the same email.')) {
+            S.userEmail = null; S.sessionToken = null;
+            localStorage.removeItem('fr_email'); localStorage.removeItem('fr_session_token');
+            // Deliberately NOT touching S.entitlement / fr_entitlement here.
+            // A signed-out driver on a legacy_free or mid-trial device should
+            // still see their correct local trial count — entitlement only
+            // gets DOWNGRADED by an explicit server check (see verify-code
+            // and the fire-and-forget check-entitlement poll), never by
+            // signing out.
+            render();
+          }
+        } else {
+          // Plain sign-in — S._postAuthAction stays null/unset, so
+          // verify-code's default (S.phase = 'input') applies: back to the
+          // main screen, not checkout. This is the one entry point that
+          // lets an already-paid driver authenticate without going near
+          // doCheckout(). See bindPaywall's checkoutBtn handler for the
+          // OTHER path, which intentionally DOES set _postAuthAction toward
+          // payment for drivers who don't have a subscription yet.
+          S._postAuthAction = null;
+          S.authStep = 'email'; S.phase = 'auth'; render();
+        }
+        break;
       case 'optBtn':       optimize(); break;
       case 'bkBtn':        S.phase='input'; S.errMsg=''; S.geoFailed=[]; render(); break;
       case 'fixBackBtn':   S.phase='input'; render(); break;
@@ -2129,12 +2154,19 @@ function vAuth() {
     ${err}
   </div>
   <button id="authSendBtn" class="btn bp" style="height:54px;margin-bottom:10px">Send code</button>
-  <div style="text-align:center;font-size:12px;color:var(--t3);letter-spacing:.3px">Used for billing only &nbsp;&middot;&nbsp; No spam</div>
+  <div style="text-align:center;font-size:12px;color:var(--t3);letter-spacing:.3px;margin-bottom:14px">Used for billing only &nbsp;&middot;&nbsp; No spam</div>
+  <div style="text-align:center">
+    <button id="authBackBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline;padding:8px">Back</button>
+  </div>
 </div>`;}
 
 
 function bindAuth() {
   var sendBtn = document.getElementById('authSendBtn');
+  var backBtn = document.getElementById('authBackBtn');
+  if (backBtn) backBtn.addEventListener('click', function() {
+    S._authErr = ''; S._postAuthAction = null; S.phase = 'input'; render();
+  });
   if (sendBtn) sendBtn.addEventListener('click', async function() {
     var email = (document.getElementById('authEmailInput').value || '').trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -2170,12 +2202,32 @@ function bindAuth() {
       S.sessionToken = d.token;
       localStorage.setItem('fr_email', S.userEmail);
       localStorage.setItem('fr_session_token', S.sessionToken);
-      // Reconcile local trial flag with the server record now that we have
-      // a verified email — server is authoritative if it disagrees.
-      var serverUsed = await checkServerTrialStatus(S.userEmail);
-      if (serverUsed === true && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid') {
-        S.entitlement = 'trial_used';
-        localStorage.setItem('fr_entitlement', 'trial_used');
+      // Check PAID status first — a driver signing in (via the standalone
+      // "Sign in" entry point, not just the paywall->checkout path) needs
+      // their subscription recognized immediately, not after the separate
+      // fire-and-forget check-entitlement poll happens to catch up later.
+      // Previously this block only checked trial-used status, so signing
+      // in with an already-paid email would briefly still look unpaid.
+      var _paidNow = false;
+      try {
+        var _per = await fetch('/.netlify/functions/check-entitlement', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: S.userEmail })
+        });
+        var _pd = await _per.json();
+        _paidNow = !!(_pd && _pd.paid);
+      } catch (e2) { /* network hiccup — fall through to trial check below */ }
+      if (_paidNow) {
+        S.entitlement = 'paid';
+        localStorage.setItem('fr_entitlement', 'paid');
+      } else {
+        // Reconcile local trial flag with the server record now that we have
+        // a verified email — server is authoritative if it disagrees.
+        var serverUsed = await checkServerTrialStatus(S.userEmail);
+        if (serverUsed === true && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid') {
+          S.entitlement = 'trial_used';
+          localStorage.setItem('fr_entitlement', 'trial_used');
+        }
       }
       S._authErr = ''; S._postAuthAction ? S._postAuthAction() : (S.phase = 'input');
       render();
@@ -2616,6 +2668,21 @@ function vInput() {
   h += '<div class="hdr">';
   h += '<div class="hbrand"><img src="' + window._LOGO_ + '" style="height:44px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div>';
   h += '<div class="hbtns" style="gap:8px">' + langPill() + unitPill();
+  // Account entry point — separate from the paywall's "Continue to
+  // payment" flow. A driver who already has an active subscription
+  // (granted directly in Stripe, or signed up on another device) needs a
+  // way to authenticate WITHOUT being funneled toward paying again. Before
+  // this existed, the only email-entry point in the whole app was inside
+  // checkoutBtn's click handler (see bindPaywall), which always ends in
+  // doCheckout() — a real driver in this situation had no way to just
+  // "log in" without accidentally starting a second, real, paid Checkout
+  // Session.
+  if (S.userEmail) {
+    h += '<button class="ib" id="acctBtn" title="' + escH(S.userEmail) + '" style="font-size:11px;padding:0 10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+      (S.entitlement === 'paid' ? '\u2713 ' : '') + escH(S.userEmail.split('@')[0]) + '</button>';
+  } else {
+    h += '<button class="ib" id="acctBtn" style="font-size:12px;padding:0 12px;font-weight:700">Sign in</button>';
+  }
   if (cnt) h += '<button class="ib" id="clrBtn" style="color:var(--err);border-color:rgba(255,68,85,.25)" title="Clear all stops">&#10005;</button>';
   h += '</div></div>';
 
