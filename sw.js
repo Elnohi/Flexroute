@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v6';   // bumped from v4: forces old cache wipe after Waze TWA fix
+const CACHE = 'flexroute-v7';   // bumped from v4: forces old cache wipe after Waze TWA fix
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
