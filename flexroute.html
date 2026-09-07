@@ -1097,16 +1097,44 @@ function bind() {
     // the button does nothing. Companion got the window.location.href
     // workaround; nothing else did. One delegated handler covers all of
     // them by matching the destination host instead of one id at a time.
+    //
+    // Regression note (2026): the window.location.href workaround alone is
+    // NOT ENOUGH on Android. A later documented bug (see the buildNavURL
+    // comment around line 3150) is that cross-origin *https* navigation to
+    // waze.com and google.com/maps is silently dropped by TWA / Chrome
+    // Custom Tab even from a click-handler window.location.href. The full
+    // fix wraps the URL in an intent:// naming the target app's package
+    // directly. Companion buttons go through buildNavURL() and get this;
+    // everything else lands here — so this handler must wrap on Android
+    // too, or non-Companion nav buttons silently do nothing in the
+    // installed app (works fine in Incognito Chrome, which is what makes
+    // this regression easy to miss during dev).
     document.addEventListener('click', function(e) {
       if (e.defaultPrevented) return; // an element-specific handler (Companion) already handled this
       var a = e.target.closest && e.target.closest('a[target="_blank"]');
       if (!a || !a.href) return;
-      if (a.href.indexOf('waze.com') === -1 && a.href.indexOf('google.com/maps') === -1) return;
+      var isWaze = a.href.indexOf('waze.com') !== -1;
+      var isMaps = a.href.indexOf('google.com/maps') !== -1;
+      if (!isWaze && !isMaps) return;
       e.preventDefault();
       if (!a.hasAttribute('onclick')) {
-        trackEvent('maps_opened', { map_type: a.href.indexOf('waze.com') !== -1 ? 'waze' : 'google_maps' });
+        trackEvent('maps_opened', { map_type: isWaze ? 'waze' : 'google_maps' });
       }
-      window.location.href = a.href;
+      var target = a.href;
+      // Android: promote to intent:// so the TWA hands the click straight
+      // to the installed app. Fallback URL is the original https so users
+      // without Waze / Maps installed still get browser navigation.
+      // Detected via _IS_ANDROID which is a top-level var evaluated at
+      // script parse time — always defined by the time any click fires.
+      if (typeof _IS_ANDROID !== 'undefined' && _IS_ANDROID) {
+        var pkg = isWaze ? 'com.waze' : 'com.google.android.apps.maps';
+        var pathAndQuery = a.href.replace(/^https?:\/\//, '');
+        target = 'intent://' + pathAndQuery +
+          '#Intent;scheme=https;package=' + pkg +
+          ';S.browser_fallback_url=' + encodeURIComponent(a.href) +
+          ';end';
+      }
+      window.location.href = target;
     });
 
     document.addEventListener('change', function(e) {
