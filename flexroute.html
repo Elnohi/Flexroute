@@ -1090,25 +1090,22 @@ function bind() {
     // Waze / Google Maps links anywhere outside Companion mode (the Google
     // Maps + Waze accordion on the result screen, the map-preview marker
     // popups, per-stop "verify" pins, "Navigate to Home") were left as plain
-    // <a target="_blank"> — the same TWA / Chrome Custom Tab issue already
-    // documented and fixed for Companion's own Waze/Maps buttons (see
-    // bindCompanion): target="_blank" is silently swallowed inside the
-    // installed Android app, so the Waze/Maps intent never fires and tapping
-    // the button does nothing. Companion got the window.location.href
-    // workaround; nothing else did. One delegated handler covers all of
-    // them by matching the destination host instead of one id at a time.
-    //
-    // Regression note (2026): the window.location.href workaround alone is
-    // NOT ENOUGH on Android. A later documented bug (see the buildNavURL
-    // comment around line 3150) is that cross-origin *https* navigation to
-    // waze.com and google.com/maps is silently dropped by TWA / Chrome
-    // Custom Tab even from a click-handler window.location.href. The full
-    // fix wraps the URL in an intent:// naming the target app's package
-    // directly. Companion buttons go through buildNavURL() and get this;
-    // everything else lands here — so this handler must wrap on Android
-    // too, or non-Companion nav buttons silently do nothing in the
-    // installed app (works fine in Incognito Chrome, which is what makes
-    // this regression easy to miss during dev).
+    // <a target="_blank">. target="_blank" is silently swallowed inside the
+    // installed Android app (a hand-rolled WebView, confirmed via
+    // MainActivity.java — not a TWA), so tapping the button did nothing.
+    // Fix: intercept the click and use window.location.href with the
+    // ORIGINAL https URL. Do NOT wrap into intent:// — a previous version
+    // of this handler did, based on a TWA/Chrome-Custom-Tab-specific quirk
+    // that doesn't apply to this app's actual native code. Confirmed via
+    // MainActivity.java's shouldOverrideUrlLoading: it resolves an https
+    // URL correctly via `new Intent(ACTION_VIEW, Uri.parse(url))` +
+    // resolveActivity() (Android App Links route it to Waze/Google Maps,
+    // or the browser as fallback), but it does NOT call
+    // Intent.parseUri(url, Intent.URI_INTENT_SCHEME) — the one method that
+    // can deserialize intent://...#Intent;...;end syntax. Uri.parse() alone
+    // treats that string as an opaque "intent:" scheme URI that resolves to
+    // nothing, so resolveActivity() returns null and the tap silently does
+    // nothing. See buildNavURL for the matching fix on the Companion side.
     document.addEventListener('click', function(e) {
       if (e.defaultPrevented) return; // an element-specific handler (Companion) already handled this
       var a = e.target.closest && e.target.closest('a[target="_blank"]');
@@ -1120,21 +1117,7 @@ function bind() {
       if (!a.hasAttribute('onclick')) {
         trackEvent('maps_opened', { map_type: isWaze ? 'waze' : 'google_maps' });
       }
-      var target = a.href;
-      // Android: promote to intent:// so the TWA hands the click straight
-      // to the installed app. Fallback URL is the original https so users
-      // without Waze / Maps installed still get browser navigation.
-      // Detected via _IS_ANDROID which is a top-level var evaluated at
-      // script parse time — always defined by the time any click fires.
-      if (typeof _IS_ANDROID !== 'undefined' && _IS_ANDROID) {
-        var pkg = isWaze ? 'com.waze' : 'com.google.android.apps.maps';
-        var pathAndQuery = a.href.replace(/^https?:\/\//, '');
-        target = 'intent://' + pathAndQuery +
-          '#Intent;scheme=https;package=' + pkg +
-          ';S.browser_fallback_url=' + encodeURIComponent(a.href) +
-          ';end';
-      }
-      window.location.href = target;
+      window.location.href = a.href;
     });
 
     document.addEventListener('change', function(e) {
@@ -3250,32 +3233,33 @@ function vResult() {
 </div>`;}
 
 // ── Nav URL builder ─────────────────────────────────────────────────────────
-// TWA / Chrome Custom Tab silently drops cross-origin navigations to
-// waze.com and google.com/maps even from a click-handler window.location.href.
-// intent:// URLs bypass the app-link resolution step by naming the target
-// package directly; Android hands the click straight to Waze / Maps.
-// If the app isn't installed, the browser_fallback_url opens the same https
-// URL the non-Android platforms use. iOS and desktop don't understand intent://
-// so they keep the https path — Waze / Maps universal links handle the rest.
-var _IS_ANDROID = /Android/i.test(navigator.userAgent);
-
+// Always returns a plain https:// URL. FlexRoute's Android app (see
+// MainActivity.java in the flexroute-webview repo) is a hand-rolled
+// android.webkit.WebView with its own shouldOverrideUrlLoading — NOT a
+// Trusted Web Activity or Chrome Custom Tab. That distinction matters: TWA/
+// Custom Tab has a well-documented quirk where it silently drops cross-
+// origin navigation to waze.com / google.com/maps, which intent:// URLs
+// (naming the target package directly) are the standard workaround for.
+// This app doesn't have that quirk — its native code resolves a plain
+// https:// URL via `new Intent(ACTION_VIEW, Uri.parse(url))` +
+// resolveActivity(), which correctly launches Waze/Google Maps through
+// their registered Android App Links, or falls back to the browser if
+// they're not installed. What it does NOT do is call
+// Intent.parseUri(url, Intent.URI_INTENT_SCHEME) — the one call that can
+// actually deserialize an intent://...#Intent;...;end string. Uri.parse()
+// alone treats that whole string as an opaque URI with scheme "intent",
+// which resolves to nothing, so resolveActivity() returns null and the
+// native code silently does nothing. A prior version of this function
+// generated intent:// URLs on Android (copied from generic TWA advice that
+// didn't actually apply to this app's architecture) which broke real
+// on-device navigation for Waze, Maps, and the Shift Mode auto-nav
+// relaunch — all of which call this same function. All testing that
+// "confirmed" the intent:// version worked was done in a desktop browser,
+// where _IS_ANDROID is false and the broken branch never ran.
 function buildNavURL(app, address) {
   var q = encodeURIComponent(address);
-  var httpsWaze = 'https://waze.com/ul?q=' + q + '&navigate=yes';
-  var httpsMaps = 'https://www.google.com/maps/search/?api=1&query=' + q;
-  if (!_IS_ANDROID) {
-    return app === 'waze' ? httpsWaze : httpsMaps;
-  }
-  if (app === 'waze') {
-    return 'intent://waze.com/ul?q=' + q + '&navigate=yes' +
-      '#Intent;scheme=https;package=com.waze' +
-      ';S.browser_fallback_url=' + encodeURIComponent(httpsWaze) +
-      ';end';
-  }
-  return 'intent://www.google.com/maps/search/?api=1&query=' + q +
-    '#Intent;scheme=https;package=com.google.android.apps.maps' +
-    ';S.browser_fallback_url=' + encodeURIComponent(httpsMaps) +
-    ';end';
+  if (app === 'waze') return 'https://waze.com/ul?q=' + q + '&navigate=yes';
+  return 'https://www.google.com/maps/search/?api=1&query=' + q;
 }
 
 function vCompanion() {
