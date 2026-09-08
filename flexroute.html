@@ -2752,6 +2752,18 @@ function bindPaywall() {
 
   var checkoutBtn = document.getElementById('checkoutBtn');
   if (checkoutBtn) checkoutBtn.addEventListener('click', async function() {
+    // Fires on EVERY tap, before the email/OTP branch below — this is the
+    // one funnel measurement missing before today. Stripe's own events only
+    // show checkout.session.created/expired, which only fires AFTER a
+    // driver has already cleared the email + OTP gate. Between
+    // paywall_shown (40-47 users/28d per GA4, under its old name
+    // trial_converted) and Stripe ever seeing a session (2 total, ever,
+    // both expired unpaid) there was no visibility into whether people
+    // weren't tapping this button at all, or were tapping it and dropping
+    // during email/OTP. This event answers that: compare its count to
+    // Stripe's checkout.session.created count to isolate exactly which
+    // side of the email/OTP gate the loss is happening on.
+    if (typeof trackEvent === 'function') trackEvent('checkout_link_clicked', { plan: selected, had_email: !!S.userEmail });
     if (!S.userEmail) {
       // Driver hasn't verified email yet. After OTP verification completes,
       // go straight to checkout — don't send them back to the paywall for
