@@ -152,6 +152,44 @@ exports.handler = async (event) => {
       );
       break;
     }
+    case 'customer.subscription.created': {
+      const sub = stripeEvent.data.object;
+      // A subscription created through real Checkout ALSO fires this event
+      // (Stripe creates the underlying Subscription object as part of that
+      // flow) -- checkout.session.completed already notifies for that case,
+      // so notifying here too would double-email every real driver signup.
+      // Ask Stripe directly whether a Checkout Session produced this
+      // subscription; only notify when none exists, meaning it was created
+      // some other way (Dashboard, as just done manually; the API directly;
+      // etc.) and nothing else will ever notify for it.
+      try {
+        const linkedSessions = await stripe.checkout.sessions.list({ subscription: sub.id, limit: 1 });
+        if (linkedSessions.data.length > 0) break; // checkout.session.completed already covered this one
+
+        const customer = await stripe.customers.retrieve(sub.customer);
+        const email = (customer && !customer.deleted && customer.email) || 'unknown email';
+        const priceId = sub.items && sub.items.data[0] && sub.items.data[0].price && sub.items.data[0].price.id;
+        const plan = priceId === 'price_1TvpRYK7RvJpTQ3hubMkSWwy' ? 'monthly'
+          : priceId === 'price_1TvpTSK7RvJpTQ3hi6YTdqT0' ? 'yearly' : (priceId || 'unknown plan');
+        const rawPrice = sub.items && sub.items.data[0] && sub.items.data[0].price;
+        const amount = formatAmount(rawPrice && rawPrice.unit_amount, rawPrice && rawPrice.currency);
+        // Discount shape varies by API/billing-mode version -- check both
+        // the classic singular field and the newer array field defensively.
+        const hasDiscount = !!(sub.discount) || (Array.isArray(sub.discounts) && sub.discounts.length > 0);
+        await notifyAdmin(
+          '📋 FlexRoute subscription created directly (not via Checkout): ' + email,
+          'Email: ' + email + '\nPlan: ' + plan + '\nList price: ' + amount +
+            (hasDiscount ? '\n(A discount is applied — actual amount charged may be $0. Check Stripe for the real invoice total.)' : '') +
+            '\nSubscription: ' + sub.id +
+            '\n\nThis fired because the subscription was NOT created through Stripe Checkout ' +
+            '(e.g. created directly in the Dashboard). If this is expected — an internal test ' +
+            'or manual grant — no action needed.'
+        );
+      } catch (e) {
+        console.error('[FlexRoute] stripe-webhook: subscription.created lookup/notify error:', e && e.message);
+      }
+      break;
+    }
     case 'customer.subscription.updated':
       // No-op today — plan changes/renewals aren't currently notification-
       // worthy on their own. See file header for guidance if that changes.
