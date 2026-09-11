@@ -1,15 +1,24 @@
 // /netlify/functions/create-checkout-session.js
 // FlexRoute — creates a Stripe Checkout session for Monthly or Yearly Premium.
 //
-// Why email, not a device ID: Stripe is the source of truth for "who has
-// paid" (per the locked monetization plan), keyed by email — there is no
-// separate FlexRoute database of customers. We pass the driver's verified
-// email into Checkout so Stripe creates/reuses a Customer record tied to
-// that email, which is what entitlement-check.js later queries.
+// Why email is now OPTIONAL: previously the app required a verified email
+// (via send-code.js/verify-code.js OTP) BEFORE ever reaching this function —
+// a real driver had to tap "Continue to payment", type an email, wait for a
+// code, open their email app, copy the code, type it in, and ONLY THEN get
+// redirected to Stripe. That's 6-8 steps before ever seeing Stripe's own
+// one-page checkout (which itself collects and verifies email as part of
+// payment). Given the app's own funnel data — dozens of paywall views per
+// month but only 2 Stripe checkout sessions EVER started, both abandoned
+// unpaid — that gate was very likely the single largest source of drop-off.
+// Now "Continue to payment" goes straight here with no email required;
+// Stripe's own hosted page collects it as part of paying. If the app
+// already knows the driver's email (a returning signed-in driver), it's
+// still passed through as customer_email to prefill Stripe's page — this
+// change only makes it OPTIONAL, not removed for everyone.
 //
 // Contract:
 //   POST /.netlify/functions/create-checkout-session
-//   Body: { email: "<verified email>", plan: "monthly" | "yearly" }
+//   Body: { email?: "<verified email>", plan: "monthly" | "yearly" }
 //   Response (200): { url: "<stripe checkout url>" }
 //   Response (4xx/5xx): { error, code }
 
@@ -36,11 +45,18 @@ function isPlausibleEmail(email) {
 }
 
 async function handleCreateCheckout(body, stripe, originHost, internalTestSecret) {
-  const email = normalizeEmail(body.email);
-  const plan = body.plan;
-  if (!email || !isPlausibleEmail(email)) {
-    return { statusCode: 400, body: { error: 'Invalid email', code: 'BAD_EMAIL' } };
+  // Email is now OPTIONAL — see file header. When present, it must still be
+  // well-formed (a driver's own device already knowing their email is a
+  // reasonable prefill; garbage input is not).
+  const rawEmail = body.email;
+  let email = null;
+  if (rawEmail !== undefined && rawEmail !== null && rawEmail !== '') {
+    email = normalizeEmail(rawEmail);
+    if (!isPlausibleEmail(email)) {
+      return { statusCode: 400, body: { error: 'Invalid email', code: 'BAD_EMAIL' } };
+    }
   }
+  const plan = body.plan;
   if (plan !== 'monthly' && plan !== 'yearly') {
     return { statusCode: 400, body: { error: 'Invalid plan', code: 'BAD_PLAN' } };
   }
@@ -48,9 +64,10 @@ async function handleCreateCheckout(body, stripe, originHost, internalTestSecret
   const priceId = PRICE_IDS[plan];
   // success_url/cancel_url point back at the app itself. {CHECKOUT_SESSION_ID}
   // is a literal Stripe template token, substituted by Stripe at redirect
-  // time — flexroute.html can read it from the query string after return,
-  // though the webhook (separate function, still to build) is what actually
-  // grants entitlement; the redirect is just where the driver lands.
+  // time — flexroute.html reads it via get-checkout-email.js when the
+  // driver wasn't already signed in, and the webhook (separate function)
+  // is what actually grants entitlement server-side; the redirect is just
+  // where the driver lands and how the client learns who just paid.
   const baseUrl = 'https://' + originHost;
 
   // ── TEMPORARY: internal live-mode test path ──────────────────────────────
@@ -71,15 +88,20 @@ async function handleCreateCheckout(body, stripe, originHost, internalTestSecret
 
   const sessionParams = {
     mode: 'subscription',
-    customer_email: email,
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: baseUrl + '/flexroute.html?checkout=success&session_id={CHECKOUT_SESSION_ID}',
     cancel_url: baseUrl + '/flexroute.html?checkout=cancelled',
-    metadata: { flexroute_email: email, flexroute_plan: plan },
+    metadata: { flexroute_plan: plan },
   };
+  if (email) {
+    // Prefills Stripe's email field for a driver whose device already knows
+    // it (e.g. previously signed in) — Stripe still lets them change it.
+    sessionParams.customer_email = email;
+    sessionParams.metadata.flexroute_email = email;
+  }
   if (isInternalTest) {
     sessionParams.discounts = [{ coupon: 'INTERNAL-TEST-100' }];
-    console.log('[FlexRoute] INTERNAL TEST CHECKOUT — 100% off coupon applied for', email);
+    console.log('[FlexRoute] INTERNAL TEST CHECKOUT — 100% off coupon applied for', email || '(no email provided)');
   }
   // ── END TEMPORARY BLOCK ───────────────────────────────────────────────────
 
