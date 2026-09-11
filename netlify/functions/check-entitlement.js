@@ -4,9 +4,10 @@
 // Stripe is the single source of truth for "has this email paid" (per the
 // locked monetization plan — no separate FlexRoute database for this).
 // This function looks up Stripe customers by email and checks for an
-// active or trialing subscription. Called on app load when S.userEmail is
-// set, to correct local entitlement state if it's stale (e.g. paid on
-// another device, or cancelled and the local flag hasn't caught up).
+// active, trialing, OR past_due subscription. Called on app load when
+// S.userEmail is set, to correct local entitlement state if it's stale
+// (e.g. paid on another device, or cancelled and the local flag hasn't
+// caught up).
 //
 // Contract:
 //   POST /.netlify/functions/check-entitlement
@@ -25,6 +26,21 @@ const FLEXROUTE_PRICE_IDS = [
   'price_1TvpRYK7RvJpTQ3hubMkSWwy', // $9.99 USD / month
   'price_1TvpTSK7RvJpTQ3hi6YTdqT0', // $79.00 USD / year
 ];
+
+// Subscription statuses that grant access. past_due is a DELIBERATE grace
+// period: when a renewal payment fails, Stripe doesn't cancel immediately —
+// it moves the subscription to past_due and retries automatically over a
+// window (configurable in Stripe's Dashboard, commonly 1-3 weeks) before
+// finally giving up and moving to canceled/unpaid. Without past_due here,
+// a driver's access would cut off the INSTANT a single payment attempt
+// failed — an expired card, a bank flagging the charge, insufficient funds
+// that one day — even though Stripe hasn't given up and the retry might
+// succeed hours later. Treating past_due as still-paid trades a few extra
+// days of access for someone who's genuinely stopped paying, for not
+// locking out someone who's still a real customer mid-retry. Once Stripe's
+// retries are exhausted, the subscription moves to canceled/unpaid — NOT
+// in this list — and access is correctly revoked on the next check.
+const GRANTING_STATUSES = ['active', 'trialing', 'past_due'];
 
 function normalizeEmail(raw) { return (raw || '').trim().toLowerCase(); }
 function isPlausibleEmail(email) {
@@ -57,13 +73,15 @@ async function handleCheckEntitlement(body, stripe) {
         limit: 10,
       });
       for (const sub of subs.data) {
-        if (sub.status === 'active' || sub.status === 'trialing') {
+        if (GRANTING_STATUSES.includes(sub.status)) {
           const item = sub.items.data[0];
           const priceId = item && item.price && item.price.id;
 
           // Only FlexRoute's own prices grant premium. Without this check, ANY
           // active subscription on the Stripe account would unlock the app —
           // which is how the old shared SpellRightPro account leaked access.
+          // Applies identically to past_due subs: a past_due subscription on
+          // an unrelated product still must never grant FlexRoute premium.
           if (!FLEXROUTE_PRICE_IDS.includes(priceId)) continue;
 
           const interval = item && item.price && item.price.recurring && item.price.recurring.interval;
