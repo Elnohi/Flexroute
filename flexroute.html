@@ -534,6 +534,38 @@ if (!navigator.onLine) document.getElementById('offlineBar').classList.add('show
 // by vPaywall() (declared earlier in the script than this used to be
 // declared), so this must come before any code that could call vPaywall().
 const FREE_TRIAL_ROUTE_LIMIT = 5;
+// Stop-count cap for trial (non-paid, non-legacy_free) users, applied at
+// DISPLAY time only — see applyTrialStopCap() below for why this never
+// touches the optimizer inputs or the locked twoOptImprove/osrmTrip/
+// osrmRoute functions themselves.
+const TRIAL_STOP_LIMIT = 15;
+
+// Called once, right after a route finishes optimizing (both the GPS/OSRM
+// success path and the haversine fallback path), before entering the
+// result screen. Sets the flags vResult() uses to lock stops beyond
+// TRIAL_STOP_LIMIT for trial users -- deliberately AFTER optimization
+// completes, so the full real stop list is what actually gets geocoded and
+// optimized (see TRIAL_STOP_LIMIT's own comment for why: zero change to
+// the locked optimizer or its inputs, gating is display-only).
+function applyTrialStopCap() {
+  var isTrial = PREMIUM_LIVE && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid';
+  if (isTrial && S.optimized.length > TRIAL_STOP_LIMIT) {
+    S._trialStopCapped = true;
+    S._trialStopCapTotal = S.optimized.length;
+    if (typeof trackEvent === 'function') {
+      trackEvent('paywall_shown', {
+        reason: 'stop_count_exceeded',
+        stop_count: S.optimized.length,
+        routes_used: S.trialRoutesUsed
+      });
+    }
+  } else {
+    S._trialStopCapped = false;
+    S._trialStopCapTotal = 0;
+  }
+}
+
+
 // Rough US average fuel cost per km driven (~$3.50/gal, ~25 mpg), used only
 // to give drivers a ballpark $ figure alongside distance/time saved on the
 // results screen and paywall. Deliberately conservative — never claimed as
@@ -993,9 +1025,13 @@ window.addEventListener('load', () => {
   (function() {
     var qs = new URLSearchParams(window.location.search);
     var checkoutResult = qs.get('checkout');
+    var sessionId = qs.get('session_id');
     if (checkoutResult) {
       window.history.replaceState({}, '', window.location.pathname);
       if (checkoutResult === 'success' && S.userEmail) {
+        // Driver was already signed in on this device before checkout (e.g.
+        // used the standalone Sign-in entry point, or a previous session) —
+        // unchanged from before, no new email/OTP step needed.
         fetch('/.netlify/functions/check-entitlement', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1011,6 +1047,56 @@ window.addEventListener('load', () => {
             S.phase = 'input'; render();
             toast('Payment received — finishing setup…');
           }
+        }).catch(function() { S.phase = 'input'; render(); });
+      } else if (checkoutResult === 'success' && sessionId) {
+        // The new default path: checkout no longer requires a known email
+        // up front (see bindPaywall / create-checkout-session.js), so the
+        // app has no idea who just paid until asking Stripe directly via
+        // the session_id it appended to this redirect URL.
+        fetch('/.netlify/functions/get-checkout-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId })
+        }).then(function(r) { return r.json(); }).then(function(d) {
+          if (!d.paid || !d.email) {
+            S.phase = 'input'; render();
+            toast('Payment received — finishing setup…');
+            return;
+          }
+          // Grant access IMMEDIATELY. Stripe's own live confirmation that
+          // this exact session paid is a STRONGER signal than an OTP could
+          // ever be — OTP below is purely to capture the email for
+          // cross-device sign-in later, never a gate on access to what was
+          // just paid for. If the send-code call below fails, or the
+          // driver backs out of entering the code, they keep full access
+          // on this device regardless.
+          S.entitlement = 'paid';
+          localStorage.setItem('fr_entitlement', 'paid');
+          S._authEmail = d.email;
+          S._postPaymentAuth = true;
+          S._postAuthAction = function() {
+            S._postPaymentAuth = false;
+            S.phase = 'input'; render();
+            toast('🎉 You\'re all set — welcome to FlexRoute Premium!');
+          };
+          // Already have the email from Stripe — skip straight to the code
+          // step instead of making the driver type an email they just gave
+          // moments ago on Stripe's own page.
+          fetch('/.netlify/functions/send-code', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: d.email })
+          }).then(function() {
+            S.authStep = 'code'; S.phase = 'auth'; render();
+          }).catch(function() {
+            // Email provider hiccup — never block a paying driver over
+            // this. Trust the already-granted local access, skip
+            // verification for now; they can still use the standalone
+            // Sign-in entry point later if they want cross-device access.
+            S.userEmail = d.email;
+            localStorage.setItem('fr_email', d.email);
+            S.phase = 'input'; render();
+            toast('🎉 You\'re all set — welcome to FlexRoute Premium!');
+          });
         }).catch(function() { S.phase = 'input'; render(); });
       } else if (checkoutResult === 'cancelled') {
         S.phase = 'paywall';
@@ -1415,6 +1501,11 @@ function bind() {
         break;
       case 'optBtn':       optimize(); break;
       case 'bkBtn':        S.phase='input'; S.errMsg=''; S.geoFailed=[]; render(); break;
+      case 'stopCapUnlockBtn':
+        S._paywallReason = 'stop_count_exceeded';
+        S._paywallStopCount = S._trialStopCapTotal;
+        S.phase = 'paywall'; render();
+        break;
       case 'fixBackBtn':   S.phase='input'; render(); break;
       case 'bkBtn2':       S.phase='input'; S.errMsg=''; render(); break;
       case 'cpBtn':
@@ -1705,6 +1796,14 @@ var LANGS = {
     pay_billing_question: 'Billing question?',
     pay_checkout_failed: 'Couldn\'t start checkout — try again in a moment',
     acct_sign_in: 'Sign in',
+    auth_postpay_headline: 'You\'re all set — one last thing.',
+    auth_postpay_sub: 'Save this email so you can sign back in on any device — you\'ve already paid, this just keeps your access safe.',
+    auth_skip_for_now: 'Skip for now',
+    pay_headline_stopcap: 'This route is ready to go.',
+    pay_sub_stopcap: 'Your route has {n} stops — trial accounts get the first 15 stops optimized per route. Unlock unlimited stops for less than a tank of gas.',
+    result_stopcap_title: '{n} stops locked',
+    result_stopcap_sub: 'Your trial shows the first 15 stops. Unlock all {n} to finish planning this route.',
+    result_stopcap_cta: 'Unlock all stops',
   },
   fr: {
     scan_title: 'Scanner vos captures Flex',
@@ -1884,6 +1983,14 @@ var LANGS = {
     pay_billing_question: 'Question de facturation ?',
     pay_checkout_failed: 'Impossible de démarrer le paiement — réessayez dans un instant',
     acct_sign_in: 'Se connecter',
+    auth_postpay_headline: 'C\'est fait — une dernière chose.',
+    auth_postpay_sub: 'Enregistrez cet e-mail pour vous reconnecter sur n\'importe quel appareil — vous avez déjà payé, ceci protège simplement votre accès.',
+    auth_skip_for_now: 'Ignorer pour l\'instant',
+    pay_headline_stopcap: 'Cet itinéraire est prêt.',
+    pay_sub_stopcap: 'Votre itinéraire compte {n} arrêts — les comptes d\'essai optimisent les 15 premiers arrêts par itinéraire. Débloquez un nombre illimité d\'arrêts pour moins qu\'un plein d\'essence.',
+    result_stopcap_title: '{n} arrêts verrouillés',
+    result_stopcap_sub: 'Votre essai affiche les 15 premiers arrêts. Débloquez les {n} arrêts pour terminer la planification de cet itinéraire.',
+    result_stopcap_cta: 'Débloquer tous les arrêts',
   },
   de: {
     scan_title: 'Flex-Screenshots scannen',
@@ -2063,6 +2170,14 @@ var LANGS = {
     pay_billing_question: 'Frage zur Abrechnung?',
     pay_checkout_failed: 'Zahlung konnte nicht gestartet werden — versuchen Sie es gleich noch einmal',
     acct_sign_in: 'Anmelden',
+    auth_postpay_headline: 'Alles erledigt — nur noch eine Sache.',
+    auth_postpay_sub: 'Speichern Sie diese E-Mail, um sich auf jedem Gerät wieder anzumelden — Sie haben bereits bezahlt, das schützt nur Ihren Zugang.',
+    auth_skip_for_now: 'Vorerst überspringen',
+    pay_headline_stopcap: 'Diese Route ist startklar.',
+    pay_sub_stopcap: 'Ihre Route hat {n} Stopps — Testkonten optimieren die ersten 15 Stopps pro Route. Schalten Sie unbegrenzte Stopps frei für weniger als eine Tankfüllung.',
+    result_stopcap_title: '{n} Stopps gesperrt',
+    result_stopcap_sub: 'Ihr Test zeigt die ersten 15 Stopps. Schalten Sie alle {n} frei, um diese Route fertig zu planen.',
+    result_stopcap_cta: 'Alle Stopps freischalten',
   },
   es: {
     scan_title: 'Escanear capturas de Flex',
@@ -2242,6 +2357,14 @@ var LANGS = {
     pay_billing_question: '¿Pregunta de facturación?',
     pay_checkout_failed: 'No se pudo iniciar el pago — intenta de nuevo en un momento',
     acct_sign_in: 'Iniciar sesión',
+    auth_postpay_headline: 'Listo — solo una cosa más.',
+    auth_postpay_sub: 'Guarda este correo para iniciar sesión en cualquier dispositivo — ya pagaste, esto solo protege tu acceso.',
+    auth_skip_for_now: 'Omitir por ahora',
+    pay_headline_stopcap: 'Esta ruta está lista.',
+    pay_sub_stopcap: 'Tu ruta tiene {n} paradas — las cuentas de prueba optimizan las primeras 15 paradas por ruta. Desbloquea paradas ilimitadas por menos de un tanque de gasolina.',
+    result_stopcap_title: '{n} paradas bloqueadas',
+    result_stopcap_sub: 'Tu prueba muestra las primeras 15 paradas. Desbloquea las {n} para terminar de planear esta ruta.',
+    result_stopcap_cta: 'Desbloquear todas las paradas',
   }
 };
 
@@ -2319,18 +2442,28 @@ function vAuth() {
   const step = S.authStep || 'email';
   const err = S._authErr ? `<div style="background:var(--err-d);border:1px solid var(--err);border-radius:var(--rs);padding:10px 13px;font-size:13px;color:var(--err);margin-top:10px">${S._authErr}</div>` : '';
   if (step === 'code') {
+    // Post-payment flow uses softer copy ("one last thing", framed as
+    // saving access) since a driver landing here has ALREADY paid and
+    // this step is purely optional cross-device convenience -- never a
+    // gate. Pre-payment flow (the standalone Sign-in entry point) keeps
+    // the original "Verify your email" framing, which is accurate there.
+    const eyebrow = S._postPaymentAuth ? '' : t('auth_verify_email');
+    const headline = S._postPaymentAuth ? t('auth_postpay_headline') : t('auth_check_inbox');
+    const sub = S._postPaymentAuth
+      ? t('auth_postpay_sub')
+      : (function(){ var parts = t('auth_code_sent_to').split('{email}'); return parts[0] + '<strong style="color:var(--t1)">' + (S._authEmail || '') + '</strong>' + (parts[1] || ''); })();
     return `
 <div class="hdr">
   <div class="hbrand"><img src="${window._LOGO_}" style="height:44px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div>
 </div>
 <div class="scr" style="padding-top:32px">
   <div style="padding:0 2px;margin-bottom:24px">
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+    ${eyebrow ? `<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
       <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
-      <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">${t('auth_verify_email')}</span>
-    </div>
-    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">${t('auth_check_inbox')}</div>
-    <div style="font-size:14px;color:var(--t2);line-height:1.55">${(function(){ var parts = t('auth_code_sent_to').split('{email}'); return parts[0] + '<strong style="color:var(--t1)">' + (S._authEmail || '') + '</strong>' + (parts[1] || ''); })()}</div>
+      <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">${eyebrow}</span>
+    </div>` : ''}
+    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">${headline}</div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.55">${sub}</div>
   </div>
   <div style="background:var(--surf);border-radius:16px;padding:20px;margin-bottom:14px">
     <div style="font-family:var(--sans);font-size:10px;font-weight:700;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:10px">${t('auth_enter_code_label')}</div>
@@ -2339,8 +2472,9 @@ function vAuth() {
     ${err}
   </div>
   <button id="authVerifyBtn" class="btn bp" style="height:54px;margin-bottom:10px">${t('auth_verify_continue')}</button>
-  <div style="text-align:center">
+  <div style="text-align:center;display:flex;justify-content:center;gap:18px">
     <button id="authResendBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline;padding:8px">${t('auth_resend_code')}</button>
+    ${S._postPaymentAuth ? `<button id="authSkipBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline;padding:8px">${t('auth_skip_for_now')}</button>` : ''}
   </div>
 </div>`;
   }
@@ -2374,8 +2508,22 @@ function vAuth() {
 function bindAuth() {
   var sendBtn = document.getElementById('authSendBtn');
   var backBtn = document.getElementById('authBackBtn');
+  var skipBtn = document.getElementById('authSkipBtn');
   if (backBtn) backBtn.addEventListener('click', function() {
     S._authErr = ''; S._postAuthAction = null; S.phase = 'input'; render();
+  });
+  if (skipBtn) skipBtn.addEventListener('click', function() {
+    // Post-payment only (see vAuth) — access was already granted the
+    // moment payment was confirmed; skipping just means not bothering to
+    // verify this device can receive mail at that address right now. Still
+    // record the email locally so the account badge reflects it correctly;
+    // a genuine cross-device sign-in later goes through the standalone
+    // Sign-in entry point and its own proper OTP check.
+    S.userEmail = S._authEmail;
+    localStorage.setItem('fr_email', S.userEmail);
+    S._postPaymentAuth = false;
+    S._authErr = ''; S.phase = 'input'; render();
+    toast('🎉 You\'re all set — welcome to FlexRoute Premium!');
   });
   if (sendBtn) sendBtn.addEventListener('click', async function() {
     var email = (document.getElementById('authEmailInput').value || '').trim().toLowerCase();
@@ -2618,6 +2766,11 @@ async function checkServerTrialStatus(email) {
 
 // ─── Paywall ────────────────────────────────────────────────────────────────
 function vPaywall() {
+  const isStopCap = S._paywallReason === 'stop_count_exceeded';
+  const headline = isStopCap ? t('pay_headline_stopcap') : t('pay_headline');
+  const sub = isStopCap
+    ? t('pay_sub_stopcap').replace('{n}', S._paywallStopCount || S._trialStopCapTotal || '')
+    : t('pay_sub').replace('{n}', FREE_TRIAL_ROUTE_LIMIT);
   return `
 <div class="hdr">
   <div class="hbrand"><img src="${window._LOGO_}" style="height:44px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute"></div>
@@ -2629,8 +2782,8 @@ function vPaywall() {
       <span style="width:7px;height:7px;background:var(--acc);border-radius:50%;display:inline-block;flex-shrink:0"></span>
       <span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:var(--acc);text-transform:uppercase">${t('pay_eyebrow')}</span>
     </div>
-    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">${t('pay_headline')}</div>
-    <div style="font-size:14px;color:var(--t2);line-height:1.55">${t('pay_sub').replace('{n}', FREE_TRIAL_ROUTE_LIMIT)}</div>
+    <div style="font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.05;margin-bottom:8px">${headline}</div>
+    <div style="font-size:14px;color:var(--t2);line-height:1.55">${sub}</div>
   </div>
 
   <!-- Trust bar — real numbers only, nothing this contradicts refund.html -->
@@ -2752,26 +2905,20 @@ function bindPaywall() {
 
   var checkoutBtn = document.getElementById('checkoutBtn');
   if (checkoutBtn) checkoutBtn.addEventListener('click', async function() {
-    // Fires on EVERY tap, before the email/OTP branch below — this is the
-    // one funnel measurement missing before today. Stripe's own events only
-    // show checkout.session.created/expired, which only fires AFTER a
-    // driver has already cleared the email + OTP gate. Between
-    // paywall_shown (40-47 users/28d per GA4, under its old name
-    // trial_converted) and Stripe ever seeing a session (2 total, ever,
-    // both expired unpaid) there was no visibility into whether people
-    // weren't tapping this button at all, or were tapping it and dropping
-    // during email/OTP. This event answers that: compare its count to
-    // Stripe's checkout.session.created count to isolate exactly which
-    // side of the email/OTP gate the loss is happening on.
+    // Fires on every tap — lets GA4 tell us how many people actually want
+    // to pay, independent of anything downstream. See the trackEvent
+    // comment history for why this matters: paywall views vastly
+    // outnumbered Stripe ever seeing a session, and the old email+OTP gate
+    // sitting between "wants to pay" and "reaches Stripe" was the prime
+    // suspect. Removed below.
     if (typeof trackEvent === 'function') trackEvent('checkout_link_clicked', { plan: selected, had_email: !!S.userEmail });
-    if (!S.userEmail) {
-      // Driver hasn't verified email yet. After OTP verification completes,
-      // go straight to checkout — don't send them back to the paywall for
-      // a second tap. Most drivers were dropping off at this second tap,
-      // thinking nothing happened after the OTP flow.
-      S._postAuthAction = function() { S.phase = 'paywall'; render(); setTimeout(doCheckout, 100); };
-      S.authStep = 'email'; S.phase = 'auth'; render(); return;
-    }
+    // Straight to Stripe, always — no pre-payment email/OTP branch. Stripe
+    // Checkout collects (and verifies, via card/Apple Pay/Google Pay/Link)
+    // an email as a normal part of paying; there is no reason to ask for
+    // one twice before a driver has even seen the payment page. A driver
+    // who's already signed in on this device still gets their email
+    // prefilled (see doCheckout's body), just never REQUIRED before this
+    // point.
     await doCheckout();
   });
 }
@@ -3366,6 +3513,15 @@ function vResult() {
     ${S.optimized.reduce(function(sum,s){return sum+(s.pkgCount||1);},0)} packages scanned &mdash; check this against your Flex app before you drive off
   </div>
 
+  ${S._trialStopCapped ? `
+  <div style="background:var(--acc-d);border:1.5px solid var(--acc);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <div style="flex:1">
+      <div style="font-size:14px;font-weight:800;color:var(--t1);margin-bottom:2px">${t('result_stopcap_title').replace('{n}', S._trialStopCapTotal - TRIAL_STOP_LIMIT)}</div>
+      <div style="font-size:12px;color:var(--t2)">${t('result_stopcap_sub').replace('{n}', S._trialStopCapTotal)}</div>
+    </div>
+    <button id="stopCapUnlockBtn" style="background:var(--acc);color:#000;border:none;border-radius:var(--rs);padding:10px 16px;font-size:13px;font-weight:800;cursor:pointer;font-family:var(--sans);white-space:nowrap">${t('result_stopcap_cta')}</button>
+  </div>` : ''}
+
   <div style="background:var(--surf);border-radius:16px;padding:10px 11px;margin-bottom:10px">
     <div class="rlist">
       ${S.startAddr ? `<div class="ri" style="border-color:var(--inf);border-width:1.5px;background:var(--inf-d)">
@@ -3375,7 +3531,7 @@ function vResult() {
         </div>
         <div class="ri-addr">${escH(S.startAddr)}</div>
       </div>` : ''}
-      ${S.optimized.map((s, i) => rRow(s, i)).join('')}
+      ${S.optimized.map((s, i) => (S._trialStopCapped && i >= TRIAL_STOP_LIMIT) ? rRowLocked(s, i) : rRow(s, i)).join('')}
       ${S.home ? `<div class="ri rh">
         <div class="ri-l">
           <div class="rn" style="background:var(--ok);font-size:14px">&#8962;</div>
@@ -4136,6 +4292,28 @@ function rRow(s, i) {
 </div>`;
 }
 
+// Trial stop-cap placeholder — shows the real position number (not
+// sensitive) with the address itself blurred, rather than a plain "locked"
+// message. The driver can see they have a real, specific stop there
+// (creating the "I need this to finish my route" pressure that's the whole
+// point of this mechanic — see TRIAL_STOP_LIMIT) without seeing its actual
+// content. No move/delete/verify controls, since none of those apply to a
+// stop the driver hasn't unlocked. Deliberately its own function, not a
+// branch inside rRow(), so the one confirmed call site of rRow() (vResult's
+// list) stays the only place this cap can ever apply — see applyTrialStopCap.
+function rRowLocked(s, i) {
+  return `<div class="ri" data-ridx="${i}" style="opacity:.75">
+  <div class="ri-l">
+    <div class="rn" style="background:var(--surf2);color:var(--t3)">${i + 1}</div>
+    <div style="height:4px"></div>
+  </div>
+  <div style="flex:1;min-width:0;display:flex;align-items:center;gap:8px">
+    <div class="ri-addr" style="flex:1;filter:blur(4px);user-select:none;pointer-events:none">${escH(s.address)}</div>
+    <span style="flex-shrink:0;font-size:15px;opacity:.6">&#128274;</span>
+  </div>
+</div>`;
+}
+
 function addStop(text, flexNum, skipRender, pkgCount) {
   if (!text?.trim()) return false;
   pkgCount = pkgCount || 1;
@@ -4709,6 +4887,7 @@ async function optimize() {
   // place — the server-side FREE_TRIAL_ROUTE_LIMIT in trial-status.js MUST
   // be kept in sync manually, there's no shared module).
   if (PREMIUM_LIVE && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid' && S.trialRoutesUsed >= FREE_TRIAL_ROUTE_LIMIT) {
+    S._paywallReason = 'trial_used';
     S.phase = 'paywall';
     render();
     trackEvent('paywall_shown', { reason: 'trial_used', routes_used: S.trialRoutesUsed });
@@ -5349,6 +5528,7 @@ async function optimize() {
     geo_failed: S.geoFailed.length,
     region: S.userState || 'unknown'
   });
+  applyTrialStopCap();
   _consumeTrialIfApplicable();
   saveSession();
   S.phase = 'result'; render();
@@ -5494,6 +5674,7 @@ async function optimizeWithGemini() {
     });
     S.phase = 'fixing';
   } else {
+    applyTrialStopCap();
     S.phase = 'result';
   }
   render();
