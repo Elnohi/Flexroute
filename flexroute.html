@@ -5047,11 +5047,23 @@ async function optimize() {
   // before, just ~30s slower to reach the fix screen) and gives an actual
   // rate-limit window a realistic chance to clear when the service was
   // the problem, instead of one token gesture at a retry.
+  //
+  // Trigger: ANY failure, not just a 50%+ mass failure. Real usage data
+  // (GA4 Realtime, Sep 2026) showed fix_screen_shown firing on the large
+  // majority of real optimize attempts, while this retry pass essentially
+  // never engaged — the 50%+/4-stop threshold was sized for the original
+  // mass-rate-limit incident (20 of 23 stops), but real routes mostly fail
+  // a SMALL number of individually-hard addresses instead, which never
+  // reached that threshold and got zero benefit from retrying. A single
+  // failed stop can be just as rate-limit-caused as twelve; there's no
+  // reason to only give the retry a chance at the larger failures. Cost is
+  // asymmetric: this block still only runs at all when something actually
+  // failed, so a clean route (the common case) is completely unaffected.
   var _nonHomeStartTotal = toGeocode.filter(function(x){ return x.key !== '__home__' && x.key !== '__start__'; }).length;
-  if (_nonHomeStartTotal >= 4 && S.geoFailed.length / _nonHomeStartTotal >= 0.5) {
+  if (S.geoFailed.length > 0) {
     var _backoffs = [3000, 8000, 20000];
     for (var _attempt = 0; _attempt < _backoffs.length && S.geoFailed.length > 0; _attempt++) {
-      console.log('[FlexRoute] Bulk geocode failure (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ') — retry ' + (_attempt + 1) + '/' + _backoffs.length + ' after ' + _backoffs[_attempt] + 'ms');
+      console.log('[FlexRoute] Geocode failure (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ') — retry ' + (_attempt + 1) + '/' + _backoffs.length + ' after ' + _backoffs[_attempt] + 'ms');
       if (typeof trackEvent === 'function') {
         trackEvent('geocode_bulk_retry', { failed: S.geoFailed.length, total: _nonHomeStartTotal, attempt: _attempt + 1 });
       }
@@ -5078,7 +5090,7 @@ async function optimize() {
       }
     }
     if (S.geoFailed.length > 0) {
-      console.warn('[FlexRoute] Bulk geocode failure persisted after ' + _backoffs.length + ' retries (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ' still failing) — likely a sustained rate limit or outage, not a blip');
+      console.warn('[FlexRoute] Geocode failure persisted after ' + _backoffs.length + ' retries (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ' still failing) — likely genuinely hard addresses or a sustained outage, not a blip. These stops remain flagged for manual correction, never dropped from the route.');
     }
   }
 
