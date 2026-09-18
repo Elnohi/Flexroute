@@ -3847,17 +3847,35 @@ function initRouteMap() {
     latlngs = [startLL].concat(latlngs);
   }
 
-  // Init map — dark tile layer matching app theme
+  // Init map — attribution enabled: OpenStreetMap's tile usage policy
+  // requires visible "OpenStreetMap contributors" credit, and heavy
+  // unattributed usage risks being blocked outright. Previously disabled
+  // entirely (attributionControl: false) under CARTO's tiles; worth fixing
+  // properly now rather than trade one usage-policy risk for another.
   _mapInstance = L.map(container, {
     zoomControl: true,
-    attributionControl: false,
+    attributionControl: true,
     tap: true
   });
 
-  // Dark OSM tile layer — CartoDB Dark Matter, no API key needed
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  // OpenStreetMap's own standard tile server — switched from CARTO's dark
+  // tiles (basemaps.cartocdn.com) after CARTO began requiring an API key
+  // on that endpoint as of Sept 2026 (confirmed industry-wide, not
+  // FlexRoute-specific — other projects hit the exact same "API KEY
+  // REQUIRED" watermark within days of each other). OSM's standard tiles
+  // are donation-funded, genuinely free forever, no signup, no key — the
+  // same free-tier-volatility risk this session already hit with Photon
+  // and Nominatim, avoided here by using the one tile provider with no
+  // history of tightening its terms. Trade-off knowingly accepted: this
+  // is OSM's standard LIGHT map style, not a dark theme match — affects
+  // only this preview panel, nothing else in the app. OSM's own
+  // subdomains are a/b/c (CARTO used 'abcd'); the {r} retina-tile
+  // placeholder is also CARTO-specific and dropped here since OSM's
+  // standard endpoint doesn't serve @2x variants at that URL pattern.
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
-    subdomains: 'abcd'
+    subdomains: 'abc',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(_mapInstance);
 
   // Fit map to all stop bounds with padding
