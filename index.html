@@ -5,16 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#0A0A12">
 <meta name="description" content="FlexRoute — Amazon Flex route optimizer. Screenshot your stop list, get a shorter route. Save time and fuel on every shift.">
-
-<!-- OpenGraph / Twitter Card — controls how the URL previews when shared -->
-<meta property="og:title" content="FlexRoute — Delivery Route Optimizer">
-<meta property="og:description" content="Amazon Flex route optimizer. Screenshot your stop list, get a shorter route. Save time and fuel on every shift.">
-<meta property="og:url" content="https://flexrouteapp.com/">
-<meta property="og:image" content="https://flexrouteapp.com/og-image.png">
-<meta property="og:type" content="website">
-<meta name="twitter:card" content="summary_large_image">
-
-<link rel="canonical" href="https://flexrouteapp.com/">
 <title>FlexRoute — Delivery Route Optimizer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -345,15 +335,17 @@ footer a:hover{color:var(--t2);}
       <a href="https://play.google.com/store/apps/details?id=com.flexrouteapp.twa&amp;pcampaignid=web_share" target="_blank" rel="noopener" onclick="track('cta_click',{location:'install_play'})" style="display:block;background:var(--acc);color:#000;text-align:center;font-family:var(--sans);font-weight:800;font-size:16px;padding:15px 20px;border-radius:12px;text-decoration:none;">Get it on Google Play &rarr;</a>
     </div>
 
-    <div style="background:var(--surf);border:1.5px solid var(--brd);border-radius:14px;padding:28px;">
+    <div style="background:rgba(34,217,138,.04);border:1.5px solid rgba(34,217,138,.4);border-radius:14px;padding:28px;display:flex;flex-direction:column;">
+      <div style="display:inline-block;align-self:flex-start;background:rgba(34,217,138,.15);border:1px solid rgba(34,217,138,.4);color:var(--ok);font-family:var(--sans);font-weight:700;font-size:10px;letter-spacing:2px;padding:4px 10px;border-radius:20px;margin-bottom:16px;">WORKS ON IPHONE</div>
       <h3 style="font-family:var(--sans);font-size:20px;font-weight:700;margin-bottom:10px;">iPhone &amp; iPad</h3>
-      <p style="font-size:14px;color:var(--t2);line-height:1.65;margin-bottom:18px;">No App Store version yet. Add FlexRoute to your home screen instead &mdash; it behaves the same way and takes about twenty seconds.</p>
-      <ol style="list-style:none;display:flex;flex-direction:column;gap:10px;">
-        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">1.</span>Open flexrouteapp.com in Safari</li>
-        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">2.</span>Tap Share &#11015; at the bottom</li>
-        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">3.</span>Scroll down and tap &ldquo;Add to Home Screen&rdquo;</li>
-        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--acc);font-family:var(--sans);font-weight:800;flex-shrink:0">4.</span>Tap &ldquo;Add&rdquo; in the top right</li>
+      <p style="font-size:14px;color:var(--t2);line-height:1.65;margin-bottom:24px;flex:1">Install straight from Safari &mdash; no App Store needed. Same app, same features, on your Home Screen in under 20 seconds.</p>
+      <button type="button" onclick="track('cta_click',{location:'install_ios'});var s=document.getElementById('ios-steps');s.style.display='flex';this.style.display='none';" style="display:block;background:var(--ok);color:#000;text-align:center;font-family:var(--sans);font-weight:800;font-size:16px;padding:15px 20px;border-radius:12px;border:none;cursor:pointer;width:100%;">Show Me How &rarr;</button>
+      <ol id="ios-steps" style="display:none;list-style:none;flex-direction:column;gap:10px;margin-top:18px;">
+        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--ok);font-family:var(--sans);font-weight:800;flex-shrink:0">1.</span>Tap <strong style="color:var(--t1)">Share &#11015;</strong> at the bottom of Safari</li>
+        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--ok);font-family:var(--sans);font-weight:800;flex-shrink:0">2.</span>Scroll down, tap <strong style="color:var(--t1)">&ldquo;Add to Home Screen&rdquo;</strong></li>
+        <li style="display:flex;gap:10px;font-size:14px;color:var(--t2)"><span style="color:var(--ok);font-family:var(--sans);font-weight:800;flex-shrink:0">3.</span>Tap <strong style="color:var(--t1)">&ldquo;Add&rdquo;</strong> in the top right &mdash; done</li>
       </ol>
+      <p style="font-size:12px;color:var(--t3);margin-top:16px;text-align:center">&#128241; App Store version coming soon &mdash; this works exactly the same in the meantime.</p>
     </div>
 
   </div>
