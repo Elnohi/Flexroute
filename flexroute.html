@@ -6008,20 +6008,27 @@ function parseFlexOCR(rawText) {
     // Universal remainder guard:
     // If something follows the matched street type, decide whether to keep or strip it.
     // Keep  → "Boulevard Haussmann", "Avenue des Champs", "County Road 1050 E", "Ave North"
-    // Strip → "Street Unit 806", "Ave Apt 4B", "Road Suite 900", "Avenue 205" (duplicate#)
+    // Keep  → "Street Unit 806", "Ave Apt 4B", "Road Suite 900", "Crescent #205" — a real
+    //         unit/apt/suite DESIGNATOR WORD is load-bearing address information (the
+    //         literal door a driver needs), never OCR noise. See the fix note above for
+    //         the real incident this corrects — two separate deliveries silently merged
+    //         into one because their unit numbers were being discarded right here.
+    // Strip → "Avenue 205" (bare trailing number, no unit word — likely a duplicate/
+    //         garbled OCR artifact; behavior for this specific case is unchanged)
     var _rem = addr.slice(m[1].length).trim();
     if (_rem) {
-      // Unit designators and bare duplicate house numbers → strip them (return truncated core)
-      var _isUnit = /^(?:apt|apartment|unit|suite|ste|#|\d)/i.test(_rem);
+      var _isWordUnit = /^(?:apt|apartment|unit|suite|ste|#)/i.test(_rem);
+      if (_isWordUnit) return addr; // real unit designator — always keep in full
+      var _isBareDigit = /^\d/.test(_rem);
       if (/\bCounty\s+Road\s*$/i.test(core)) {
         // County Road X E — road number always kept
         return addr;
-      } else if (!_isUnit) {
+      } else if (!_isBareDigit) {
         // Proper name / article / direction after street type → keep full address
         // e.g. "Haussmann", "des Champs", "North", "Martin Luther King Jr"
         return addr;
       }
-      // _isUnit = true → fall through, return truncated core below
+      // bare digit remainder, no unit word → fall through, return truncated core (unchanged)
     }
     return core;
   }
