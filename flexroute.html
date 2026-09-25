@@ -6366,6 +6366,23 @@ function parseFlexOCR(rawText) {
         j++;
       }
 
+      if (!addrLine) {
+        for (var _lk = i + 1; _lk < j && !addrLine; _lk++) {
+          if (!lines[_lk] || isNoise(lines[_lk]) || isCity(lines[_lk])) continue;
+          var _lenientLine = cleanLine(lines[_lk]);
+          if (/^\d{1,5}[a-z]?\s+[A-Za-z]{2,}/.test(_lenientLine) && _lenientLine.length >= 8 && _lenientLine.length <= 60) {
+            var _lenientAddr = truncateAfterStreetType(_lenientLine);
+            if (_lenientAddr && /^\d/.test(_lenientAddr) && _lenientAddr.length >= 6) {
+              addrLine = _lenientAddr;
+              if (!cityLine) cityLine = pendingCity || '';
+              if (typeof trackEvent === 'function') {
+                trackEvent('ocr_line_rescued', { stop_num: extractStopNum(lines[i]) });
+              }
+            }
+          }
+        }
+      }
+
       if (addrLine) {
         var city = cityLine || pendingCity || '';
         // Strip Amazon noise that OCR sometimes appends to last address line
