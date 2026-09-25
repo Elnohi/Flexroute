@@ -1673,6 +1673,7 @@ var LANGS = {
     finish_shift: '✓ Finish Shift',
     all_stops: '☰ All stops',
     packages_at_stop: '{n} packages at this stop',
+    packages_with_nums: '{n} packages — #{list}',
     pkg_in_car_num: 'Package #{n} in car',
     shift_complete: 'Shift Complete!',
     stops_delivered: '{n} stops',
@@ -1860,6 +1861,7 @@ var LANGS = {
     finish_shift: '✓ Fin du quart',
     all_stops: '☰ Tous les arrêts',
     packages_at_stop: '{n} colis à cet arrêt',
+    packages_with_nums: '{n} colis — n° {list}',
     pkg_in_car_num: 'Colis n°{n} en voiture',
     shift_complete: 'Quart terminé !',
     stops_delivered: '{n} arrêts',
@@ -2047,6 +2049,7 @@ var LANGS = {
     finish_shift: '✓ Schicht beenden',
     all_stops: '☰ Alle Stopps',
     packages_at_stop: '{n} Pakete an diesem Stopp',
+    packages_with_nums: '{n} Pakete — Nr. {list}',
     pkg_in_car_num: 'Paket Nr. {n} im Auto',
     shift_complete: 'Schicht abgeschlossen!',
     stops_delivered: '{n} Stopps',
@@ -2234,6 +2237,7 @@ var LANGS = {
     finish_shift: '✓ Finalizar turno',
     all_stops: '☰ Todas las paradas',
     packages_at_stop: '{n} paquetes en esta parada',
+    packages_with_nums: '{n} paquetes — n.º {list}',
     pkg_in_car_num: 'Paquete n°{n} en el coche',
     shift_complete: '¡Turno completado!',
     stops_delivered: '{n} paradas',
@@ -3682,10 +3686,11 @@ function vCompanion() {
       '<div class="comp-addr">' + escH(stop.address) + '</div>' +
       (stop.flexNum != null ? (function(){
         var _n = stop.flexNum, _k = stop.pkgCount || 1;
-        var _lbl = _k > 1
-          ? 'Package #' + _n + ' &mdash; ' + _k + ' packages'
-          : 'Package #' + _n + ' in car';
-        return '<div class="comp-pkg">&#128230; ' + _lbl + '</div>';
+        var _nums = (stop.packageNums && stop.packageNums.length > 1) ? stop.packageNums.slice().sort(function(a,b){return a-b;}) : null;
+        var _lbl = _nums
+          ? t('packages_with_nums').replace('{n}', _k).replace('{list}', _nums.join(', '))
+          : (_k > 1 ? t('packages_at_stop').replace('{n}', _k) : t('pkg_in_car_num').replace('{n}', _n));
+        return '<div class="comp-pkg">&#128230; ' + escH(_lbl) + '</div>';
       })() : '<div style="height:20px"></div>') +
       '<div class="comp-navbtns">' +
         '<a href="' + wazeURL + '" target="_blank" class="comp-waze" id="compWazeBtn">&#9664; Waze</a>' +
@@ -4183,7 +4188,7 @@ async function reoptimizeRemaining() {
   // Stage: remaining stops become the input; start = last delivered location.
   S.stops = remaining.map(function(st){
     return { id: st.id || mkId(), address: st.address, flexNum: st.flexNum != null ? st.flexNum : null,
-             coords: st.coords || null, pkgCount: st.pkgCount || 1 };
+             coords: st.coords || null, pkgCount: st.pkgCount || 1, packageNums: st.packageNums || [] };
   });
   var last = delivered.length ? delivered[delivered.length - 1] : null;
   if (last && last.coords) {
@@ -4298,7 +4303,13 @@ function rRow(s, i) {
       style="flex-shrink:0;font-size:11px;color:var(--t3);text-decoration:none;padding:3px 7px;border:1px solid var(--brd);border-radius:6px;white-space:nowrap;margin-top:2px"
       title="Verify this location on Google Maps">&#128205; verify</a>` : ''}
   </div>
-  ${(s.pkgCount||1) > 1 ? `<div style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,153,0,.15);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:700;padding:3px 9px;border-radius:10px;margin-top:6px;font-family:var(--sans)">&#128230; ${s.pkgCount} packages at this stop</div>` : ''}
+  ${(s.pkgCount||1) > 1 ? (function(){
+    var _nums = (s.packageNums && s.packageNums.length > 1) ? s.packageNums.slice().sort(function(a,b){return a-b;}) : null;
+    var _label = _nums
+      ? t('packages_with_nums').replace('{n}', s.pkgCount).replace('{list}', _nums.join(', '))
+      : t('packages_at_stop').replace('{n}', s.pkgCount);
+    return '<div style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,153,0,.15);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:700;padding:3px 9px;border-radius:10px;margin-top:6px;font-family:var(--sans)">&#128230; ' + escH(_label) + '</div>';
+  })() : ''}
   ${s._moved ? `<div class="ri-manual">&#128204; MOVED BY YOU${s._pinned ? ' \u00b7 STAYS HERE' : ''}</div>` : ''}
   ${isL ? `<div class="ri-tag">LAST</div>` : ''}
   </div>
@@ -4332,7 +4343,7 @@ function rRowLocked(s, i) {
 </div>`;
 }
 
-function addStop(text, flexNum, skipRender, pkgCount) {
+function addStop(text, flexNum, skipRender, pkgCount, packageNums) {
   if (!text?.trim()) return false;
   pkgCount = pkgCount || 1;
   // Merge same addresses — add packages instead of discarding
@@ -4344,11 +4355,21 @@ function addStop(text, flexNum, skipRender, pkgCount) {
     // Use MAX, not SUM — same stop appears in multiple overlapping screenshots
   // 3 screenshots × 6 packages = 18 (wrong). Should be 6 (the real count).
   existing.pkgCount = Math.max(existing.pkgCount || 1, pkgCount || 1);
+    // Combine package-number lists (not just take one side) so a stop that's
+    // been through both the OCR-parse merge AND this address-level merge
+    // still shows every real package number, not just whichever call
+    // happened to arrive last.
+    if (packageNums && packageNums.length) {
+      var _existNums = existing.packageNums || (existing.flexNum != null ? [existing.flexNum] : []);
+      packageNums.forEach(function(n){ if (_existNums.indexOf(n) === -1) _existNums.push(n); });
+      existing.packageNums = _existNums;
+    }
     if (!skipRender) { saveSession(); render(); }
     return true;
   }
 
-  var newStop = { id: mkId(), address: text.trim(), flexNum: flexNum ?? null, coords: null, pkgCount: pkgCount };
+  var newStop = { id: mkId(), address: text.trim(), flexNum: flexNum ?? null, coords: null, pkgCount: pkgCount,
+    packageNums: (packageNums && packageNums.length) ? packageNums.slice() : (flexNum != null ? [flexNum] : []) };
 
   if (!skipRender && flexNum == null && S.stops.length > 0) {
     // Manual stop: insert in the middle of the list so it doesn't default to last.
@@ -4629,7 +4650,7 @@ async function handleFiles(files) {
         trackEvent('depot_autodetected', {});
       }
       for (const it of items) {
-        if (addStop(it.address, it.num, true, it.pkgCount || 1)) added++;
+        if (addStop(it.address, it.num, true, it.pkgCount || 1, it.packageNums)) added++;
       }
     } catch (err) {
       failed++;
@@ -6008,27 +6029,34 @@ function parseFlexOCR(rawText) {
     // Universal remainder guard:
     // If something follows the matched street type, decide whether to keep or strip it.
     // Keep  → "Boulevard Haussmann", "Avenue des Champs", "County Road 1050 E", "Ave North"
-    // Keep  → "Street Unit 806", "Ave Apt 4B", "Road Suite 900", "Crescent #205" — a real
-    //         unit/apt/suite DESIGNATOR WORD is load-bearing address information (the
-    //         literal door a driver needs), never OCR noise. See the fix note above for
-    //         the real incident this corrects — two separate deliveries silently merged
-    //         into one because their unit numbers were being discarded right here.
-    // Strip → "Avenue 205" (bare trailing number, no unit word — likely a duplicate/
-    //         garbled OCR artifact; behavior for this specific case is unchanged)
+    // Strip → "Street Unit 806", "Ave Apt 4B", "Road Suite 900", "Avenue 205" (duplicate#)
+    //
+    // RESTORED per explicit direction: unit/apt/suite designators AND bare
+    // trailing digits are both stripped again here, exactly as they were
+    // through months of real production use (confirmed reliable Aug-Sept
+    // 2026). Building number matters for routing; unit number doesn't
+    // change WHERE to drive, and keeping either form here risked OCR/
+    // parsing reliability regressions (ocr_stops_unreadable returning
+    // after months of being resolved). The package-undercount problem this
+    // used to cause when merging two units at the same building — e.g. two
+    // "Deliver one package" stops at "10 Alford Crescent" merging into a
+    // single 1-package stop instead of 2 — is now fixed at the dedup/merge
+    // stage instead (see _rawKey in the dedup logic), which distinguishes
+    // genuinely different units using the ORIGINAL unstripped text without
+    // needing to preserve or display the unit number here at all.
     var _rem = addr.slice(m[1].length).trim();
     if (_rem) {
-      var _isWordUnit = /^(?:apt|apartment|unit|suite|ste|#)/i.test(_rem);
-      if (_isWordUnit) return addr; // real unit designator — always keep in full
-      var _isBareDigit = /^\d/.test(_rem);
+      // Unit designators and bare duplicate house numbers → strip them (return truncated core)
+      var _isUnit = /^(?:apt|apartment|unit|suite|ste|#|\d)/i.test(_rem);
       if (/\bCounty\s+Road\s*$/i.test(core)) {
         // County Road X E — road number always kept
         return addr;
-      } else if (!_isBareDigit) {
+      } else if (!_isUnit) {
         // Proper name / article / direction after street type → keep full address
         // e.g. "Haussmann", "des Champs", "North", "Martin Luther King Jr"
         return addr;
       }
-      // bare digit remainder, no unit word → fall through, return truncated core (unchanged)
+      // _isUnit = true → fall through, return truncated core below
     }
     return core;
   }
@@ -6062,7 +6090,18 @@ function parseFlexOCR(rawText) {
       s = s.replace(/^\d{1,3}\s*[.)\]]\s*/, ''); // strip if that digit was a number prefix
     }
     // Apt-dash: "607-30 Mutual St" → "30 Mutual St"
-    // Apartment number prefix before hyphen — strip it, keep street number
+    // Apartment number prefix before hyphen — strip it, keep street number.
+    // RESTORED per explicit direction: this was a deliberate, hard-won
+    // trade-off from months of real production use (confirmed reliable
+    // Aug-Sept 2026), not an oversight. Building number matters for
+    // routing; unit number doesn't change WHERE to drive, and keeping it
+    // risked OCR/parsing reliability regressions (ocr_stops_unreadable
+    // returning after months of being resolved). The package-undercount
+    // problem this used to cause when merging two units at the same
+    // building is now fixed differently — see _rawKey in the dedup logic
+    // below, which distinguishes genuinely different units using the
+    // ORIGINAL unstripped text, without needing to preserve or display
+    // the unit number at all.
     s = s.replace(/^\d{2,4}-(\d+\s+[A-Za-z])/, '$1');
     return s.trim();
   }
@@ -6388,37 +6427,73 @@ function parseFlexOCR(rawText) {
             .replace(/\bplz\b/g, 'plaza').replace(/\bvlg\b/g, 'village');
         }
         var normAddr = _dedupNorm(fullAddr);
-        var hasUnitInfo = /\b(unit|apt|apartment|suite|ste|#)\.?\s*\d/i.test(fullAddr);
+        // Stop serial number, extracted from THIS block's own annotation
+        // line (e.g. "(14) # D-38.3D") — a reliable, address-independent
+        // signal for telling two colliding entries apart. Since building-
+        // level addresses are intentionally short again (see the revert
+        // note on truncateAfterStreetType/cleanLine above — this trades
+        // unit-level display detail for OCR/parsing reliability, a
+        // deliberate choice confirmed reliable through months of real use),
+        // two genuinely different units at the same building now normalize
+        // to an IDENTICAL address string with no way to tell them apart
+        // from the text alone. Amazon's own per-stop serial number still
+        // can, though: it's assigned uniquely per delivery and survives
+        // completely independently of anything cleanLine/truncateAfterStreetType
+        // do to the address. Two different serial numbers colliding on the
+        // same short address are unambiguously two different deliveries —
+        // their package counts must always be summed, not guessed at via
+        // count-matching (which silently undercounted the original Alford
+        // Crescent incident: two "Deliver one package" stops with equal
+        // counts were assumed to be one overlapping screenshot and never
+        // summed). A matching or unextractable serial number falls back to
+        // that same count-matching heuristic, which still correctly
+        // handles the common, legitimate overlapping-screenshot case.
+        var _stopNum = extractStopNum(_schedLine);
         var _existingResult = results.find(function(r) {
           var rNorm = _dedupNorm(r.address);
           if (rNorm === normAddr) return true; // exact match, always same stop
-          // Prefix relationship (one is a truncated OCR read of the other) —
-          // only treat as the same stop if NEITHER side carries unit/suite
-          // info the other lacks. If either has a unit number the other
-          // doesn't, they're different sub-addresses, not OCR variance.
+          // Prefix relationship (one is a truncated OCR read of the other)
           var shorter = normAddr.length <= rNorm.length ? normAddr : rNorm;
           var longer  = normAddr.length <= rNorm.length ? rNorm : normAddr;
           if (longer.indexOf(shorter) !== 0) return false; // not a prefix relationship
-          var rHasUnit = /\b(unit|apt|apartment|suite|ste|#)\.?\s*\d/i.test(r.address);
-          if (hasUnitInfo !== rHasUnit) return false; // one has unit info, other doesn't → different sub-address
           // Require the prefix to be reasonably long relative to the shorter
           // string so two short, unrelated lines don't accidentally collide
           // (e.g. avoids matching on just a house number + first letter).
           return shorter.length >= 12;
         });
+        // Appends _stopNum to a merged result's packageNums list, so the
+        // driver sees exactly which numbered packages to grab for a multi-
+        // package stop (e.g. "#12, #13, #16"), not just a bare count. Only
+        // called when a merge is being treated as a genuinely different
+        // delivery — never for the "same package, overlapping screenshot"
+        // case, since that's the same physical box already recorded.
+        function _addPackageNum(target) {
+          if (_stopNum === null) return;
+          if (!target.packageNums) target.packageNums = target.num !== null ? [target.num] : [];
+          if (target.packageNums.indexOf(_stopNum) === -1) target.packageNums.push(_stopNum);
+        }
         if (_existingResult) {
-          // Same address found:
-          // - Same pkg count (e.g. 6 + 6 + 6) = overlapping screenshots → use MAX (keep 6)
-          // - Different pkg count (e.g. 1 + 1 + 1) = multiple deliveries → use SUM (= 3)
           var _existPkg = _existingResult.pkgCount || 1;
-          if (currentPkgCount === _existPkg) {
-            // Same count — overlapping screenshot, don't multiply
+          var _bothNumsKnown = _stopNum !== null && _existingResult.num !== null;
+          var _definitelyDifferentStop = _bothNumsKnown && _stopNum !== _existingResult.num;
+          if (_definitelyDifferentStop) {
+            // Confirmed different delivery by serial number — always sum,
+            // regardless of whether the package counts happen to match.
+            _existingResult.pkgCount = _existPkg + currentPkgCount;
+            _addPackageNum(_existingResult);
+          } else if (currentPkgCount === _existPkg) {
+            // Same count, same/unknown serial number — overlapping
+            // screenshot, don't multiply, don't duplicate the package number.
             _existingResult.pkgCount = _existPkg;
           } else {
+            // Different count, same/unknown serial number — multiple
+            // deliveries, sum as before.
             _existingResult.pkgCount = _existPkg + currentPkgCount;
+            _addPackageNum(_existingResult);
           }
         } else {
-          results.push({ num: null, address: fullAddr, pkgCount: currentPkgCount });
+          results.push({ num: _stopNum, address: fullAddr, pkgCount: currentPkgCount,
+            packageNums: _stopNum !== null ? [_stopNum] : [] });
         }
       } else {
         // Scheduled block found but no address line could be parsed —
