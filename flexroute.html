@@ -6013,17 +6013,8 @@ function parseFlexOCR(rawText) {
     //         literal door a driver needs), never OCR noise. See the fix note above for
     //         the real incident this corrects — two separate deliveries silently merged
     //         into one because their unit numbers were being discarded right here.
-    // Keep  → "Avenue 214", "Street 5402" — a bare trailing number with NO unit word is
-    //         ALSO commonly a real Toronto/Canada condo unit number (drivers routinely
-    //         see e.g. "50 Dunfield Avenue 214" meaning Unit 214) — confirmed by real
-    //         incident: "50 Dunfield Avenue 214", "111 Davisville Avenue 502", and
-    //         "2221 Yonge Street 5402" all lost their real unit number here in a single
-    //         route. Previously this whole category was stripped on the theory it was
-    //         usually OCR-duplicated house-number noise; that theory didn't hold up
-    //         against real data. Now only stripped when it's a CONFIRMED duplicate —
-    //         i.e. the trailing number exactly matches the address's own leading house
-    //         number (e.g. a genuine OCR artifact like "1050 Eastern Avenue 1050") —
-    //         since that's the one case a bare number is verifiably not a real unit.
+    // Strip → "Avenue 205" (bare trailing number, no unit word — likely a duplicate/
+    //         garbled OCR artifact; behavior for this specific case is unchanged)
     var _rem = addr.slice(m[1].length).trim();
     if (_rem) {
       var _isWordUnit = /^(?:apt|apartment|unit|suite|ste|#)/i.test(_rem);
@@ -6032,16 +6023,12 @@ function parseFlexOCR(rawText) {
       if (/\bCounty\s+Road\s*$/i.test(core)) {
         // County Road X E — road number always kept
         return addr;
-      } else if (_isBareDigit) {
-        var _leadingNum = (addr.match(/^\d+/) || [])[0];
-        var _trailingNum = (_rem.match(/^\d+/) || [])[0];
-        if (!_leadingNum || _trailingNum !== _leadingNum) return addr; // not a confirmed duplicate — keep in full
-        // else: confirmed duplicate of the house number → fall through, strip
-      } else {
+      } else if (!_isBareDigit) {
         // Proper name / article / direction after street type → keep full address
         // e.g. "Haussmann", "des Champs", "North", "Martin Luther King Jr"
         return addr;
       }
+      // bare digit remainder, no unit word → fall through, return truncated core (unchanged)
     }
     return core;
   }
@@ -6074,19 +6061,9 @@ function parseFlexOCR(rawText) {
       s = s.replace(/^[^\d]+(?=\d)/, '');         // strip up to first digit
       s = s.replace(/^\d{1,3}\s*[.)\]]\s*/, ''); // strip if that digit was a number prefix
     }
-    // NOTE: this used to also strip a leading "NNN-" unit-number prefix here
-    // ("607-30 Mutual St" → "30 Mutual St") — removed. That's real, load-
-    // bearing address information (a Toronto/Canada condo unit number), not
-    // OCR noise, and stripping it PERMANENTLY at parse time — before the
-    // address is ever stored or shown to the driver — caused real, confirmed
-    // data loss: "610-1 Belsize Drive", "3305-2181 Yonge Street", "1105-60
-    // Holly Street", and "1612-5 Soudan Avenue" all lost their unit prefix
-    // in a single real route. geocode()'s aptStreetMatch already handles
-    // this correctly as a GEOCODING-ONLY fallback (a temporary variant tried
-    // only if the full address fails to geocode, never touching the stored
-    // address) — stripping it here too was redundant with that and actively
-    // harmful. See truncateAfterStreetType's word-unit fix for the same
-    // class of bug on the trailing side (e.g. "Unit 67").
+    // Apt-dash: "607-30 Mutual St" → "30 Mutual St"
+    // Apartment number prefix before hyphen — strip it, keep street number
+    s = s.replace(/^\d{2,4}-(\d+\s+[A-Za-z])/, '$1');
     return s.trim();
   }
 
