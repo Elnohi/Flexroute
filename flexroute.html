@@ -1674,6 +1674,7 @@ var LANGS = {
     all_stops: '☰ All stops',
     packages_at_stop: '{n} packages at this stop',
     packages_with_nums: '{n} packages — #{list}',
+    list_and: 'and',
     pkg_in_car_num: 'Package #{n} in car',
     shift_complete: 'Shift Complete!',
     stops_delivered: '{n} stops',
@@ -1862,6 +1863,7 @@ var LANGS = {
     all_stops: '☰ Tous les arrêts',
     packages_at_stop: '{n} colis à cet arrêt',
     packages_with_nums: '{n} colis — n° {list}',
+    list_and: 'et',
     pkg_in_car_num: 'Colis n°{n} en voiture',
     shift_complete: 'Quart terminé !',
     stops_delivered: '{n} arrêts',
@@ -2050,6 +2052,7 @@ var LANGS = {
     all_stops: '☰ Alle Stopps',
     packages_at_stop: '{n} Pakete an diesem Stopp',
     packages_with_nums: '{n} Pakete — Nr. {list}',
+    list_and: 'und',
     pkg_in_car_num: 'Paket Nr. {n} im Auto',
     shift_complete: 'Schicht abgeschlossen!',
     stops_delivered: '{n} Stopps',
@@ -2238,6 +2241,7 @@ var LANGS = {
     all_stops: '☰ Todas las paradas',
     packages_at_stop: '{n} paquetes en esta parada',
     packages_with_nums: '{n} paquetes — n.º {list}',
+    list_and: 'y',
     pkg_in_car_num: 'Paquete n°{n} en el coche',
     shift_complete: '¡Turno completado!',
     stops_delivered: '{n} paradas',
@@ -3688,7 +3692,7 @@ function vCompanion() {
         var _n = stop.flexNum, _k = stop.pkgCount || 1;
         var _nums = (stop.packageNums && stop.packageNums.length > 1) ? stop.packageNums.slice().sort(function(a,b){return a-b;}) : null;
         var _lbl = _nums
-          ? t('packages_with_nums').replace('{n}', _k).replace('{list}', _nums.join(', '))
+          ? t('packages_with_nums').replace('{n}', _k).replace('{list}', _formatNumList(_nums))
           : (_k > 1 ? t('packages_at_stop').replace('{n}', _k) : t('pkg_in_car_num').replace('{n}', _n));
         return '<div class="comp-pkg">&#128230; ' + escH(_lbl) + '</div>';
       })() : '<div style="height:20px"></div>') +
@@ -4306,7 +4310,7 @@ function rRow(s, i) {
   ${(s.pkgCount||1) > 1 ? (function(){
     var _nums = (s.packageNums && s.packageNums.length > 1) ? s.packageNums.slice().sort(function(a,b){return a-b;}) : null;
     var _label = _nums
-      ? t('packages_with_nums').replace('{n}', s.pkgCount).replace('{list}', _nums.join(', '))
+      ? t('packages_with_nums').replace('{n}', s.pkgCount).replace('{list}', _formatNumList(_nums))
       : t('packages_at_stop').replace('{n}', s.pkgCount);
     return '<div style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,153,0,.15);border:1px solid var(--acc);color:var(--acc);font-size:12px;font-weight:700;padding:3px 9px;border-radius:10px;margin-top:6px;font-family:var(--sans)">&#128230; ' + escH(_label) + '</div>';
   })() : ''}
@@ -7305,6 +7309,15 @@ function normalizeAddress(addr) {
 // sleep() is defined once earlier in the file. Duplicate removed to avoid the
 // "duplicate block silently wins" pattern (same class of bug as the old rzoom
 // CSS duplication).
+// "22, 23 and 24" instead of a bare "22, 23, 24" — reads as a real list, not
+// a raw data dump, in whichever language is active (uses the translated
+// "and"/"et"/"und"/"y" word rather than hardcoding English).
+function _formatNumList(nums) {
+  if (nums.length === 1) return String(nums[0]);
+  var andWord = t('list_and');
+  if (nums.length === 2) return nums[0] + ' ' + andWord + ' ' + nums[1];
+  return nums.slice(0, -1).join(', ') + ' ' + andWord + ' ' + nums[nums.length - 1];
+}
 function escH(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 </script>
 </body>
