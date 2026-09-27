@@ -1265,6 +1265,22 @@ function bind() {
     });
 
     document.getElementById('app').addEventListener('click', async function(e) {
+      var ocrFixBtn = e.target.closest('[data-ocrfix]');
+      if (ocrFixBtn) {
+        var oidx = parseInt(ocrFixBtn.getAttribute('data-ocrfix'), 10);
+        var oinp = document.getElementById('ocrfix-' + oidx);
+        var oval = oinp ? oinp.value.trim() : '';
+        if (!oval) return;
+        if (addStop(oval)) {
+          if (S._ocrWarn && S._ocrWarn.items) {
+            S._ocrWarn.items.splice(oidx, 1);
+            if (!S._ocrWarn.items.length && !S._ocrWarn.possibleMissingNote) S._ocrWarn = null;
+          }
+          toast('\u2713 Stop added. Tap Optimize to include it.');
+          saveSession(); render();
+        }
+        return;
+      }
       var fixBtn = e.target.closest('[data-fix]');
       if (fixBtn) {
         var sid = fixBtn.getAttribute('data-fix');
@@ -3254,8 +3270,21 @@ function vInput() {
   if (S._ocrWarn) {
     h += '<div class="geo-warn" id="ocrWarnBox" style="margin-bottom:14px;position:relative;padding-right:32px">';
     h += '<div style="font-weight:700;margin-bottom:4px">&#9888; ' + escH(S._ocrWarn.summary) + '</div>';
-    if (S._ocrWarn.lines.length) {
-      h += '<div style="margin:4px 0;opacity:.85">' + S._ocrWarn.lines.map(function(l){ return escH(l); }).join('<br>') + '</div>';
+    if (S._ocrWarn.items && S._ocrWarn.items.length) {
+      h += S._ocrWarn.items.map(function(d, idx){
+        var label = d.num ? `Stop #${d.num}` : `stop ${idx + 1} of ${S._ocrWarn.items.length}`;
+        var prefill = d.raw ? escH(d.raw) : '';
+        return '<div style="margin:8px 0;display:flex;flex-direction:column;gap:5px">'
+          + '<div style="opacity:.85;font-size:13px">' + escH(label) + '</div>'
+          + '<div style="display:flex;gap:6px">'
+          + '<input id="ocrfix-' + idx + '" value="' + prefill + '" placeholder="Type or correct the address"'
+          + ' style="flex:1;min-width:0;font-size:13px;padding:7px 9px;border-radius:8px;border:1px solid var(--brd);background:var(--surf2);color:var(--t1)">'
+          + '<button data-ocrfix="' + idx + '" style="flex-shrink:0;font-size:12px;font-weight:700;padding:7px 12px;border-radius:8px;border:1px solid var(--acc);background:transparent;color:var(--acc);cursor:pointer">Add</button>'
+          + '</div></div>';
+      }).join('');
+    }
+    if (S._ocrWarn.possibleMissingNote) {
+      h += '<div style="margin:8px 0;opacity:.85">' + escH(S._ocrWarn.possibleMissingNote) + '</div>';
     }
     h += '<div style="margin-top:6px">' + escH(S._ocrWarn.note) + '</div>';
     h += '<button id="ocrWarnDismiss" aria-label="Dismiss" style="position:absolute;top:8px;right:8px;background:transparent;border:none;color:inherit;opacity:.6;font-size:16px;line-height:1;cursor:pointer;padding:4px">&#10005;</button>';
@@ -4391,7 +4420,12 @@ function addStop(text, flexNum, skipRender, pkgCount, packageNums) {
     saveSession();
     render();
     if (flexNum == null) {
-      trackEvent('stop_added_manually', { total_stops: S.stops.length });
+      var _minsSinceWarn = S._lastOcrWarnAt ? Math.round((Date.now() - S._lastOcrWarnAt) / 60000) : null;
+      trackEvent('stop_added_manually', {
+        total_stops: S.stops.length,
+        likely_recovery: _minsSinceWarn !== null && _minsSinceWarn <= 30,
+        mins_since_ocr_warning: _minsSinceWarn
+      });
     }
   }
   return true;
@@ -4414,7 +4448,7 @@ function mvStop(id, dir) {
 }
 function clrAll() {
   if (!confirm('Clear all stops?')) return;
-  S.stops = []; S.lastId = null; S.errMsg = ''; S._ocrWarn = null;
+  S.stops = []; S.lastId = null; S.errMsg = ''; S._ocrWarn = null; S._lastOcrWarnAt = null;
   S.savings = null; S.optimized = []; S.geoFailed = [];
   clearSession(); render();
 }
@@ -4725,16 +4759,11 @@ async function handleFiles(files) {
       // before continuing" when the driver can already tap Optimize as-is.
       // Mid-shift, that false alarm is exactly what pushes a driver to give
       // up on the app entirely instead of losing 10 seconds to add 2 stops.
-      var _detailLines = unreadableDetails.map(function(d, idx) {
-        var label = d.num ? `Stop #${d.num}` : `stop ${idx + 1} of ${unreadableDetails.length}`;
-        var detail = d.raw ? ` — "${d.raw}"` : '';
-        return `${label}${detail}`;
-      });
       var _summary = unreadable > 0
         ? `${added} stop${added > 1 ? 's' : ''} added — ${unreadable} couldn't be read automatically`
         : `${added} stop${added > 1 ? 's' : ''} added`;
       var _note = unreadable > 0
-        ? `You're good to optimize now with these ${added}. Add the missed ${unreadable > 1 ? 'ones' : 'one'} above, or from your Flex app, whenever you get a chance.`
+        ? `You're good to optimize now with these ${added}. Fix the missed ${unreadable > 1 ? 'ones' : 'one'} below, or add ${unreadable > 1 ? 'them' : 'it'} from your Flex app, whenever you get a chance.`
         : `You're good to optimize now with these ${added}.`;
       // possibleMissing: a stop that vanished with NO trace at all — not
       // added, not in the list above. We only know an unaccounted-for
@@ -4742,10 +4771,13 @@ async function handleFiles(files) {
       // stop it belongs to (that text is exactly what OCR failed to anchor).
       // This is a different, more serious flag than unreadable — say so
       // plainly rather than folding it into the same "couldn't be read" line.
-      if (possibleMissing > 0) {
-        _detailLines.push(`Possible missing stop${possibleMissing > 1 ? 's' : ''} — your screenshot may contain ${possibleMissing} more delivery${possibleMissing > 1 ? 'ies' : ''} than FlexRoute found. Double-check your Flex app's stop count before you start.`);
-      }
-      S._ocrWarn = { summary: _summary, lines: _detailLines, note: _note };
+      // No raw text exists to pre-fill for this case, so it stays a plain
+      // note rather than an editable row like the items below.
+      var _possibleMissingNote = possibleMissing > 0
+        ? `Possible missing stop${possibleMissing > 1 ? 's' : ''} — your screenshot may contain ${possibleMissing} more delivery${possibleMissing > 1 ? 'ies' : ''} than FlexRoute found. Double-check your Flex app's stop count before you start.`
+        : null;
+      S._ocrWarn = { summary: _summary, items: unreadableDetails.slice(), possibleMissingNote: _possibleMissingNote, note: _note };
+      S._lastOcrWarnAt = Date.now();
       trackEvent('ocr_stops_unreadable', { unreadable: unreadable, possible_missing: possibleMissing, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
