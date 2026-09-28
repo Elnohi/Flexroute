@@ -1022,6 +1022,36 @@ window.addEventListener('load', () => {
   }
 
   // ── Post-checkout redirect handling ─────────────────────────────────────
+  // Reports a CONFIRMED payment to GA4 as a standard `purchase` event. This
+  // was missing entirely: the app tracked the tap on "Continue to payment"
+  // but never the payment itself, so GA4's Purchases stayed at 0 even after
+  // a real subscriber. transaction_id is the Stripe checkout session id, so
+  // GA4 can dedupe, and a localStorage guard stops a reload re-firing it.
+  // A 100%-off internal test checkout (amount 0) is not real revenue and is
+  // deliberately not reported.
+  function _trackPurchaseOnce(sessionId, d) {
+    try {
+      if (!sessionId || !d || !d.paid || typeof trackEvent !== 'function') return;
+      var seen = [];
+      try { seen = JSON.parse(localStorage.getItem('fr_purchase_tracked') || '[]'); } catch (e) {}
+      if (seen.indexOf(sessionId) !== -1) return;
+      var plan = d.plan === 'yearly' ? 'yearly' : (d.plan === 'monthly' ? 'monthly' : null);
+      var listPrice = plan === 'yearly' ? 79 : (plan === 'monthly' ? 9.99 : null);
+      var value = (typeof d.amount === 'number') ? d.amount : listPrice;
+      if (value === 0) return;
+      var params = {
+        transaction_id: sessionId,
+        currency: d.currency || 'USD',
+        items: [{ item_id: 'flexroute_premium_' + (plan || 'unknown'), item_name: 'FlexRoute Premium',
+                  item_category: 'subscription', item_variant: plan || 'unknown', quantity: 1 }]
+      };
+      if (value !== null && value !== undefined) { params.value = value; params.items[0].price = value; }
+      if (typeof d.tax === 'number' && d.tax > 0) params.tax = d.tax;
+      trackEvent('purchase', params);
+      seen.push(sessionId);
+      localStorage.setItem('fr_purchase_tracked', JSON.stringify(seen.slice(-20)));
+    } catch (e) {}
+  }
   (function() {
     var qs = new URLSearchParams(window.location.search);
     var checkoutResult = qs.get('checkout');
@@ -1032,6 +1062,16 @@ window.addEventListener('load', () => {
         // Driver was already signed in on this device before checkout (e.g.
         // used the standalone Sign-in entry point, or a previous session) —
         // unchanged from before, no new email/OTP step needed.
+        // Report the purchase too — a separate lookup, since this path only
+        // asks about entitlement and doesn't know the amount charged.
+        if (sessionId) {
+          fetch('/.netlify/functions/get-checkout-email', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId })
+          }).then(function(r) { return r.json(); }).then(function(pd) {
+            _trackPurchaseOnce(sessionId, pd);
+          }).catch(function() {});
+        }
         fetch('/.netlify/functions/check-entitlement', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1058,6 +1098,7 @@ window.addEventListener('load', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_id: sessionId })
         }).then(function(r) { return r.json(); }).then(function(d) {
+          _trackPurchaseOnce(sessionId, d);
           if (!d.paid || !d.email) {
             S.phase = 'input'; render();
             toast('Payment received — finishing setup…');
@@ -1133,10 +1174,27 @@ window.addEventListener('load', () => {
         if (p.startAddr) S.startAddr = p.startAddr;
         S.uid = p.uid || 0;
         S.geoFailed = p.geoFailed || [];
+        // Shift PROGRESS (which stops are delivered, where to resume) is
+        // restored whether or not the driver was INSIDE Shift Mode when the
+        // page was last saved. It used to be restored only if `p.companion`
+        // was true — but tapping ← back to the route sets companion=false and
+        // saves, so if the page reloaded any time after that (switching apps
+        // to check something, Android reclaiming memory, opening Edit) the
+        // delivered stops were forgotten and Shift Mode restarted at stop 1.
+        S.cIdx = p.cIdx || 0; S.cDone = p.cDone || []; S.cShiftStart = p.cShiftStart || null;
         if (p.companion) {
-          S.companion=p.companion; S.cIdx=p.cIdx||0; S.cDone=p.cDone||[]; S.cShiftStart=p.cShiftStart||null;
-          if (p.cNavApp) S.cNavApp = p.cNavApp;
-          if (typeof p.cAutoNav === 'boolean') S.cAutoNav = p.cAutoNav;
+          S.companion = p.companion;
+          // Which nav app auto-nav uses, and whether auto-nav is on, are USER
+          // PREFERENCES kept in their own localStorage keys (fr_nav_app /
+          // fr_auto_nav), written the instant they're tapped — and S already
+          // loaded them at startup. This snapshot is only refreshed when
+          // saveSession() happens to run, so it can hold an OLDER choice.
+          // Letting it override the fresh preference is a real bug: tap Waze,
+          // Android reloads the page while you're in Waze, the stale snapshot
+          // still says 'maps', and "Delivered" then opens Google Maps for the
+          // next stop. So the snapshot is only a fallback when no preference
+          // was ever stored.
+          if (!S.cNavApp && p.cNavApp) S.cNavApp = p.cNavApp;
         }
         S.phase = (p.optimized && p.optimized.length > 0) ? 'result' : 'input';
         render();
@@ -1515,7 +1573,20 @@ function bind() {
           S.authStep = 'email'; S.phase = 'auth'; render();
         }
         break;
-      case 'optBtn':       optimize(); break;
+      case 'optBtn':
+        // MID-SHIFT: some stops are already delivered. A full optimize() would
+        // wipe that progress ("new route = new shift") and re-plan stops the
+        // driver has already been to — so coming back from Edit and pressing
+        // Optimize used to restart Shift Mode from stop 1.
+        if (_shiftInProgress()) {
+          if (!_editedSinceOptimize()) {
+            // Nothing changed: no re-plan needed — straight back to the route.
+            S.tweakMode = false; S.phase = 'result'; saveSession(); render(); break;
+          }
+          // Edited: re-plan ONLY what's left, keeping delivered stops frozen.
+          S.tweakMode = false; saveSession(); reoptimizeRemaining(); break;
+        }
+        optimize(); break;
       case 'bkBtn':        S.phase='input'; S.errMsg=''; S.geoFailed=[]; render(); break;
       case 'stopCapUnlockBtn':
         S._paywallReason = 'stop_count_exceeded';
@@ -1750,6 +1821,10 @@ var LANGS = {
     share_btn: '⇧ Share',
     try_again: '⚡ Try again',
     start_shift_btn: '▶ Start Shift Mode',
+    resume_shift: '▶ Resume Shift — stop {n} of {total}',
+    autonav_hint_waze: 'Auto-nav will open Waze for the next stop',
+    autonav_hint_maps: 'Auto-nav will open Google Maps for the next stop',
+    autonav_hint_choose: 'Tap Waze or Maps once — auto-nav will keep using your choice',
     open_google_maps: 'Open in Google Maps',
     waze_stop_by_stop: '◀ Waze — stop by stop',
     one_stop_low_mem: 'One stop at a time — uses less memory.',
@@ -1939,6 +2014,10 @@ var LANGS = {
     share_btn: '⇧ Partager',
     try_again: '⚡ Réessayer',
     start_shift_btn: '▶ Démarrer le quart',
+    resume_shift: '▶ Reprendre la tournée — arrêt {n} sur {total}',
+    autonav_hint_waze: 'La navigation auto ouvrira Waze pour l\'arrêt suivant',
+    autonav_hint_maps: 'La navigation auto ouvrira Google Maps pour l\'arrêt suivant',
+    autonav_hint_choose: 'Touchez Waze ou Maps une fois — la navigation auto gardera votre choix',
     open_google_maps: 'Ouvrir dans Google Maps',
     waze_stop_by_stop: '◀ Waze — arrêt par arrêt',
     one_stop_low_mem: 'Un arrêt à la fois — utilise moins de mémoire.',
@@ -2128,6 +2207,10 @@ var LANGS = {
     share_btn: '⇧ Teilen',
     try_again: '⚡ Erneut versuchen',
     start_shift_btn: '▶ Schichtmodus starten',
+    resume_shift: '▶ Schicht fortsetzen — Stopp {n} von {total}',
+    autonav_hint_waze: 'Auto-Navigation öffnet Waze für den nächsten Stopp',
+    autonav_hint_maps: 'Auto-Navigation öffnet Google Maps für den nächsten Stopp',
+    autonav_hint_choose: 'Einmal Waze oder Maps antippen — die Auto-Navigation merkt sich Ihre Wahl',
     open_google_maps: 'In Google Maps öffnen',
     waze_stop_by_stop: '◀ Waze — Stopp für Stopp',
     one_stop_low_mem: 'Ein Stopp nach dem anderen — benötigt weniger Speicher.',
@@ -2317,6 +2400,10 @@ var LANGS = {
     share_btn: '⇧ Compartir',
     try_again: '⚡ Reintentar',
     start_shift_btn: '▶ Iniciar modo turno',
+    resume_shift: '▶ Reanudar turno — parada {n} de {total}',
+    autonav_hint_waze: 'La navegación automática abrirá Waze para la siguiente parada',
+    autonav_hint_maps: 'La navegación automática abrirá Google Maps para la siguiente parada',
+    autonav_hint_choose: 'Toca Waze o Maps una vez: la navegación automática recordará tu elección',
     open_google_maps: 'Abrir en Google Maps',
     waze_stop_by_stop: '◀ Waze — parada a parada',
     one_stop_low_mem: 'Una parada a la vez — usa menos memoria.',
@@ -3535,7 +3622,11 @@ function vResult() {
   </div>
 
   <button class="btn bp" id="startShiftBtn" style="height:54px;margin-bottom:8px">
-    &#9654; ${t("start_shift_btn")}
+    ${(function(){
+      if (!_shiftInProgress()) return '&#9654; ' + t("start_shift_btn");
+      var _tot = S.optimized.filter(function(x){ return !x.geoFailed; }).length;
+      return escH(t('resume_shift').replace('{n}', S.cIdx + 1).replace('{total}', _tot));
+    })()}
   </button>
   <div style="text-align:center;font-size:12px;color:var(--t3);margin-bottom:14px;letter-spacing:.3px">One stop at a time &nbsp;&middot;&nbsp; Auto-nav &nbsp;&middot;&nbsp; Progress saved</div>
 
@@ -3729,6 +3820,9 @@ function vCompanion() {
         '<a href="' + wazeURL + '" target="_blank" class="comp-waze" id="compWazeBtn">&#9664; Waze</a>' +
         '<a href="' + mapsURL + '" target="_blank" class="comp-maps" id="compMapsBtn">Maps</a>' +
       '</div>' +
+      (S.cAutoNav && !isLast ? '<div id="compAutoHint" style="font-size:12px;color:var(--t3);text-align:center;margin-top:10px;line-height:1.4">' +
+        escH(S.cNavApp === 'waze' ? t('autonav_hint_waze') : (S.cNavApp === 'maps' ? t('autonav_hint_maps') : t('autonav_hint_choose'))) +
+        '</div>' : '') +
       '<button class="comp-done" id="compDoneBtn">' + (isLast ? t('finish_shift') : '&#10003; Delivered \u2014 Next Stop') + '</button>' +
     '</div>' +
     '<div class="comp-footer">' +
@@ -3775,8 +3869,11 @@ function startCompanion() {
   S.companion = true;
   // Only reset progress if this is a fresh start (no shift in progress).
   // If user returns from the optimization page mid-shift, resume where they left off.
-  if (!S.cShiftStart) {
+  var _hasProgress = (S.cDone && S.cDone.length > 0) || S.cIdx > 0;
+  if (!S.cShiftStart && !_hasProgress) {
     S.cIdx = 0; S.cDone = []; S.cShiftStart = Date.now();
+  } else if (!S.cShiftStart) {
+    S.cShiftStart = Date.now();   // progress exists but the start time was lost: KEEP the progress
   }
   trackEvent('companion_started', { stop_count: S.optimized.filter(function(s){ return !s.geoFailed; }).length });
   saveSession();
@@ -4043,6 +4140,7 @@ function bindCompanion() {
   if (autoNavBtn) autoNavBtn.addEventListener('click', function(){
     S.cAutoNav = !S.cAutoNav;
     try { localStorage.setItem('fr_auto_nav', S.cAutoNav ? '1' : '0'); } catch(e) {}
+    saveSession();
     render();
   });
   // Waze / Maps buttons: intercept the anchor's default and do a top-level
@@ -4056,6 +4154,7 @@ function bindCompanion() {
     e.preventDefault();
     S.cNavApp = 'waze';
     try { localStorage.setItem('fr_nav_app', 'waze'); } catch(e2) {}
+    saveSession();   // the page may be reloaded while the driver is in Waze — keep the snapshot current
     trackEvent('maps_opened', { map_type: 'companion_waze' });
     window.location.href = wBtn.href;
   });
@@ -4064,6 +4163,7 @@ function bindCompanion() {
     e.preventDefault();
     S.cNavApp = 'maps';
     try { localStorage.setItem('fr_nav_app', 'maps'); } catch(e2) {}
+    saveSession();   // the page may be reloaded while the driver is in Maps — keep the snapshot current
     trackEvent('maps_opened', { map_type: 'companion_maps' });
     window.location.href = mBtn.href;
   });
@@ -4185,6 +4285,27 @@ function removeOptimizedStop(idx) {
 }
 
 // ── Shift-aware re-optimization ─────────────────────────────────────────────
+// A shift is IN PROGRESS when some stops are delivered but not all of them.
+function _shiftInProgress() {
+  if (!S.optimized || !S.optimized.length || !S.cDone || !S.cDone.length) return false;
+  var live = S.optimized.filter(function(s){ return !s.geoFailed; });
+  return S.cIdx < live.length;
+}
+// Has the Edit list changed since the route was optimized? Compares the
+// stops that are still to be delivered on both sides (delivered ones are
+// frozen and never part of the comparison).
+function _editedSinceOptimize() {
+  if (S.tweakMode) return true;
+  var delivered = {};
+  (S.cDone || []).forEach(function(n){ var st = S.optimized[n]; if (st && st.id) delivered[st.id] = true; });
+  var a = {}, b = {}, na = 0, nb = 0;
+  S.optimized.forEach(function(st){ if (st.id && !delivered[st.id]) { a[st.id] = true; na++; } });
+  S.stops.forEach(function(st){ if (st.id && !delivered[st.id]) { b[st.id] = true; nb++; } });
+  if (na !== nb) return true;
+  for (var id in a) { if (!b[id]) return true; }
+  return false;
+}
+
 // Re-optimizes ONLY the undelivered stops, starting from the driver's last
 // delivered location. Delivered stops are frozen as a completed prefix and
 // are NEVER fed back into the optimizer.
@@ -4197,6 +4318,11 @@ async function reoptimizeRemaining() {
   if (!S.optimized || !S.optimized.length) return;
   var doneIdx = (S.cDone || []).slice().sort(function(a,b){ return a-b; });
   var delivered = doneIdx.map(function(n){ return S.optimized[n]; }).filter(Boolean);
+  // optimize() ends with "new route = new shift" and clears cShiftStart. The
+  // progress (cDone/cIdx) is re-attached below, but the START TIME never was —
+  // so startCompanion() saw "no start time" = "fresh shift" and reset the
+  // whole shift to stop 1 even though the driver had already delivered some.
+  var _shiftStart = S.cShiftStart;
 
   // Undelivered = optimized stops not marked done…
   var remaining = S.optimized.filter(function(_, i){ return doneIdx.indexOf(i) < 0; });
@@ -4215,7 +4341,7 @@ async function reoptimizeRemaining() {
   var snap = {
     stops: S.stops, optimized: S.optimized, savings: S.savings,
     gpsCoords: S.gpsCoords, gpsAddr: S.gpsAddr,
-    cDone: (S.cDone||[]).slice(), cIdx: S.cIdx
+    cDone: (S.cDone||[]).slice(), cIdx: S.cIdx, cShiftStart: S.cShiftStart
   };
 
   // Stage: remaining stops become the input; start = last delivered location.
@@ -4239,6 +4365,7 @@ async function reoptimizeRemaining() {
     S.optimized = newOrder;
     S.cDone = delivered.map(function(_, i){ return i; });
     S.cIdx = delivered.length;
+    S.cShiftStart = _shiftStart || Date.now();
     S.gpsCoords = snap.gpsCoords; S.gpsAddr = snap.gpsAddr;
     if (S.savings) S.savings.partial = delivered.length; // describes remainder only
     trackEvent('route_reoptimized', { trigger: 'mid_shift', delivered: delivered.length, remaining: S.optimized.length - delivered.length });
@@ -4247,7 +4374,7 @@ async function reoptimizeRemaining() {
     // Restore everything — a failed re-optimize must not lose shift progress
     S.stops = snap.stops; S.optimized = snap.optimized; S.savings = snap.savings;
     S.gpsCoords = snap.gpsCoords; S.gpsAddr = snap.gpsAddr;
-    S.cDone = snap.cDone; S.cIdx = snap.cIdx;
+    S.cDone = snap.cDone; S.cIdx = snap.cIdx; S.cShiftStart = snap.cShiftStart;
     toast('Re-optimization failed — your route and progress are unchanged.');
     S.phase = 'result'; saveSession(); render();
   } finally {
@@ -4458,6 +4585,7 @@ function clrAll() {
   if (!confirm('Clear all stops?')) return;
   S.stops = []; S.lastId = null; S.errMsg = ''; S._ocrWarn = null; S._lastOcrWarnAt = null;
   S.savings = null; S.optimized = []; S.geoFailed = [];
+  S.companion = false; S.cIdx = 0; S.cDone = []; S.cShiftStart = null;
   clearSession(); render();
 }
 // Full-name → 2-letter code map. Shared between stateFromPhoton() and the
