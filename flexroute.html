@@ -3238,7 +3238,7 @@ function vInput() {
     h += '<div style="margin-bottom:14px">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">';
     h += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:#FF9900;text-transform:uppercase;display:flex;align-items:center;gap:8px">Stops <span style="background:#FF9900;color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px">' + cnt + '</span></div>';
-    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + S.stops.filter(function(s){return s.flexNum!=null;}).length + ' scanned &middot; ' + S.stops.filter(function(s){return s.flexNum==null;}).length + ' manual &middot; <strong style="color:#FF9900">' + S.stops.reduce(function(sum,s){return sum+(s.pkgCount||1);},0) + '</strong> packages</span>';
+    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + S.stops.filter(function(s){return s.flexNum!=null||s.scanned;}).length + ' scanned &middot; ' + S.stops.filter(function(s){return s.flexNum==null&&!s.scanned;}).length + ' manual &middot; <strong style="color:#FF9900">' + S.stops.reduce(function(sum,s){return sum+(s.pkgCount||1);},0) + '</strong> packages</span>';
     h += '</div>';
     h += '<div style="background:#13131E;border-radius:16px;overflow:hidden;padding:12px 14px">';
     h += '<div class="ir" style="margin-bottom:10px"><div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Add address manually" value="' + escH(S.manVal) + '" style="font-size:14px"/></div>';
@@ -3359,12 +3359,12 @@ function sRow(s, i) {
   }
 
   // Normal stop
-  return `<div class="si ${isL ? 'islast' : ''}" style="${!hn ? 'border-style:dashed;' : ''}">
-  <div class="fn ${hn ? '' : 'nnum'}" title="${hn ? 'Flex pkg #' + s.flexNum : 'Manually added'}">${hn ? s.flexNum : '+'}</div>
+  return `<div class="si ${isL ? 'islast' : ''}" style="${!hn && !s.scanned ? 'border-style:dashed;' : ''}">
+  <div class="fn ${hn ? '' : 'nnum'}" title="${hn ? 'Flex pkg #' + s.flexNum : (s.scanned ? 'Number not read from the screenshot' : 'Manually added')}">${hn ? s.flexNum : (s.scanned ? '?' : '+')}</div>
   <div class="sb">
     <div class="sa">${escH(s.address)}</div>
     <div class="sm">
-      ${hn ? `Flex stop #${s.flexNum}` : 'Manually added'}
+      ${hn ? `Flex stop #${(s.packageNums && s.packageNums.length > 1) ? _formatNumList(s.packageNums) : s.flexNum}` : (s.scanned ? 'Scanned &mdash; number not read' : 'Manually added')}
       ${pc > 1 ? `&nbsp;<span style="background:rgba(255,153,0,.18);border:1px solid var(--acc);color:var(--acc);font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;font-family:var(--sans)">&#128230; ${pc} pkgs</span>` : ''}
     </div>
   </div>
@@ -4221,7 +4221,7 @@ async function reoptimizeRemaining() {
   // Stage: remaining stops become the input; start = last delivered location.
   S.stops = remaining.map(function(st){
     return { id: st.id || mkId(), address: st.address, flexNum: st.flexNum != null ? st.flexNum : null,
-             coords: st.coords || null, pkgCount: st.pkgCount || 1, packageNums: st.packageNums || [] };
+             coords: st.coords || null, pkgCount: st.pkgCount || 1, packageNums: st.packageNums || [], scanned: !!st.scanned };
   });
   var last = delivered.length ? delivered[delivered.length - 1] : null;
   if (last && last.coords) {
@@ -4376,7 +4376,7 @@ function rRowLocked(s, i) {
 </div>`;
 }
 
-function addStop(text, flexNum, skipRender, pkgCount, packageNums) {
+function addStop(text, flexNum, skipRender, pkgCount, packageNums, fromScan) {
   if (!text?.trim()) return false;
   pkgCount = pkgCount || 1;
   // Merge same addresses — add packages instead of discarding
@@ -4385,23 +4385,31 @@ function addStop(text, flexNum, skipRender, pkgCount, packageNums) {
     return s.address.toLowerCase().replace(/\s+/g,' ').replace(/,\s*/g,',') === norm;
   });
   if (existing) {
-    // Use MAX, not SUM — same stop appears in multiple overlapping screenshots
-  // 3 screenshots × 6 packages = 18 (wrong). Should be 6 (the real count).
-  existing.pkgCount = Math.max(existing.pkgCount || 1, pkgCount || 1);
-    // Combine package-number lists (not just take one side) so a stop that's
-    // been through both the OCR-parse merge AND this address-level merge
-    // still shows every real package number, not just whichever call
-    // happened to arrive last.
-    if (packageNums && packageNums.length) {
-      var _existNums = existing.packageNums || (existing.flexNum != null ? [existing.flexNum] : []);
-      packageNums.forEach(function(n){ if (_existNums.indexOf(n) === -1) _existNums.push(n); });
-      existing.packageNums = _existNums;
+    // Same address from another screenshot. Amazon's own numbers tell the two
+    // cases apart: the SAME number again is an overlapping screenshot of one
+    // stop (use MAX — 3 screenshots × 6 packages is 6, not 18); a DIFFERENT
+    // number is a different delivery at the same building (add them up).
+    var _incoming = (packageNums && packageNums.length) ? packageNums : (flexNum != null ? [flexNum] : []);
+    var _have = existing.packageNums || (existing.flexNum != null ? [existing.flexNum] : []);
+    var _fresh = _incoming.filter(function(n){ return _have.indexOf(n) === -1; });
+    if (_fresh.length && _have.length) {
+      existing.pkgCount = (existing.pkgCount || 1) + (pkgCount || 1);
+    } else {
+      existing.pkgCount = Math.max(existing.pkgCount || 1, pkgCount || 1);
     }
+    // Keep every number (not just whichever call arrived last), sorted.
+    var _all = _have.slice();
+    _incoming.forEach(function(n){ if (_all.indexOf(n) === -1) _all.push(n); });
+    _all.sort(function(a, b){ return a - b; });
+    existing.packageNums = _all;
+    if (existing.flexNum == null && _all.length) existing.flexNum = _all[0];
+    if (fromScan) existing.scanned = true;
     if (!skipRender) { saveSession(); render(); }
     return true;
   }
 
   var newStop = { id: mkId(), address: text.trim(), flexNum: flexNum ?? null, coords: null, pkgCount: pkgCount,
+    scanned: !!fromScan,
     packageNums: (packageNums && packageNums.length) ? packageNums.slice() : (flexNum != null ? [flexNum] : []) };
 
   if (!skipRender && flexNum == null && S.stops.length > 0) {
@@ -4627,7 +4635,7 @@ function copyRoute() {
   const lines = [
     _startLbl ? `Start: ${_startLbl}` : '',
     S.savings ? `Saved: ${S.savings.savedKm}km, ~${S.savings.savedMin}min vs Amazon order${S.savings.realGPS ? ' (real GPS)' : ''}` : '',
-    ...S.optimized.map((s, i) => `${i + 1}.${s.flexNum != null ? ` [pkg #${s.flexNum}]` : ''} ${s.address}`),
+    ...S.optimized.map((s, i) => `${i + 1}.${s.flexNum != null ? ` [pkg #${(s.packageNums && s.packageNums.length > 1) ? s.packageNums.join(', ') : s.flexNum}]` : ''} ${s.address}`),
     S.home ? `End — Home: ${S.home}` : ''
   ].filter(Boolean).join('\n');
   // Primary: Clipboard API (HTTPS, modern browsers)
@@ -4688,7 +4696,7 @@ async function handleFiles(files) {
         trackEvent('depot_autodetected', {});
       }
       for (const it of items) {
-        if (addStop(it.address, it.num, true, it.pkgCount || 1, it.packageNums)) added++;
+        if (addStop(it.address, it.num, true, it.pkgCount || 1, it.packageNums, true)) added++;
       }
     } catch (err) {
       failed++;
@@ -4715,10 +4723,11 @@ async function handleFiles(files) {
     var _topCity = Object.keys(_cHits).sort(function(a,b){ return _cHits[b]-_cHits[a]; })[0];
     if (_topCity) { S._inferredCity = _topCity; console.log('[FlexRoute] Inferred city:', _topCity); }
   }
-  // Renumber flexNum sequentially across all uploaded images (fixes 1,2,3,1,2,3 issue)
-  var flexStops = S.stops.filter(function(s){ return s.flexNum != null; });
-  flexStops.forEach(function(s, i){ s.flexNum = i + 1; });
-  flexStops.forEach(function(s, i){ s.flexNum = i + 1; s.flexNumEnd = i + 1; });
+  // Stops carry Amazon's own itinerary-wide numbers (continuous across
+  // screenshots), so there is nothing to renumber here. This block used to
+  // overwrite flexNum with the list position to stop per-image numbers
+  // restarting at 1 (1,2,3,1,2,3) — but positional numbers are always one
+  // behind Amazon's (the depot pickup is #1), so it would undo the fix.
   // CDN blocked — scanner can't load
   if (lastErr === 'CDN_BLOCKED') {
     // Detect likely cause: in-app browser vs preview environment
@@ -4983,8 +4992,8 @@ async function optimize() {
     stop_count: S.stops.length,
     has_home: !!S.home,
     has_start: !!S.startAddr,
-    scanned_stops: S.stops.filter(s => s.flexNum != null).length,
-    manual_stops: S.stops.filter(s => s.flexNum == null).length,
+    scanned_stops: S.stops.filter(s => s.flexNum != null || s.scanned).length,
+    manual_stops: S.stops.filter(s => s.flexNum == null && !s.scanned).length,
     region: S.userState || 'unknown',
     region_auto: !localStorage.getItem('fr_state_manual')
   });
@@ -6263,20 +6272,82 @@ function parseFlexOCR(rawText) {
       || line.length < 3;
   }
 
-  // Pulls the stop number Flex prints on the annotation line itself, e.g.
-  // "(14) # D-38.3D « Scheduled 3:00 - 8:00 a.m." -> 14
-  // "13) # D-38.3X « Scheduled..." -> 13   (OCR sometimes drops the "(")
-  // Used ONLY for driver-facing display (which stop to check) — never for
-  // route sequencing, so an occasional miss here is cosmetic, not a bug.
-  function extractStopNum(scheduledLine) {
+  // Pulls the stop number Flex prints in the numbered badge at the START of
+  // every stop — the same number the driver looks up in the Amazon Flex app
+  // when they arrive to complete the delivery. Formats seen from OCR:
+  //   "(14) # D-38.3D « Scheduled 3:00 - 8:00 a.m."  -> 14
+  //   "13) # D-38.3X « Scheduled..."                  -> 13  (OCR dropped the "(")
+  //   "14 Scheduled 3:00 - 8:00 a.m."                 -> 14  (bare number, same row;
+  //                                                          the clock icon may read as stray chars)
+  //   "14" / "(14)" on the line just above "Scheduled" -> 14  (badge read as its own line)
+  // Returns null when no number can be read — callers then infer it from the
+  // neighbouring stops (see _resolveSerials) instead of guessing.
+  function extractStopNum(scheduledLine, prevLine) {
     if (!scheduledLine) return null;
     var m = scheduledLine.match(/^\(?\s*(\d{1,3})\s*\)/);
-    return m ? parseInt(m[1], 10) : null;
+    if (m) return parseInt(m[1], 10);
+    m = scheduledLine.match(/^\W{0,2}(\d{1,3})\s+\S{0,3}\s*(?:#|scheduled|expected|estimated)/i);
+    if (m) return parseInt(m[1], 10);
+    if (prevLine) {
+      var pm = String(prevLine).trim().match(/^\W{0,2}(\d{1,3})\W{0,2}$/);
+      if (pm) return parseInt(pm[1], 10);
+    }
+    return null;
+  }
+  // Amazon numbers every itinerary block consecutively (1 = the depot pickup,
+  // so the first delivery is 2, then 3, 4 …). Given the number we managed to
+  // READ for each block (null where OCR failed) in scan order, work out the
+  // number each block really carries:
+  //   - reads that agree on one offset (read - position) confirm each other,
+  //     which also fills the gaps where a read failed;
+  //   - a lone read that agrees with nothing is treated as OCR noise;
+  //   - if nothing readable survives but the depot block sits at the top of
+  //     the list, the first delivery is #2 (every itinerary seen so far);
+  //   - otherwise the number stays unknown (null) — never a made-up one.
+  function _resolveSerials(reads, depotFirst) {
+    var n = reads.length, out = [], i, q;
+    for (i = 0; i < n; i++) out.push(null);
+    var runs = [];
+    for (i = 0; i < n; i++) {
+      if (reads[i] == null) continue;
+      var off = reads[i] - i, last = runs[runs.length - 1];
+      if (last && last.off === off) { last.end = i; last.support++; }
+      else runs.push({ off: off, start: i, end: i, support: 1 });
+    }
+    var totalReads = 0;
+    runs.forEach(function(r) { totalReads += r.support; });
+    var solid = runs.filter(function(r) { return r.support >= 2; });
+    if (!solid.length && totalReads === 1) solid = runs.slice();
+    if (!solid.length) {
+      if (depotFirst) for (i = 0; i < n; i++) out[i] = i + 2;
+      return out;
+    }
+    for (i = 0; i < n; i++) {
+      var before = null, after = null;
+      for (q = 0; q < solid.length; q++) {
+        if (solid[q].start <= i && i <= solid[q].end) { before = after = solid[q]; break; }
+        if (solid[q].end < i) before = solid[q];
+        else if (!after) after = solid[q];
+      }
+      var use = null;
+      if (before && after) { if (before.off === after.off) use = before; }
+      else use = before || after;
+      if (use) { var v = use.off + i; if (v >= 1 && v <= 999) out[i] = v; }
+    }
+    return out;
   }
   function extractNumFromAddr(addrLine) { return null; }
 
+  // One entry per real "Scheduled" block, in scan order — parsed OR skipped —
+  // because both consume a number in Amazon's consecutive numbering.
+  var _blockLog = [];
+  var _depotFirst = false;
+
   var i = 0;
   while (i < lines.length) {
+    // The depot pickup is circle #1 in Flex; when it heads the list, the first
+    // delivery block is #2 (used only as a last-resort anchor for numbering).
+    if (_blockLog.length === 0 && /pick(?:ed)?[\s\-]?up\s+at\b/i.test(lines[i])) _depotFirst = true;
     // Depot detection: "Picked up at 3:48 a.m." / "400 Nugget Avenue" / "Scarborough"
     // The pickup block is not a delivery stop — but it IS the driver's depot.
     // Capture it so the app can auto-fill the Start address when empty.
@@ -6501,7 +6572,7 @@ function parseFlexOCR(rawText) {
         // summed). A matching or unextractable serial number falls back to
         // that same count-matching heuristic, which still correctly
         // handles the common, legitimate overlapping-screenshot case.
-        var _stopNum = extractStopNum(_schedLine);
+        var _stopNum = extractStopNum(_schedLine, i > 0 ? lines[i - 1] : null);
         var _existingResult = results.find(function(r) {
           var rNorm = _dedupNorm(r.address);
           if (rNorm === normAddr) return true; // exact match, always same stop
@@ -6548,6 +6619,7 @@ function parseFlexOCR(rawText) {
           results.push({ num: _stopNum, address: fullAddr, pkgCount: currentPkgCount,
             packageNums: _stopNum !== null ? [_stopNum] : [] });
         }
+        _blockLog.push({ kind: 'ok', read: _stopNum, ref: _existingResult || results[results.length - 1] });
       } else {
         // Scheduled block found but no address line could be parsed —
         // capture WHICH stop so the driver can find it instead of diffing
@@ -6566,15 +6638,14 @@ function parseFlexOCR(rawText) {
         for (var _k = i + 1; _k < j; _k++) {
           if (lines[_k] && !isNoise(lines[_k]) && !isCity(lines[_k])) _rawLines.push(lines[_k]);
         }
-        var _skipNum = extractStopNum(lines[i]);
+        var _skipNum = extractStopNum(lines[i], i > 0 ? lines[i - 1] : null);
         var _skipRaw = _rawLines.join(' / ').substring(0, 120);
         // Only report if we have a stop number OR meaningful raw text.
         // An empty block is a false isScheduled match on noise.
         if (_skipNum || _skipRaw) {
-          _skippedDetails.push({
-            num: _skipNum,
-            raw: _skipRaw
-          });
+          var _skipDetail = { num: _skipNum, raw: _skipRaw };
+          _skippedDetails.push(_skipDetail);
+          _blockLog.push({ kind: 'skip', read: _skipNum, ref: _skipDetail });
         } else {
           _skippedBlocks--; // undo the increment — not a real skip
         }
@@ -6585,8 +6656,31 @@ function parseFlexOCR(rawText) {
     }
   }
 
-  // Number stops by position in list — matches package loading order in car
-  results.forEach(function(r, idx) { r.num = idx + 1; });
+  // Each stop carries the number(s) Amazon printed for the block(s) it came
+  // from — the numbers the driver looks up in the Flex app. (This used to
+  // renumber stops by position in the list, which is always one behind
+  // Amazon's own numbering because the depot pickup is #1.)
+  var _serials = _resolveSerials(_blockLog.map(function(e) { return e.read; }), _depotFirst);
+  results.forEach(function(r) { r._sn = []; });
+  _blockLog.forEach(function(e, k) {
+    var sv = _serials[k];
+    if (e.kind === 'skip') { e.ref.num = sv; }
+    else if (sv != null && e.ref._sn.indexOf(sv) === -1) e.ref._sn.push(sv);
+  });
+  results.forEach(function(r) {
+    r._sn.sort(function(a, b) { return a - b; });
+    r.packageNums = r._sn;
+    r.num = r._sn.length ? r._sn[0] : null;
+    delete r._sn;
+  });
+  if (typeof trackEvent === 'function' && _blockLog.length) {
+    trackEvent('stop_serials_resolved', {
+      blocks: _blockLog.length,
+      read: _blockLog.filter(function(e) { return e.read != null; }).length,
+      known: _serials.filter(function(v) { return v != null; }).length,
+      depot_first: _depotFirst
+    });
+  }
   results._skipped = _skippedBlocks;
   results._skippedDetails = _skippedDetails;
 
