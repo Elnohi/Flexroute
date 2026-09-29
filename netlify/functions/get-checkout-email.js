@@ -29,7 +29,10 @@
 // Contract:
 //   POST /.netlify/functions/get-checkout-email
 //   Body: { session_id: "cs_..." }
-//   Response (200): { paid: boolean, email: string|null, plan: string|null }
+//   Response (200): { paid: boolean, email: string|null, plan: string|null,
+//                     amount: number|null, tax: number, currency: string|null }
+//                   (amount = charged excluding tax, in major units; used to report
+//                    the real purchase value to analytics)
 //   Response (4xx/5xx): { error, code }
 
 const Stripe = require('stripe');
@@ -82,7 +85,19 @@ exports.handler = async function(event) {
     const email = (session.customer_details && session.customer_details.email)
       || session.customer_email || null;
     const plan = (session.metadata && session.metadata.flexroute_plan) || null;
-    return { statusCode: 200, headers: cors, body: JSON.stringify({ paid: true, email: email, plan: plan }) };
+    // What was actually charged, so analytics reports the real figure rather
+    // than a guess from the plan. GA4's purchase `value` excludes tax, so
+    // tax is returned separately. Stripe amounts are in the smallest unit
+    // (cents) — converted to major units here. A 100%-off internal test
+    // checkout comes back as amount 0, which the app deliberately does NOT
+    // report as revenue.
+    const total = typeof session.amount_total === 'number' ? session.amount_total : null;
+    const taxMinor = (session.total_details && typeof session.total_details.amount_tax === 'number')
+      ? session.total_details.amount_tax : 0;
+    const amount = total === null ? null : Math.round(total - taxMinor) / 100;
+    const tax = taxMinor / 100;
+    const currency = session.currency ? String(session.currency).toUpperCase() : null;
+    return { statusCode: 200, headers: cors, body: JSON.stringify({ paid: true, email: email, plan: plan, amount: amount, tax: tax, currency: currency }) };
   } catch (e) {
     // Stripe throws for a malformed/nonexistent session ID (e.g. someone
     // hand-editing the URL) — treat that the same as "not paid" rather than
