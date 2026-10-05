@@ -1329,12 +1329,33 @@ function bind() {
         var oinp = document.getElementById('ocrfix-' + oidx);
         var oval = oinp ? oinp.value.trim() : '';
         if (!oval) return;
-        if (addStop(oval)) {
+        // The warning already knows which Amazon number this block carried
+        // (resolved from the neighbouring stops even when OCR couldn't read
+        // the address). Carry it onto the recovered stop, so the driver sees
+        // the same number they look up in the Flex app — not "Manually added".
+        var oitem = (S._ocrWarn && S._ocrWarn.items) ? S._ocrWarn.items[oidx] : null;
+        var onum = (oitem && oitem.num != null) ? oitem.num : null;
+        var oadded = onum != null ? addStop(oval, onum, false, 1, [onum], true) : addStop(oval);
+        if (oadded) {
+          if (onum != null) {
+            // keep the list in Amazon's order: put it before the first higher-numbered stop
+            var _ri = -1, _j = -1, _q;
+            for (_q = S.stops.length - 1; _q >= 0; _q--) {
+              if (S.stops[_q].flexNum === onum && S.stops[_q].address === oval) { _ri = _q; break; }
+            }
+            if (_ri === S.stops.length - 1) {
+              for (_q = 0; _q < _ri; _q++) {
+                if (S.stops[_q].flexNum != null && S.stops[_q].flexNum > onum) { _j = _q; break; }
+              }
+              if (_j >= 0) { var _mv = S.stops.splice(_ri, 1)[0]; S.stops.splice(_j, 0, _mv); }
+            }
+          }
+          trackEvent('ocr_stop_recovered', { had_num: onum != null, edited: !!(oitem && oitem.raw) && oval !== oitem.raw });
           if (S._ocrWarn && S._ocrWarn.items) {
             S._ocrWarn.items.splice(oidx, 1);
             if (!S._ocrWarn.items.length && !S._ocrWarn.possibleMissingNote) S._ocrWarn = null;
           }
-          toast('\u2713 Stop added. Tap Optimize to include it.');
+          toast(onum != null ? '\u2713 Stop #' + onum + ' added. Tap Optimize to include it.' : '\u2713 Stop added. Tap Optimize to include it.');
           saveSession(); render();
         }
         return;
@@ -1636,8 +1657,15 @@ function bind() {
     }
   });
 
+}
   // Hidden debug trigger: long-press (500ms) on the scanned count label
   // reveals the raw OCR panel. Not visible to drivers — no button, no hint.
+  // This MUST be attached on every render, not once: render() rebuilds the
+  // DOM, so the label is a brand-new element each time. It used to sit in the
+  // run-once block above, so it only attached if the label happened to exist
+  // during the very first bind() (page loaded straight onto the stop list) —
+  // in the normal flow (open app, THEN scan) it never attached at all and the
+  // raw OCR text was unreachable.
   var scanLbl = document.getElementById('scanCountLbl');
   if (scanLbl) {
     var _dbgTimer = null;
@@ -1650,8 +1678,6 @@ function bind() {
     scanLbl.addEventListener('pointerup', function() { clearTimeout(_dbgTimer); });
     scanLbl.addEventListener('pointerleave', function() { clearTimeout(_dbgTimer); });
   }
-
-}
   // Element bindings — re-added every render() since DOM is recreated
   on('saveKey',      'click', function(){ saveKey(); });
   on('clearKeyBtn',  'click', function(){ S.gmapsKey=''; localStorage.removeItem('fr_gk2'); toast('Key removed'); S.phase='input'; render(); });
@@ -6410,7 +6436,7 @@ function parseFlexOCR(rawText) {
   //   "14" / "(14)" on the line just above "Scheduled" -> 14  (badge read as its own line)
   // Returns null when no number can be read — callers then infer it from the
   // neighbouring stops (see _resolveSerials) instead of guessing.
-  function extractStopNum(scheduledLine, prevLine) {
+  function extractStopNum(scheduledLine, prevLine, prev2Line) {
     if (!scheduledLine) return null;
     var m = scheduledLine.match(/^\(?\s*(\d{1,3})\s*\)/);
     if (m) return parseInt(m[1], 10);
@@ -6418,7 +6444,10 @@ function parseFlexOCR(rawText) {
     if (m) return parseInt(m[1], 10);
     if (prevLine) {
       var pm = String(prevLine).trim().match(/^\W{0,2}(\d{1,3})\W{0,2}$/);
-      if (pm) return parseInt(pm[1], 10);
+      // A bare number right after a "Locations" label is that dropdown's
+      // package COUNT ("Locations  2  v"), not the next stop's badge — taking
+      // it as one would plant a bogus number in the sequence.
+      if (pm && !(prev2Line && /^locations?\b/i.test(String(prev2Line).trim()))) return parseInt(pm[1], 10);
     }
     return null;
   }
@@ -6433,6 +6462,17 @@ function parseFlexOCR(rawText) {
   //     the list, the first delivery is #2 (every itinerary seen so far);
   //   - otherwise the number stays unknown (null) — never a made-up one.
   function _resolveSerials(reads, depotFirst) {
+    // The depot pickup is circle #1 and sits right above the first delivery, so
+    // when it heads the list it counts as one extra, trustworthy read. Without
+    // it, ONE stray digit anywhere (the only "read" on the whole scan) was
+    // trusted as the sole evidence and shifted every stop's number by the
+    // same amount — real incident: first stop shown as #1 instead of #2.
+    // A lone digit that disagrees with the depot is now outvoted; two or
+    // more consistent reads still win over it (a block really can be missing).
+    if (depotFirst) return _resolveCore([1].concat(reads), true).slice(1);
+    return _resolveCore(reads, false);
+  }
+  function _resolveCore(reads, withDepot) {
     var n = reads.length, out = [], i, q;
     for (i = 0; i < n; i++) out.push(null);
     var runs = [];
@@ -6447,7 +6487,7 @@ function parseFlexOCR(rawText) {
     var solid = runs.filter(function(r) { return r.support >= 2; });
     if (!solid.length && totalReads === 1) solid = runs.slice();
     if (!solid.length) {
-      if (depotFirst) for (i = 0; i < n; i++) out[i] = i + 2;
+      if (withDepot) for (i = 0; i < n; i++) out[i] = i + 1;   // index 0 is the depot (#1)
       return out;
     }
     for (i = 0; i < n; i++) {
@@ -6470,6 +6510,7 @@ function parseFlexOCR(rawText) {
   // because both consume a number in Amazon's consecutive numbering.
   var _blockLog = [];
   var _depotFirst = false;
+  var _orphanNext = -1;   // line index where a header-less block begins (see the block scanner)
 
   var i = 0;
   while (i < lines.length) {
@@ -6490,8 +6531,9 @@ function parseFlexOCR(rawText) {
         }
       }
     }
-    if (isScheduled(lines[i])) {
-      var addrLine = '', cityLine = '', j = i + 1;
+    var _isOrphan = (i === _orphanNext);   // a stop whose "Scheduled" header was cropped away
+    if (isScheduled(lines[i]) || _isOrphan) {
+      var addrLine = '', cityLine = '', j = _isOrphan ? i : i + 1;
       var currentPkgCount = 1;  // reset per stop block
 
       // ── Inline address extraction ─────────────────────────────────────
@@ -6506,7 +6548,7 @@ function parseFlexOCR(rawText) {
       // contains a street address. If so, extract it and treat it as if
       // it were on the next line, so the rest of the block scanner (city,
       // package count, dedup) works unchanged.
-      var _schedLine = lines[i];
+      var _schedLine = _isOrphan ? '' : lines[i];
       var _inlineAddr = '';
       // Strip everything up to and including the time pattern, then check what's left
       var _afterTime = _schedLine
@@ -6533,6 +6575,7 @@ function parseFlexOCR(rawText) {
       }
 
       var pendingCity = '';
+      var _sawDeliver = false, _orphanAt = -1;
       while (j < lines.length && j < i + 18) {
         var ln = lines[j].replace(/^[|\[\]]+\s*/, '');  // strip OCR pipe/bracket artifacts from Flex UI columns
         if (isScheduled(ln)) break;
@@ -6542,6 +6585,7 @@ function parseFlexOCR(rawText) {
           var _n = _deliverM[1].toLowerCase();
           var _words = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
           currentPkgCount = _words[_n] || parseInt(_n) || 1;
+          _sawDeliver = true;
           j++; continue;
         }
         if (isNoise(ln)) { j++; continue; }
@@ -6551,6 +6595,16 @@ function parseFlexOCR(rawText) {
           if (!addrLine) pendingCity = ln; else cityLine = ln;
           j++; continue;
         }
+        // HEADER-LESS STOP. This block already has its address AND its
+        // "Deliver…" line, and now ANOTHER street line follows. A normal block
+        // has nothing after "Deliver…" but the Locations row, so this is the
+        // next stop with its "Scheduled" header cropped off — what a scroll-
+        // captured (stitched) screenshot does at a seam. The scanner used to
+        // keep only the first street line and let the second "Deliver…" line
+        // overwrite this block's package count, so that stop's address
+        // silently vanished (Amazon said 36 packages, FlexRoute found 35).
+        // End this block here and let the main loop re-start at this line.
+        if (addrLine && _sawDeliver && isStreet(ln)) { _orphanAt = j; break; }
         // Check: does this line + next line form a valid street address?
         // e.g. "26 Longfellow" (no keyword) + "Court" (keyword) = "26 Longfellow Court"
         var nextLn2 = lines[j + 1] ? lines[j + 1].trim() : '';
@@ -6700,7 +6754,7 @@ function parseFlexOCR(rawText) {
         // summed). A matching or unextractable serial number falls back to
         // that same count-matching heuristic, which still correctly
         // handles the common, legitimate overlapping-screenshot case.
-        var _stopNum = extractStopNum(_schedLine, i > 0 ? lines[i - 1] : null);
+        var _stopNum = extractStopNum(_schedLine, i > 0 ? lines[i - 1] : null, i > 1 ? lines[i - 2] : null);
         var _existingResult = results.find(function(r) {
           var rNorm = _dedupNorm(r.address);
           if (rNorm === normAddr) return true; // exact match, always same stop
@@ -6747,7 +6801,11 @@ function parseFlexOCR(rawText) {
           results.push({ num: _stopNum, address: fullAddr, pkgCount: currentPkgCount,
             packageNums: _stopNum !== null ? [_stopNum] : [] });
         }
-        _blockLog.push({ kind: 'ok', read: _stopNum, ref: _existingResult || results[results.length - 1] });
+        // A header-less fragment that merged into an address we ALREADY have is
+        // a duplicated slice from the stitch, not another Amazon stop — it must
+        // not take a number. One with a NEW address is a real, recovered stop.
+        if (_isOrphan && !_existingResult && typeof trackEvent === 'function') trackEvent('ocr_headerless_stop_recovered', {});
+        if (!(_isOrphan && _existingResult)) _blockLog.push({ kind: 'ok', read: _stopNum, ref: _existingResult || results[results.length - 1] });
       } else {
         // Scheduled block found but no address line could be parsed —
         // capture WHICH stop so the driver can find it instead of diffing
@@ -6766,11 +6824,24 @@ function parseFlexOCR(rawText) {
         for (var _k = i + 1; _k < j; _k++) {
           if (lines[_k] && !isNoise(lines[_k]) && !isCity(lines[_k])) _rawLines.push(lines[_k]);
         }
-        var _skipNum = extractStopNum(lines[i], i > 0 ? lines[i - 1] : null);
+        var _skipNum = extractStopNum(lines[i], i > 0 ? lines[i - 1] : null, i > 1 ? lines[i - 2] : null);
         var _skipRaw = _rawLines.join(' / ').substring(0, 120);
-        // Only report if we have a stop number OR meaningful raw text.
-        // An empty block is a false isScheduled match on noise.
-        if (_skipNum || _skipRaw) {
+        // A REAL delivery that couldn't be read still prints its fixed
+        // "Deliver N package(s)" line (or leaves some text behind). A "block"
+        // with neither is a fragment — a duplicated "Scheduled" line or a
+        // stitching seam — NOT a stop. A stray digit above it is not evidence
+        // of a delivery either: that used to be enough to report "Stop #29
+        // couldn't be read" (no such stop — all 36 packages were already in
+        // the list) AND to give the fragment a slot in the numbering, which
+        // pushed the numbers of the stops around it off by one.
+        var _skipHasDeliver = false;
+        for (var _dk = i + 1; _dk < j; _dk++) {
+          if (/^deliver\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+packages?/i.test(lines[_dk] || '')) { _skipHasDeliver = true; break; }
+        }
+        if (!_skipRaw && !_skipHasDeliver && typeof trackEvent === 'function') {
+          trackEvent('ocr_fragment_ignored', { had_num: _skipNum != null });
+        }
+        if (_skipRaw || _skipHasDeliver) {
           var _skipDetail = { num: _skipNum, raw: _skipRaw };
           _skippedDetails.push(_skipDetail);
           _blockLog.push({ kind: 'skip', read: _skipNum, ref: _skipDetail });
@@ -6778,6 +6849,7 @@ function parseFlexOCR(rawText) {
           _skippedBlocks--; // undo the increment — not a real skip
         }
       }
+      if (_orphanAt >= 0) _orphanNext = _orphanAt;
       i = j;
     } else {
       i++;
