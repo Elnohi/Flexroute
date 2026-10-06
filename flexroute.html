@@ -6520,7 +6520,11 @@ function parseFlexOCR(rawText) {
           _best[_a] = _best[_b] + runs[_a].support; _prev[_a] = _b;
         }
       }
-      if (_best[_a] > _bw) { _bw = _best[_a]; _bi = _a; }
+      // Tie on total support: prefer the chain ending at the SMALLER offset. A bigger offset
+      // claims blocks OCR never saw, a stronger claim than the conservative one. Real incident:
+      // two stray badge reads (#11, #16) tied with the genuine late reads (#22, #23) and, by
+      // always taking the earlier chain, shifted every stop by +6.
+      if (_best[_a] > _bw || (_best[_a] === _bw && _bi >= 0 && runs[_a].off < runs[_bi].off)) { _bw = _best[_a]; _bi = _a; }
     }
     var _chain = [];
     for (_a = _bi; _a >= 0; _a = _prev[_a]) _chain.unshift(runs[_a]);
