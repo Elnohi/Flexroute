@@ -1787,6 +1787,7 @@ var LANGS = {
     all_stops: '☰ All stops',
     packages_at_stop: '{n} packages at this stop',
     packages_with_nums: '{n} packages — #{list}',
+    pkg_num_unknown: 'Number not read — check your Flex app',
     list_and: 'and',
     pkg_in_car_num: 'Package #{n} in car',
     shift_complete: 'Shift Complete!',
@@ -1980,6 +1981,7 @@ var LANGS = {
     all_stops: '☰ Tous les arrêts',
     packages_at_stop: '{n} colis à cet arrêt',
     packages_with_nums: '{n} colis — n° {list}',
+    pkg_num_unknown: 'Numéro non lu — vérifiez votre appli Flex',
     list_and: 'et',
     pkg_in_car_num: 'Colis n°{n} en voiture',
     shift_complete: 'Quart terminé !',
@@ -2173,6 +2175,7 @@ var LANGS = {
     all_stops: '☰ Alle Stopps',
     packages_at_stop: '{n} Pakete an diesem Stopp',
     packages_with_nums: '{n} Pakete — Nr. {list}',
+    pkg_num_unknown: 'Nummer nicht gelesen — in der Flex-App prüfen',
     list_and: 'und',
     pkg_in_car_num: 'Paket Nr. {n} im Auto',
     shift_complete: 'Schicht abgeschlossen!',
@@ -2366,6 +2369,7 @@ var LANGS = {
     all_stops: '☰ Todas las paradas',
     packages_at_stop: '{n} paquetes en esta parada',
     packages_with_nums: '{n} paquetes — n.º {list}',
+    pkg_num_unknown: 'Número no leído: revisa tu app Flex',
     list_and: 'y',
     pkg_in_car_num: 'Paquete n°{n} en el coche',
     shift_complete: '¡Turno completado!',
@@ -3834,14 +3838,25 @@ function vCompanion() {
     '<div class="comp-body">' +
       '<div class="comp-stopnum">Stop ' + (idx+1) + ' of ' + total + (isLast ? ' \u2014 LAST STOP' : '') + '</div>' +
       '<div class="comp-addr">' + escH(stop.address) + '</div>' +
-      (stop.flexNum != null ? (function(){
-        var _n = stop.flexNum, _k = stop.pkgCount || 1;
-        var _nums = (stop.packageNums && stop.packageNums.length > 1) ? stop.packageNums.slice().sort(function(a,b){return a-b;}) : null;
-        var _lbl = _nums
-          ? t('packages_with_nums').replace('{n}', _k).replace('{list}', _formatNumList(_nums))
-          : (_k > 1 ? t('packages_at_stop').replace('{n}', _k) : t('pkg_in_car_num').replace('{n}', _n));
-        return '<div class="comp-pkg">&#128230; ' + escH(_lbl) + '</div>';
-      })() : '<div style="height:20px"></div>') +
+      (function(){
+        var _k = stop.pkgCount || 1;
+        // Number known: "package #N in car" / "N packages — #A and B".
+        if (stop.flexNum != null) {
+          var _n = stop.flexNum;
+          var _nums = (stop.packageNums && stop.packageNums.length > 1) ? stop.packageNums.slice().sort(function(a,b){return a-b;}) : null;
+          var _lbl = _nums
+            ? t('packages_with_nums').replace('{n}', _k).replace('{list}', _formatNumList(_nums))
+            : (_k > 1 ? t('packages_at_stop').replace('{n}', _k) : t('pkg_in_car_num').replace('{n}', _n));
+          return '<div class="comp-pkg">&#128230; ' + escH(_lbl) + '</div>';
+        }
+        // Number NOT read: this used to show nothing at all — so a 2-package stop
+        // looked like a 1-package stop. Always show the count, and say plainly
+        // when the number wasn't read so the driver checks the Flex app.
+        if (_k > 1) return '<div class="comp-pkg">&#128230; ' + escH(t('packages_at_stop').replace('{n}', _k)) + '</div>' +
+          (stop.scanned ? '<div style="font-size:12px;color:var(--t3);text-align:center;margin-top:-4px;margin-bottom:8px">' + escH(t('pkg_num_unknown')) + '</div>' : '');
+        if (stop.scanned) return '<div style="font-size:13px;color:var(--t3);text-align:center;margin:0 0 8px;min-height:20px">&#128230; ' + escH(t('pkg_num_unknown')) + '</div>';
+        return '<div style="height:20px"></div>';
+      })() +
       '<div class="comp-navbtns">' +
         '<a href="' + wazeURL + '" target="_blank" class="comp-waze" id="compWazeBtn">&#9664; Waze</a>' +
         '<a href="' + mapsURL + '" target="_blank" class="comp-maps" id="compMapsBtn">Maps</a>' +
@@ -6447,7 +6462,12 @@ function parseFlexOCR(rawText) {
       // A bare number right after a "Locations" label is that dropdown's
       // package COUNT ("Locations  2  v"), not the next stop's badge — taking
       // it as one would plant a bogus number in the sequence.
-      if (pm && !(prev2Line && /^locations?\b/i.test(String(prev2Line).trim()))) return parseInt(pm[1], 10);
+      // ...but only when the label stands ALONE ("Locations" / "2"). If the count is
+      // already on the label's own line ("Locations 2"), the bare number below it
+      // is the NEXT stop's real badge — discarding it left every stop that follows
+      // a collapsed group without a number.
+      var _p2 = prev2Line ? String(prev2Line).trim() : '';
+      if (pm && !(/^locations?\b/i.test(_p2) && !/\d/.test(_p2))) return parseInt(pm[1], 10);
     }
     return null;
   }
@@ -6484,8 +6504,34 @@ function parseFlexOCR(rawText) {
     }
     var totalReads = 0;
     runs.forEach(function(r) { totalReads += r.support; });
-    var solid = runs.filter(function(r) { return r.support >= 2; });
-    if (!solid.length && totalReads === 1) solid = runs.slice();
+    // Amazon numbers the blocks 1,2,3… down the list, so a block's offset
+    // (number − position) can only STAY the same or GROW (growth = a block OCR
+    // never saw). A later run with a SMALLER offset is a contradiction — e.g. the
+    // first stops read as #8–#16 and eleven stops later the list reads #22, where
+    // only five numbers (17–21) exist for eleven stops. Keep the best-supported
+    // chain of runs that never goes backwards and treat the rest as misreads;
+    // runs of equal offset on either side of a dropped run then join up, so the
+    // stops in between are numbered from the consensus instead of left blank.
+    var _best = [], _prev = [], _bi = -1, _bw = 0, _a, _b;
+    for (_a = 0; _a < runs.length; _a++) {
+      _best[_a] = runs[_a].support; _prev[_a] = -1;
+      for (_b = 0; _b < _a; _b++) {
+        if (runs[_b].off <= runs[_a].off && _best[_b] + runs[_a].support > _best[_a]) {
+          _best[_a] = _best[_b] + runs[_a].support; _prev[_a] = _b;
+        }
+      }
+      if (_best[_a] > _bw) { _bw = _best[_a]; _bi = _a; }
+    }
+    var _chain = [];
+    for (_a = _bi; _a >= 0; _a = _prev[_a]) _chain.unshift(runs[_a]);
+    var _merged = [];
+    _chain.forEach(function(r) {
+      var l = _merged[_merged.length - 1];
+      if (l && l.off === r.off) { l.end = r.end; l.support += r.support; }
+      else _merged.push({ off: r.off, start: r.start, end: r.end, support: r.support });
+    });
+    var solid = _merged.filter(function(r) { return r.support >= 2; });
+    if (!solid.length && totalReads === 1) solid = _merged.slice();
     if (!solid.length) {
       if (withDepot) for (i = 0; i < n; i++) out[i] = i + 1;   // index 0 is the depot (#1)
       return out;
