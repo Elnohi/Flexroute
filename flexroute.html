@@ -353,6 +353,8 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
       gtag('event', name, params || {});
     }
   }
+  // 1 when opened inside Facebook/Instagram/etc. in-app browsers (same pattern the scanner warnings use).
+  var FR_IN_APP = /Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent) ? 1 : 0;
 </script>
 <style>
 .ios-banner{background:linear-gradient(135deg,rgba(255,153,0,.15),rgba(255,153,0,.05));border:1.5px solid rgba(255,153,0,.4);border-radius:12px;padding:13px 15px;margin-bottom:12px;display:flex;align-items:flex-start;gap:12px;position:relative}
@@ -5083,7 +5085,10 @@ async function optimize() {
   // local trial counter and the server has nothing to check against.
   // No OTP at this stage — just collection + server reconciliation.
   // OTP verification happens later at checkout time.
-  if (PREMIUM_LIVE && !S.userEmail && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid') {
+  // Value before ask: the first route runs without an email; the email is requested before route 2.
+  // A mid-shift re-optimize of the same route (S._reoptRemaining) is never gated.
+  if (PREMIUM_LIVE && !S.userEmail && S.entitlement !== 'legacy_free' && S.entitlement !== 'paid'
+      && !S._reoptRemaining && (S.trialRoutesUsed || 0) >= 1) {
     // Show email prompt if not already visible
     if (!document.getElementById('trialEmailOverlay')) {
       var ov = document.createElement('div');
@@ -5092,7 +5097,7 @@ async function optimize() {
       var cd = document.createElement('div');
       cd.style.cssText = 'background:#13131E;border:1px solid var(--acc);border-radius:20px;padding:28px 24px;max-width:400px;width:100%;font-family:var(--body,sans-serif);color:#FFF;text-align:center';
       cd.innerHTML =
-        '<div style="font-family:var(--sans);font-size:20px;font-weight:700;color:var(--acc);margin-bottom:10px">Enter your email to start</div>' +
+        '<div style="font-family:var(--sans);font-size:20px;font-weight:700;color:var(--acc);margin-bottom:10px">Enter your email to continue</div>' +
         '<div style="font-size:14px;color:var(--t2);line-height:1.5;margin-bottom:16px">Your email keeps your routes saved across sessions — no spam, ever.</div>' +
         '<input id="trialEmailInput" type="email" placeholder="you@example.com" autocomplete="email" style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:12px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--t1);font-size:15px;outline:none;margin-bottom:12px">' +
         '<div id="trialEmailErr" style="font-size:12px;color:var(--err);margin-bottom:10px;min-height:16px"></div>' +
@@ -5100,6 +5105,7 @@ async function optimize() {
       ov.appendChild(cd);
       document.body.appendChild(ov);
       document.getElementById('trialEmailInput').focus();
+      trackEvent('email_gate_shown', { routes_used: S.trialRoutesUsed || 0, in_app: FR_IN_APP });
       document.getElementById('trialEmailBtn').addEventListener('click', async function() {
         var inp = document.getElementById('trialEmailInput');
         var errDiv = document.getElementById('trialEmailErr');
@@ -5110,6 +5116,7 @@ async function optimize() {
           return;
         }
         var btn = document.getElementById('trialEmailBtn');
+        trackEvent('email_gate_submitted', { routes_used: S.trialRoutesUsed || 0, in_app: FR_IN_APP });
         if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
         // Save email locally and reconcile with server
         S._authEmail = email;
@@ -5164,8 +5171,10 @@ async function optimize() {
     scanned_stops: S.stops.filter(s => s.flexNum != null || s.scanned).length,
     manual_stops: S.stops.filter(s => s.flexNum == null && !s.scanned).length,
     region: S.userState || 'unknown',
-    region_auto: !localStorage.getItem('fr_state_manual')
+    region_auto: !localStorage.getItem('fr_state_manual'),
+    in_app: FR_IN_APP
   });
+  S._optT0 = Date.now(); // for duration_ms on route_optimized
 
   // Step 1 — Geocode all addresses including start and home
   // Seed coordMap from stops that already have valid coords (e.g. from the fix screen).
@@ -5315,7 +5324,9 @@ async function optimize() {
   var _nonHomeStartTotal = toGeocode.filter(function(x){ return x.key !== '__home__' && x.key !== '__start__'; }).length;
   if (S.geoFailed.length > 0) {
     var _backoffs = [3000, 8000, 20000];
+    var _retryT0 = Date.now(), _initFailed = S.geoFailed.length, _recPer = [];
     for (var _attempt = 0; _attempt < _backoffs.length && S.geoFailed.length > 0; _attempt++) {
+      var _failedBefore = S.geoFailed.length;
       console.log('[FlexRoute] Geocode failure (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ') — retry ' + (_attempt + 1) + '/' + _backoffs.length + ' after ' + _backoffs[_attempt] + 'ms');
       if (typeof trackEvent === 'function') {
         trackEvent('geocode_bulk_retry', { failed: S.geoFailed.length, total: _nonHomeStartTotal, attempt: _attempt + 1 });
@@ -5341,7 +5352,14 @@ async function optimize() {
         render();
         if (ri < _retryStops.length - 1) await sleep(400);
       }
+      _recPer.push(_failedBefore - S.geoFailed.length); // stops this attempt recovered
     }
+    // Measurement only: how many stops each retry attempt actually recovers, and what the waiting cost.
+    trackEvent('geocode_retry_outcome', {
+      initial_failed: _initFailed, final_failed: S.geoFailed.length, total: _nonHomeStartTotal,
+      attempts: _recPer.length, a1_recovered: _recPer[0] || 0, a2_recovered: _recPer[1] || 0, a3_recovered: _recPer[2] || 0,
+      retry_ms: Date.now() - _retryT0, in_app: FR_IN_APP
+    });
     if (S.geoFailed.length > 0) {
       console.warn('[FlexRoute] Geocode failure persisted after ' + _backoffs.length + ' retries (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ' still failing) — likely genuinely hard addresses or a sustained outage, not a blip. These stops remain flagged for manual correction, never dropped from the route.');
     }
@@ -5687,7 +5705,9 @@ async function optimize() {
       failed_count: S.geoFailed.length,
       total_stops: S.stops.length,
       region: S.userState || 'unknown',
-      trigger: 'pre_osrm'
+      trigger: 'pre_osrm',
+      duration_ms: S._optT0 ? Date.now() - S._optT0 : 0,
+      in_app: FR_IN_APP
     });
     S.phase = 'input';
     S.stops.forEach(function(s) {
@@ -5791,7 +5811,9 @@ async function optimize() {
     saved_min: S.savings ? S.savings.savedMin : 0,
     orig_km: S.savings ? S.savings.origKm : 0,
     geo_failed: S.geoFailed.length,
-    region: S.userState || 'unknown'
+    region: S.userState || 'unknown',
+    duration_ms: S._optT0 ? Date.now() - S._optT0 : 0,
+    in_app: FR_IN_APP
   });
   applyTrialStopCap();
   _consumeTrialIfApplicable();
@@ -5926,7 +5948,9 @@ async function optimizeWithGemini() {
     saved_min: S.savings ? S.savings.savedMin : 0,
     orig_km: S.savings ? S.savings.origKm : 0,
     geo_failed: S.geoFailed.length,
-    region: S.userState || 'unknown'
+    region: S.userState || 'unknown',
+    duration_ms: S._optT0 ? Date.now() - S._optT0 : 0,
+    in_app: FR_IN_APP
   });
   _consumeTrialIfApplicable();
   var _failedStops = S.stops.filter(function(s){ return s.geoFailed; });
@@ -5935,7 +5959,9 @@ async function optimizeWithGemini() {
       failed_count: _failedStops.length,
       total_stops: S.stops.length,
       region: S.userState || 'unknown',
-      trigger: 'post_haversine'
+      trigger: 'post_haversine',
+      duration_ms: S._optT0 ? Date.now() - S._optT0 : 0,
+      in_app: FR_IN_APP
     });
     S.phase = 'fixing';
   } else {

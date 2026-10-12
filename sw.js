@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v20';   // v20: stop-number resolver tie-break fix
+const CACHE = 'flexroute-v21';   // v21: email gate after first route + timing/retry events
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
