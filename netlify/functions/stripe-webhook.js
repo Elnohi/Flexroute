@@ -39,6 +39,7 @@
 //                             Defaults to flexrouteapp@gmail.com if unset.)
 
 const Stripe = require('stripe');
+const reviewEmails = require('./_review-emails');
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -83,6 +84,28 @@ async function notifyAdmin(subject, text) {
     }
   } catch (e) {
     console.error('[FlexRoute] stripe-webhook: owner notification error:', e && e.message);
+  }
+}
+
+// Cancellation feedback email (see _review-emails.js). Called when a cancellation is
+// SCHEDULED (customer.subscription.updated) and again, harmlessly, when it takes effect
+// (customer.subscription.deleted) -- the second call is deduped per subscription, and it
+// also covers immediate cancellations that never had a scheduling event. Never throws.
+async function onCancelSignal(sub, ended) {
+  try {
+    const customer = await stripe.customers.retrieve(sub.customer);
+    const email = (customer && !customer.deleted && customer.email) || null;
+    const item = sub.items && sub.items.data && sub.items.data[0];
+    const endsAt = sub.cancel_at || (item && item.current_period_end) || sub.current_period_end || null;
+    const mail = reviewEmails.buildCancelEmail({ endsAt: endsAt, ended: !!ended, email: email });
+    const status = await reviewEmails.sendOnce({
+      kind: 'cancel-feedback', subId: sub.id, to: email, subject: mail.subject, text: mail.text
+    });
+    console.log('[FlexRoute] stripe-webhook: cancel-feedback email ->', status, sub.id);
+    return { email: email, status: status, endsAt: endsAt };
+  } catch (e) {
+    console.error('[FlexRoute] stripe-webhook: cancel-feedback error:', e && e.message);
+    return null;
   }
 }
 
@@ -150,6 +173,7 @@ exports.handler = async (event) => {
         'Customer: ' + sub.customer + '\nSubscription: ' + sub.id +
           '\nCancelled at: ' + (sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : 'unknown')
       );
+      await onCancelSignal(sub, true); // no-op duplicate if the scheduling event already sent it
       break;
     }
     case 'customer.subscription.created': {
@@ -190,10 +214,28 @@ exports.handler = async (event) => {
       }
       break;
     }
-    case 'customer.subscription.updated':
-      // No-op today — plan changes/renewals aren't currently notification-
-      // worthy on their own. See file header for guidance if that changes.
+    case 'customer.subscription.updated': {
+      // Plan changes/renewals are still not notification-worthy. The one update that
+      // IS: a customer scheduling a cancellation for the end of the billing period
+      // (cancel_at_period_end false -> true, or a cancel_at date newly set). That is the
+      // moment they decide to leave, long before customer.subscription.deleted fires.
+      // NOTE: this event type must be enabled on the Stripe webhook endpoint.
+      const sub = stripeEvent.data.object;
+      const prev = stripeEvent.data.previous_attributes || {};
+      const scheduledNow = sub.status !== 'canceled' &&
+        ((sub.cancel_at_period_end === true && prev.cancel_at_period_end === false) ||
+         (!!sub.cancel_at && prev.cancel_at === null));
+      if (scheduledNow) {
+        const r = await onCancelSignal(sub, false);
+        await notifyAdmin(
+          '\u23f3 FlexRoute subscription set to cancel: ' + ((r && r.email) || sub.customer),
+          'Customer: ' + ((r && r.email) || sub.customer) + '\nSubscription: ' + sub.id +
+            '\nEnds: ' + ((r && r.endsAt) ? reviewEmails.formatDate(r.endsAt) : 'end of billing period') +
+            '\nFeedback email: ' + (r ? r.status : 'error')
+        );
+      }
       break;
+    }
     default:
       // Unhandled event type. Still ack.
       break;
