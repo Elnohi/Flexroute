@@ -7096,6 +7096,12 @@ function expandAbbr(q) {
     return ' ' + {N:'North',S:'South',E:'East',W:'West'}[d.toUpperCase()];
   });
 
+  // US-style directional PREFIX: "123 W Main St" -> "123 West Main St". A lone letter is ignored
+  // by fuzzy search, so East/West versions of the same street get mixed up. Skipped when the next
+  // word is a street type ("100 E Street" is a street NAMED E).
+  q = q.replace(/^(\d+[A-Za-z]?\s+)(N|S|E|W)\.?\s+(?!(?:st|street|ave|avenue|rd|road|dr|drive|blvd|boulevard|ln|lane|ct|court|pl|place|way|pkwy|parkway|hwy|highway|cir|circle|ter|terrace)\b)(?=[A-Za-z0-9])/i,
+    function(m, num, d) { return num + {N:'North',S:'South',E:'East',W:'West'}[d.toUpperCase()] + ' '; });
+
   // Street type abbreviations (only when following digits or another word, not at start)
   // Careful: "St" at start = "Saint" (e.g. "St. Clair Ave")
   q = q.replace(/(?<=[A-Za-z])(\s+)St\.?(\s*)(?=[,\s]|$)/g, (m,pre,suf)=>pre+'Street'+suf);
@@ -7125,6 +7131,19 @@ function expandAbbr(q) {
   // Clean up extra spaces
   q = q.replace(/\s{2,}/g, ' ').trim();
   return q;
+}
+
+// Street direction of an address or of a geocoder result's street label: 'north'|'south'|'east'|'west'|null.
+// Handles "123 W Main St", "123 West Main Street", "King St W", "Dundas Street East".
+function _streetDir(seg) {
+  seg = (seg || '').split(',')[0].trim();
+  var map = { n:'north', s:'south', e:'east', w:'west', north:'north', south:'south', east:'east', west:'west' };
+  var STREET_T = /^(?:st|street|ave|avenue|rd|road|dr|drive|blvd|boulevard|ln|lane|ct|court|pl|place|way|pkwy|parkway|hwy|highway|cir|circle|ter|terrace)\b/i;
+  var m = seg.match(/^(?:\d+[A-Za-z]?\s+)?(north|south|east|west|n|s|e|w)\.?\s+(\S.*)$/i);
+  if (m && !STREET_T.test(m[2])) return map[m[1].toLowerCase()];
+  m = seg.match(/\s(north|south|east|west|n|s|e|w)\.?(?:\s+(?:unit|apt|apartment|suite|ste|floor)\b.*|\s*#.*)?$/i);
+  if (m) return map[m[1].toLowerCase()];
+  return null;
 }
 
 // ─── Region context inference ─────────────────────────────────────────────────
@@ -7232,7 +7251,8 @@ async function fetchCandidates(q, limit) {
           lon: f.geometry.coordinates[0],
           lat: f.geometry.coordinates[1],
           state:   (f.properties && f.properties.state) || '',
-          country: (f.properties && f.properties.country) || ''
+          country: (f.properties && f.properties.country) || '',
+          label:   f.properties ? [f.properties.housenumber, f.properties.street || f.properties.name].filter(Boolean).join(' ') : ''
         }));
       } catch (e) { console.warn('[FlexRoute] Photon error:', e && e.name, q); return []; }
     })();
@@ -7269,7 +7289,8 @@ async function fetchCandidates(q, limit) {
           lon: f.lon, lat: f.lat,
           state:        f.state || '',
           country:      f.country || '',
-          country_code: f.country_code || ''
+          country_code: f.country_code || '',
+          label:        (f.display_name || '').split(',').slice(0, 2).join(' ')
         }));
       } catch (e) { console.warn('[FlexRoute] Nominatim proxy error:', e && e.name, q); return []; }
     })();
@@ -7314,6 +7335,21 @@ async function fetchCandidates(q, limit) {
         console.warn('[FlexRoute] No candidates match userState=' + S.userState +
                      ' — using full list. Address may be genuinely cross-region.');
       }
+    }
+
+    // Direction check: when the address says West/East/North/South, prefer candidates on that
+    // same-direction street, then ones with no direction, and only then the rest. Before this, both
+    // "East Main St" and "West Main St" came back and the one nearest the route centre won.
+    // Never leaves the list empty, so it can't do worse than before.
+    var _wantDir = _streetDir(address);
+    if (_wantDir) {
+      var _same = candidates.filter(function(c) { return _streetDir(c.label) === _wantDir; });
+      var _none = candidates.filter(function(c) { return !_streetDir(c.label); });
+      var _pick = _same.length ? _same : (_none.length ? _none : candidates);
+      if (_pick.length < candidates.length && typeof trackEvent === 'function') {
+        trackEvent('geocode_direction_filtered', { dropped: candidates.length - _pick.length, kept: _pick.length, want: _wantDir, region: S.userState || 'unknown' });
+      }
+      candidates = _pick;
     }
 
     if (!biasLat || !biasLon) return candidates[0];
