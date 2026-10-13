@@ -1436,8 +1436,9 @@ function bind() {
   // ── Single document-level click delegation for all result/companion buttons ──
   // Replaces per-element on() calls that caused listener accumulation across renders
   document.addEventListener('click', function(e) {
-    // ── data-attribute buttons (delete, move, last, tweak reorder, lang) ──
-    var dataEl = e.target.closest ? e.target.closest('[data-del],[data-up],[data-dn],[data-last],[data-rup],[data-rdn],[data-rdel],[data-lang]') : null;
+    // ── data-attribute buttons (delete, move, last, tweak reorder, lang, fix-screen apply/skip) ──
+    // NOTE: every data-* button handled below MUST appear in this selector, or its click is silently ignored.
+    var dataEl = e.target.closest ? e.target.closest('[data-del],[data-up],[data-dn],[data-last],[data-rup],[data-rdn],[data-rdel],[data-lang],[data-fix-apply],[data-fix-skip]') : null;
     if (dataEl) {
       var delId  = dataEl.getAttribute('data-del');
       var upId   = dataEl.getAttribute('data-up');
@@ -1646,6 +1647,7 @@ function bind() {
       case 'clearHomeBtn':  S.home=''; localStorage.removeItem('fr_hm'); toast('Home address cleared'); render(); break;
       case 'retryOptBtn': S.errMsg=''; optimize(); break;
       case 'ocrWarnDismiss': S._ocrWarn=null; render(); break;
+      case 'scanSumDismiss': S._scanSummary=null; render(); break;
       case 'newShiftBtn':
         if (!confirm('Start a new shift? This will clear all current stops.')) break;
         S.stops=[]; S.optimized=[]; S.savings=null;
@@ -3409,6 +3411,14 @@ function vInput() {
     h += '<button id="ocrWarnDismiss" aria-label="Dismiss" style="position:absolute;top:8px;right:8px;background:transparent;border:none;color:inherit;opacity:.6;font-size:16px;line-height:1;cursor:pointer;padding:4px">&#10005;</button>';
     h += '</div>';
   }
+  if (S._scanSummary) {
+    var _ss = S._scanSummary;
+    h += '<div style="position:relative;margin:8px 0;padding:12px 40px 12px 14px;border-radius:12px;border:1px solid ' + (_ss.complete ? 'var(--ok)' : 'var(--brd)') + ';background:' + (_ss.complete ? 'rgba(34,217,138,.08)' : 'var(--surf2)') + ';font-size:13px;line-height:1.45;color:var(--t1)">';
+    h += '<div style="font-weight:700;color:' + (_ss.complete ? 'var(--ok)' : 'var(--t1)') + '">' + escH(_ss.title) + '</div>';
+    _ss.lines.forEach(function(l) { h += '<div style="margin-top:4px;opacity:.9">' + escH(l) + '</div>'; });
+    h += '<button id="scanSumDismiss" aria-label="Dismiss" style="position:absolute;top:8px;right:8px;background:transparent;border:none;color:inherit;opacity:.6;font-size:16px;line-height:1;cursor:pointer;padding:4px 8px">&times;</button>';
+    h += '</div>';
+  }
 
   if (S.errMsg) {
     h += '<div style="background:rgba(255,68,85,.12);border:1px solid #FF4455;border-radius:10px;padding:12px 15px;margin-bottom:14px">';
@@ -3483,7 +3493,7 @@ function sRow(s, i) {
   <div class="sb">
     <div class="sa">${escH(s.address)}</div>
     <div class="sm">
-      ${hn ? `Flex stop #${(s.packageNums && s.packageNums.length > 1) ? _formatNumList(s.packageNums) : s.flexNum}` : (s.scanned ? 'Scanned &mdash; number not read' : 'Manually added')}
+      ${hn ? `Flex stop${(s.packageNums && s.packageNums.length > 1) ? 's' : ''} #${(s.packageNums && s.packageNums.length > 1) ? _formatNumList(s.packageNums) : s.flexNum}` : (s.scanned ? 'Scanned &mdash; number not read' : 'Manually added')}
       ${pc > 1 ? `&nbsp;<span style="background:rgba(255,153,0,.18);border:1px solid var(--acc);color:var(--acc);font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;font-family:var(--sans)">&#128230; ${pc} pkgs</span>` : ''}
     </div>
   </div>
@@ -4848,6 +4858,8 @@ async function handleFiles(files) {
   S.errMsg = ''; S._ocrWarn = null; render();
   let added = 0, failed = 0, lastErr = '', unreadable = 0, possibleMissing = 0;
   let unreadableDetails = [];
+  let _sumDepot = false, _sumEnd = false, _sumUnres = 0, _sumSn = [];
+  S._scanSummary = null;
   for (let i = 0; i < imgs.length; i++) {
     S.sc = { done: i, total: imgs.length, msg: `Scanning image ${i + 1} of ${imgs.length}...` };
     render();
@@ -4855,6 +4867,12 @@ async function handleFiles(files) {
       const items = await extractFromFile(imgs[i]);
       unreadable += items._skipped || 0;
       possibleMissing += items._possibleMissing || 0;
+      if (items._meta) {
+        _sumDepot = _sumDepot || !!items._meta.depotFirst;
+        _sumEnd = _sumEnd || !!items._meta.endMarker;
+        _sumUnres += items._meta.unresolved || 0;
+        items._meta.serials.forEach(function(n) { if (_sumSn.indexOf(n) === -1) _sumSn.push(n); });
+      }
       if (items._skippedDetails && items._skippedDetails.length) {
         unreadableDetails = unreadableDetails.concat(items._skippedDetails);
       }
@@ -4959,8 +4977,10 @@ async function handleFiles(files) {
       S._ocrWarn = { summary: _summary, items: unreadableDetails.slice(), possibleMissingNote: _possibleMissingNote, note: _note };
       S._lastOcrWarnAt = Date.now();
       trackEvent('ocr_stops_unreadable', { unreadable: unreadable, possible_missing: possibleMissing, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
+      S._scanSummary = null;
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
+      S._scanSummary = _buildScanSummary({ depot: _sumDepot, end: _sumEnd, unres: _sumUnres, sn: _sumSn });
     }
     // Analytics: screenshot scanned successfully
     trackEvent('screenshot_scanned', {
@@ -4969,6 +4989,47 @@ async function handleFiles(files) {
     });
   }
   render();
+}
+
+// Post-scan summary: confirms the whole Flex list was read ONLY when every check passes
+// (warehouse block at the top, end-of-list message at the bottom, no jumps in the Flex
+// numbers, nothing unreadable). Otherwise it says what it could not confirm.
+function _buildScanSummary(ctx) {
+  var sn = ctx.sn.slice().sort(function(a, b) { return a - b; });
+  var scanned = S.stops.filter(function(s) { return s.scanned; });
+  var mine = sn.length ? scanned.filter(function(s) {
+    return (s.packageNums || []).some(function(n) { return sn.indexOf(n) >= 0; });
+  }) : scanned;
+  var stops = mine.length;
+  var pkgs = mine.reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0);
+  var flexN = sn.length, min = sn[0], max = sn[sn.length - 1];
+  var gapAt = null;
+  for (var gi = 1; gi < sn.length; gi++) { if (sn[gi] !== sn[gi - 1] + 1) { gapAt = [sn[gi - 1], sn[gi]]; break; } }
+  // With the warehouse block present, the first delivery MUST be Flex #2 (the warehouse is #1).
+  // If the numbers start higher, a stop before it was lost and the numbers were shifted to fit.
+  var badStart = flexN > 0 && ctx.depot && min !== 2;
+  var complete = flexN > 0 && ctx.depot && ctx.end && ctx.unres === 0 && !gapAt && !badStart;
+  var merged = mine.filter(function(s) { return s.packageNums && s.packageNums.length > 1; });
+  var title, lines = [];
+  if (complete) {
+    title = '\u2713 Full list read: ' + flexN + ' Flex stop' + (flexN > 1 ? 's' : '') + ', ' + pkgs + ' package' + (pkgs > 1 ? 's' : '');
+    if (merged.length && flexN > stops) {
+      lines.push((flexN - stops) + ' Flex stop' + (flexN - stops > 1 ? 's' : '') + ' share a building with another one, so FlexRoute shows ' + stops +
+        ' stops. Each combined stop lists all of its Flex numbers (for example #' + _formatNumList(merged[0].packageNums.slice().sort(function(a, b) { return a - b; })) + ').');
+    }
+    lines.push('Flex counts the warehouse as stop 1, so its list ends at #' + max + '.');
+  } else {
+    title = stops + ' stop' + (stops !== 1 ? 's' : '') + ', ' + pkgs + ' package' + (pkgs !== 1 ? 's' : '') + ' scanned';
+    if (!ctx.depot) lines.push("We couldn't see the warehouse pickup (\"Picked up at\u2026\") at the top of your Flex list.");
+    if (!ctx.end) lines.push("We couldn't see Flex's end-of-list message at the bottom, so we can't confirm the whole list was captured.");
+    if (gapAt) lines.push('Flex stop numbers jump from #' + gapAt[0] + ' to #' + gapAt[1] + ', so a stop may be missing.');
+    if (badStart && !gapAt) lines.push('The first stop after the warehouse should be Flex #2, but the numbers start at #' + min + ', so a stop may be missing.');
+    if (ctx.unres > 0) lines.push("Some Flex stop numbers couldn't be read.");
+    lines.push('Compare with your Flex list and add a screenshot of any part that is missing.');
+  }
+  trackEvent('scan_summary_shown', { complete: complete ? 1 : 0, stops: stops, packages: pkgs, merged: merged.length,
+    missing_depot: ctx.depot ? 0 : 1, missing_end: ctx.end ? 0 : 1, gap: (gapAt || badStart) ? 1 : 0, in_app: FR_IN_APP });
+  return { complete: complete, title: title, lines: lines };
 }
 
 async function extractFromFile(file) {
@@ -6881,7 +6942,7 @@ function parseFlexOCR(rawText) {
         // a duplicated slice from the stitch, not another Amazon stop — it must
         // not take a number. One with a NEW address is a real, recovered stop.
         if (_isOrphan && !_existingResult && typeof trackEvent === 'function') trackEvent('ocr_headerless_stop_recovered', {});
-        if (!(_isOrphan && _existingResult)) _blockLog.push({ kind: 'ok', read: _stopNum, ref: _existingResult || results[results.length - 1] });
+        if (!(_isOrphan && _existingResult)) _blockLog.push({ kind: 'ok', read: _stopNum, pk: currentPkgCount, ref: _existingResult || results[results.length - 1] });
       } else {
         // Scheduled block found but no address line could be parsed —
         // capture WHICH stop so the driver can find it instead of diffing
@@ -6937,17 +6998,29 @@ function parseFlexOCR(rawText) {
   // renumber stops by position in the list, which is always one behind
   // Amazon's own numbering because the depot pickup is #1.)
   var _serials = _resolveSerials(_blockLog.map(function(e) { return e.read; }), _depotFirst);
-  results.forEach(function(r) { r._sn = []; });
+  results.forEach(function(r) { r._sn = []; r._pk = {}; r._unres = 0; });
   _blockLog.forEach(function(e, k) {
     var sv = _serials[k];
     if (e.kind === 'skip') { e.ref.num = sv; }
-    else if (sv != null && e.ref._sn.indexOf(sv) === -1) e.ref._sn.push(sv);
+    else if (sv == null) { e.ref._unres++; }
+    else {
+      if (e.ref._sn.indexOf(sv) === -1) e.ref._sn.push(sv);
+      e.ref._pk[sv] = Math.max(e.ref._pk[sv] || 0, e.pk || 1);   // same number seen twice = one package set (overlap)
+    }
   });
   results.forEach(function(r) {
     r._sn.sort(function(a, b) { return a - b; });
     r.packageNums = r._sn;
     r.num = r._sn.length ? r._sn[0] : null;
-    delete r._sn;
+    // Different Flex numbers at the same building are different packages: the stop's package
+    // count is the sum over its distinct numbers (was stuck at 1 when Vision scatters the badges
+    // and the numbers were only resolved after merging). Only when every merged block resolved.
+    if (r._sn.length > 1 && r._unres === 0) {
+      var _sum = 0;
+      r._sn.forEach(function(n) { _sum += r._pk[n] || 1; });
+      r.pkgCount = _sum;
+    }
+    delete r._sn; delete r._pk; delete r._unres;
   });
   if (typeof trackEvent === 'function' && _blockLog.length) {
     trackEvent('stop_serials_resolved', {
@@ -6990,6 +7063,15 @@ function parseFlexOCR(rawText) {
   if (_deliverMatches.length > _accountedFor + 1) {  // +1 tolerance for OCR noise
     results._possibleMissing = _deliverMatches.length - _accountedFor;
   }
+  // Evidence for the post-scan summary card. Read-only: changes nothing above.
+  var _metaSn = [];
+  _blockLog.forEach(function(e, k) { var v = _serials[k]; if (v != null && _metaSn.indexOf(v) === -1) _metaSn.push(v); });
+  results._meta = {
+    depotFirst: _depotFirst,
+    endMarker: /assigned more stops|see them in your itinerary/i.test(rawText),
+    serials: _metaSn,
+    unresolved: _serials.filter(function(v) { return v == null; }).length
+  };
   return results;
 }
 
