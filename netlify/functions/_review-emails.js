@@ -107,35 +107,43 @@ function isExcluded(email) {
 }
 
 // ── Message text ────────────────────────────────────────────────────────────
+// Stripe stores exact timestamps. A date taken in UTC can read as the NEXT day for someone who
+// subscribed in the evening, so the date is shown in US Eastern time (the same dates the owner
+// sees in the Stripe dashboard). The year is shown only when it isn't the current year
+// ("November 10", but "January 5, 2027" across a year boundary).
 function formatDate(unixSeconds) {
   if (!unixSeconds) return '';
-  return new Date(unixSeconds * 1000).toLocaleDateString('en-US',
-    { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+  const d = new Date(unixSeconds * 1000);
+  const tz = 'America/New_York';
+  const yearOf = function(x) { return x.toLocaleDateString('en-US', { year: 'numeric', timeZone: tz }); };
+  const opts = (yearOf(d) === yearOf(new Date()))
+    ? { month: 'long', day: 'numeric', timeZone: tz }
+    : { year: 'numeric', month: 'long', day: 'numeric', timeZone: tz };
+  return d.toLocaleDateString('en-US', opts);
 }
 
 function footer(email) {
   return '\n\n--\nDon\'t want emails like this? Click here and we won\'t send another: ' + optoutUrl(email);
 }
 
-// Deliberately says "Hi there": the name on a Stripe customer is the billing name,
-// which can differ from the person who owns the inbox, and test accounts have
-// placeholder names.
+// Greets "Hi There" rather than by name: the name on a Stripe customer is the billing name,
+// which can differ from the person who owns the inbox, and test accounts have placeholder names.
 function buildCancelEmail(opts) {
   const when = formatDate(opts.endsAt);
+  const taken = ', and that\'s all taken care of: you won\'t be charged again';
   const status = opts.ended
-    ? 'Your FlexRoute subscription has been cancelled, and you won\'t be charged again.'
+    ? 'I saw that your subscription has been cancelled' + taken + '.'
     : (when
-        ? 'Your FlexRoute subscription is set to end on ' + when + ', and you won\'t be charged again. You can keep using the app until then.'
-        : 'Your FlexRoute subscription is set to end at the close of your current billing period, and you won\'t be charged again. You can keep using the app until then.');
+        ? 'I saw that your subscription is set to end on ' + when + taken + ', and you can keep using the app until then.'
+        : 'I saw that your subscription is set to end at the close of your current billing period' + taken + ', and you can keep using the app until then.');
   const text =
-    'Hi there,\n\n' +
+    'Hi There,\n\n' +
     'Thanks for trying FlexRoute. ' + status + '\n\n' +
     'We\'re a small team and your feedback really helps us improve. Would you mind sharing, in a sentence or two, ' +
     'what led you to cancel? For example: routes didn\'t optimize the way you expected, you don\'t need it often enough, ' +
     'the price, or something else.\n\n' +
-    'If a route went wrong, the area and roughly how many stops it had (or a screenshot) would help us look into it. ' +
-    'Feel free to blur names or anything you\'d rather not share.\n\n' +
-    'Just reply to this email. No need to reply if you\'d rather not.\n\n' +
+    'If a route went wrong, the area and roughly how many stops it had (or a screenshot) would help us look into it.\n\n' +
+    'No need to reply if you\'d rather not.\n\n' +
     'Thanks again,\nThe FlexRoute Team' + footer(opts.email);
   return { subject: 'Quick question about your FlexRoute subscription', text: text };
 }
@@ -145,7 +153,7 @@ function buildCheckinEmail(opts) {
     ? '\n\nIf FlexRoute is saving you time, a short review helps other drivers find it: ' + process.env.REVIEW_URL
     : '';
   const text =
-    'Hi there,\n\n' +
+    'Hi There,\n\n' +
     'Thanks for subscribing to FlexRoute. We\'re a small team and we want to make sure the app is really saving you time on your routes.\n\n' +
     'Has it worked well for you so far? If anything has been confusing, slow, or didn\'t optimize the way you expected, ' +
     'we\'d like to hear about it and fix it. A sentence or two is plenty, and if a route went wrong, the area and roughly ' +
