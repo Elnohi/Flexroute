@@ -30,3 +30,7 @@
   for = "/.netlify/functions/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
+
+# Daily 15:00 UTC (11:00 AM Eastern): day-10 subscriber check-in email. Does nothing unless REVIEW_EMAILS_ENABLED=1.
+[functions."review-checkin"]
+  schedule = "0 15 * * *"
