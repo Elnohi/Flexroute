@@ -250,6 +250,11 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
 .comp-addr{font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.1;margin-bottom:10px;letter-spacing:-.5px;animation:cSlide .3s ease}
 @keyframes cSlide{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 .comp-pkg{display:block;width:100%;background:rgba(255,153,0,.12);border:2px solid rgba(255,153,0,.4);border-radius:12px;padding:14px 20px;font-family:var(--sans);font-size:20px;font-weight:800;color:var(--acc);text-align:center;letter-spacing:0.3px;margin-bottom:20px}
+.comp-flex{display:block;width:100%;box-sizing:border-box;background:rgba(255,153,0,.12);border:2px solid rgba(255,153,0,.45);border-radius:14px;padding:12px 16px 14px;text-align:center;margin-bottom:20px}
+.comp-flexlbl{font-family:var(--sans);font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:var(--t2)}
+.comp-flexnums{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 18px;font-family:var(--sans);font-weight:900;color:var(--acc);line-height:1.02;margin:6px 0 8px}
+.comp-flexnums.n1{font-size:76px}.comp-flexnums.n2{font-size:58px}.comp-flexnums.n3{font-size:48px}.comp-flexnums.nm{font-size:38px}
+.comp-flexpk{font-family:var(--sans);font-size:18px;font-weight:700;color:var(--t1)}
 .comp-navbtns{display:flex;gap:12px;width:100%;max-width:380px;margin-bottom:14px}
 .comp-waze{flex:1;background:#06D6A0;color:#000;border:none;border-radius:12px;padding:17px;font-size:17px;font-weight:800;font-family:var(--sans);cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px}
 .comp-maps{flex:1;background:#4285F4;color:#fff;border:none;border-radius:12px;padding:17px;font-size:17px;font-weight:800;font-family:var(--sans);cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px}
@@ -1794,6 +1799,9 @@ var LANGS = {
     pkg_num_unknown: 'Number not read — check your Flex app',
     list_and: 'and',
     pkg_in_car_num: 'Package #{n} in car',
+    flex_stop_one: 'Flex stop',
+    flex_stop_many: 'Flex stops',
+    one_package: '1 package',
     shift_complete: 'Shift Complete!',
     stops_delivered: '{n} stops',
     done_back: '✓ Done — Back to route',
@@ -1988,6 +1996,9 @@ var LANGS = {
     pkg_num_unknown: 'Numéro non lu — vérifiez votre appli Flex',
     list_and: 'et',
     pkg_in_car_num: 'Colis n°{n} en voiture',
+    flex_stop_one: 'Arrêt Flex',
+    flex_stop_many: 'Arrêts Flex',
+    one_package: '1 colis',
     shift_complete: 'Quart terminé !',
     stops_delivered: '{n} arrêts',
     done_back: '✓ Terminé — Retour à l\'itinéraire',
@@ -2182,6 +2193,9 @@ var LANGS = {
     pkg_num_unknown: 'Nummer nicht gelesen — in der Flex-App prüfen',
     list_and: 'und',
     pkg_in_car_num: 'Paket Nr. {n} im Auto',
+    flex_stop_one: 'Flex-Stopp',
+    flex_stop_many: 'Flex-Stopps',
+    one_package: '1 Paket',
     shift_complete: 'Schicht abgeschlossen!',
     stops_delivered: '{n} Stopps',
     done_back: '✓ Fertig — Zurück zur Route',
@@ -2376,6 +2390,9 @@ var LANGS = {
     pkg_num_unknown: 'Número no leído: revisa tu app Flex',
     list_and: 'y',
     pkg_in_car_num: 'Paquete n°{n} en el coche',
+    flex_stop_one: 'Parada Flex',
+    flex_stop_many: 'Paradas Flex',
+    one_package: '1 paquete',
     shift_complete: '¡Turno completado!',
     stops_delivered: '{n} paradas',
     done_back: '✓ Listo — Volver a la ruta',
@@ -3852,14 +3869,21 @@ function vCompanion() {
       '<div class="comp-addr">' + escH(stop.address) + '</div>' +
       (function(){
         var _k = stop.pkgCount || 1;
-        // Number known: "package #N in car" / "N packages — #A and B".
+        // Number known: a big card the driver can read at a glance and match against the Flex
+        // itinerary: "FLEX STOP  #23", or "FLEX STOPS  #23 #24 #30" when several Flex numbers
+        // share this building, plus the package count. (Flex has no link that opens a specific
+        // stop, so finding it is by number.)
         if (stop.flexNum != null) {
-          var _n = stop.flexNum;
-          var _nums = (stop.packageNums && stop.packageNums.length > 1) ? stop.packageNums.slice().sort(function(a,b){return a-b;}) : null;
-          var _lbl = _nums
-            ? t('packages_with_nums').replace('{n}', _k).replace('{list}', _formatNumList(_nums))
-            : (_k > 1 ? t('packages_at_stop').replace('{n}', _k) : t('pkg_in_car_num').replace('{n}', _n));
-          return '<div class="comp-pkg">&#128230; ' + escH(_lbl) + '</div>';
+          var _fn = (stop.packageNums && stop.packageNums.length > 1)
+            ? stop.packageNums.slice().sort(function(a,b){return a-b;}) : [stop.flexNum];
+          var _sz = _fn.length === 1 ? 'n1' : (_fn.length === 2 ? 'n2' : (_fn.length === 3 ? 'n3' : 'nm'));
+          var _numsHtml = _fn.map(function(n){ return '<span>#' + escH(String(n)) + '</span>'; }).join('');
+          var _pkTxt = _k > 1 ? t('packages_at_stop').replace('{n}', _k) : t('one_package');
+          return '<div class="comp-flex">' +
+            '<div class="comp-flexlbl">' + escH(t(_fn.length > 1 ? 'flex_stop_many' : 'flex_stop_one')) + '</div>' +
+            '<div class="comp-flexnums ' + _sz + '">' + _numsHtml + '</div>' +
+            '<div class="comp-flexpk">&#128230; ' + escH(_pkTxt) + '</div>' +
+          '</div>';
         }
         // Number NOT read: this used to show nothing at all — so a 2-package stop
         // looked like a 1-package stop. Always show the count, and say plainly
@@ -3899,7 +3923,7 @@ function toggleCompList() {
     var cls = isDone ? 'cdone' : isCurr ? 'ccurr' : '';
     return '<div class="comp-mrow ' + cls + '">' +
       '<div class="comp-mn" style="background:' + bg + ';color:' + tc + '">' + (isDone ? '&#10003;' : (i+1)) + '</div>' +
-      '<div class="comp-ma">' + escH(s.address) + (s.flexNum!=null ? ' <span style="color:var(--acc);font-size:11px">#'+s.flexNum+'</span>' : '') + '</div>' +
+      '<div class="comp-ma">' + escH(s.address) + (s.flexNum!=null ? ' <span style="color:var(--acc);font-size:11px">#'+((s.packageNums && s.packageNums.length > 1) ? _formatNumList(s.packageNums.slice().sort(function(a,b){return a-b;})) : s.flexNum)+'</span>' : '') + '</div>' +
       '</div>';
   }).join('');
   var overlay = document.createElement('div');
@@ -6303,7 +6327,15 @@ function parseFlexOCR(rawText) {
     if (CITIES.indexOf(low) >= 0) return true;
     // Soft: short, no digits, not a street — catches cities not in list
     if (low.length >= 3 && low.length <= 35 && !/\d/.test(low)) {
-      var hasKw = STREET_KW.some(function(k){ return (' '+low).indexOf(k) >= 0; });
+      // A street line ends in a street-type word ("Maple Street", "Rotary Drive"). The previous
+      // check rejected a street keyword anywhere as a word PREFIX, which threw out real cities that
+      // merely START with one — Greenville, Greenwood, Rock Hill, Fort Mill, Mount Pleasant,
+      // Lakewood, Brentwood, Parkland, Rowlett... — and the stop then lost its city and geocoded
+      // against the whole state. Now only an unambiguous street type as the LAST word counts
+      // (a trailing N/S/E/W is ignored: "Main Street East").
+      var _w = low.replace(/[.,]+$/, '').split(/\s+/);
+      while (_w.length > 1 && /^(?:n|s|e|w|ne|nw|se|sw|north|south|east|west)$/.test(_w[_w.length - 1])) _w.pop();
+      var hasKw = _w.length >= 1 && /^(?:ave|avenue|st|street|rd|road|dr|drive|blvd|boulevard|cres|crescent|court|ct|way|pl|place|lane|ln|terrace|ter|terr|trail|trl|pkwy|parkway|hwy|highway|cir|circle|sq|square|pike|loop|gate|path|close|mews|plaza|plz|route|rte)$/.test(_w[_w.length - 1]);
       var isN = /^(deliver|package|itinerary|next|current|after|location|expected|scheduled)/i.test(low);
       if (!hasKw && !isN) return true;
     }
@@ -6349,8 +6381,10 @@ function parseFlexOCR(rawText) {
     if (_rem) {
       // Unit designators and bare duplicate house numbers → strip them (return truncated core)
       var _isUnit = /^(?:apt|apartment|unit|suite|ste|#|\d)/i.test(_rem);
-      if (/\bCounty\s+Road\s*$/i.test(core)) {
-        // County Road X E — road number always kept
+      if (/\b(?:County|State|Town|Township|Fire|Farm|Ranch|Forest|Rural|Private)\s+(?:Road|Rd|Lane|Ln|Route|Trail|Trl|Highway|Hwy)\s*$/i.test(core)) {
+        // County Road X E / State Road 21 / Fire Lane 12 / Farm Road 1960 — here the number IS the
+        // road's name (not a duplicate house number), so it is always kept. Ordinary streets
+        // ("Avenue 205") keep the strip below.
         return addr;
       } else if (!_isUnit) {
         // Proper name / article / direction after street type → keep full address
@@ -6361,6 +6395,12 @@ function parseFlexOCR(rawText) {
     }
     return core;
   }
+
+  // Rural grid / fire-number addresses carry a quadrant letter attached to the house number:
+  // "W1234 County Road B", "N6543 Hwy 41", "W240N1234 Pewaukee Rd" (common in WI/MN/MI and
+  // other rural areas). The letter is PART of the address. OCR noise ("QO) 47", "a7) 136",
+  // "a 47", "@9) 103") never matches: it has a bracket, is lowercase, or is not attached.
+  var _GRIDNUM = /^(?:[NSEW]\d{2,4}[NSEW]\d{2,6}|[NSEW]\d{3,6})\s+[A-Za-z]/;
 
   // Strip ALL leading noise — symbols, OCR artifacts, stop number prefixes
   // Handles: ©, ®, *, @, ), a, QO), a7), eo), @9), (4), 4), 20 14, etc.
@@ -6382,6 +6422,9 @@ function parseFlexOCR(rawText) {
     if (/^[A-Za-z][A-Za-z\s\-\.']{3,}\s+\d+[a-z]?$/i.test(s.trim()) && s.trim().length > 8) {
       return s.trim();
     }
+    // 3.6 Rural grid / fire-number address: return intact (step 4 below would delete the
+    //     letter and leave a DIFFERENT address: "W1234 County Rd B" -> "1234 County Rd B").
+    if (_GRIDNUM.test(s.trim())) return s.trim();
     // 4. AGGRESSIVE: strip any leading non-digit chars until we find an address
     //    Handles "QO) 47", "a 47", "a7) 136", "eo) 103", "@9) 103"
     //    Run up to 3 times to handle compound prefixes like "a7) 136"
@@ -6439,8 +6482,9 @@ function parseFlexOCR(rawText) {
       // Japanese/Asian block format: "2-14-3 Shinjuku", "1-1 Marunouchi"
       /^\d+-\d+(?:-\d+)?\s+[A-Za-z]/i.test(orig)
     );
-    if (!intlOk && !/^\d/.test(clean)) return false;
+    if (!intlOk && !/^\d/.test(clean) && !_GRIDNUM.test(clean)) return false;
     if (intlOk) return true;  // International street — bypass STREET_KW check
+    if (_GRIDNUM.test(clean)) return true;  // Rural grid / fire-number address (letter + number + street word)
     // Indiana township grid: "1424 S 600 W" "9880 N 750 E" "6841 e850 n"
     if (/^\d+\s+[NSEWnsew]\s+\d+\s+[NSEWnsew]\s*$/i.test(clean)) return true;
     if (/^\d+\s+[nsew]\d+\s+[nsew]\s*$/i.test(clean)) return true;
