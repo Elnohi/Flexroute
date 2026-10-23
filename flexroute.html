@@ -1677,15 +1677,29 @@ function bind() {
   // raw OCR text was unreachable.
   var scanLbl = document.getElementById('scanCountLbl');
   if (scanLbl) {
-    var _dbgTimer = null;
-    scanLbl.addEventListener('pointerdown', function() {
-      _dbgTimer = setTimeout(function() {
-        var p = document.getElementById('dbgPanel');
-        if (p) { p.style.display = p.style.display === 'none' ? 'block' : 'none'; if (p.style.display === 'block') p.textContent = S._lastOCR || ''; }
-      }, 500);
+    // Opens/closes the raw OCR panel and copies the raw text to the clipboard (one tap from pasting it
+    // to support). 5 quick taps is the reliable trigger: on Android a long-press is taken over by
+    // text selection and cancels the pointer events. Long-press still works where the browser allows it.
+    var _toggleDbg = function() {
+      var p = document.getElementById('dbgPanel');
+      if (!p) return;
+      p.style.display = p.style.display === 'none' ? 'block' : 'none';
+      if (p.style.display === 'block') {
+        p.textContent = S._lastOCR || '';
+        try { if (navigator.clipboard && S._lastOCR) navigator.clipboard.writeText(S._lastOCR).then(function() { toast('Raw OCR text copied'); }, function() {}); } catch (e) {}
+      }
+    };
+    var _dbgTimer = null, _dbgTaps = [];
+    scanLbl.style.userSelect = 'none'; scanLbl.style.webkitUserSelect = 'none'; scanLbl.style.touchAction = 'manipulation';
+    scanLbl.addEventListener('pointerdown', function() { _dbgTimer = setTimeout(_toggleDbg, 500); });
+    scanLbl.addEventListener('click', function() {
+      var now = Date.now();
+      _dbgTaps = _dbgTaps.filter(function(t) { return now - t < 2500; }); _dbgTaps.push(now);
+      if (_dbgTaps.length >= 5) { _dbgTaps = []; _toggleDbg(); }
     });
     scanLbl.addEventListener('pointerup', function() { clearTimeout(_dbgTimer); });
     scanLbl.addEventListener('pointerleave', function() { clearTimeout(_dbgTimer); });
+    scanLbl.addEventListener('pointercancel', function() { clearTimeout(_dbgTimer); });
   }
   // Element bindings — re-added every render() since DOM is recreated
   on('saveKey',      'click', function(){ saveKey(); });
@@ -4882,7 +4896,8 @@ async function handleFiles(files) {
   S.errMsg = ''; S._ocrWarn = null; render();
   let added = 0, failed = 0, lastErr = '', unreadable = 0, possibleMissing = 0;
   let unreadableDetails = [];
-  let _sumDepot = false, _sumEnd = false, _sumUnres = 0, _sumSn = [];
+  let _sumDepot = false, _sumEnd = false, _sumUnres = 0, _sumSn = [], _sumTotal = null, _sumNew = false, _sumCounts = 0,
+      _sumIcon = 0, _sumDeliver = 0, _sumBoth = 0, _sumConfOpen = 0, _sumConfFixed = 0;
   S._scanSummary = null;
   for (let i = 0; i < imgs.length; i++) {
     S.sc = { done: i, total: imgs.length, msg: `Scanning image ${i + 1} of ${imgs.length}...` };
@@ -4895,6 +4910,11 @@ async function handleFiles(files) {
         _sumDepot = _sumDepot || !!items._meta.depotFirst;
         _sumEnd = _sumEnd || !!items._meta.endMarker;
         _sumUnres += items._meta.unresolved || 0;
+        if (items._meta.totalPackages != null && _sumTotal == null) _sumTotal = items._meta.totalPackages;
+        _sumNew = _sumNew || !!items._meta.newLayout;
+        _sumCounts += items._meta.countsFound || 0;
+        _sumIcon += items._meta.iconCounts || 0; _sumDeliver += items._meta.deliverCounts || 0; _sumBoth += items._meta.bothCounts || 0;
+        _sumConfOpen += items._meta.conflictsOpen || 0; _sumConfFixed += items._meta.conflictsFixed || 0;
         items._meta.serials.forEach(function(n) { if (_sumSn.indexOf(n) === -1) _sumSn.push(n); });
       }
       if (items._skippedDetails && items._skippedDetails.length) {
@@ -5004,7 +5024,8 @@ async function handleFiles(files) {
       S._scanSummary = null;
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
-      S._scanSummary = _buildScanSummary({ depot: _sumDepot, end: _sumEnd, unres: _sumUnres, sn: _sumSn });
+      S._scanSummary = _buildScanSummary({ depot: _sumDepot, end: _sumEnd, unres: _sumUnres, sn: _sumSn, total: _sumTotal, newLayout: _sumNew, counts: _sumCounts,
+        icon: _sumIcon, deliver: _sumDeliver, both: _sumBoth, confOpen: _sumConfOpen, confFixed: _sumConfFixed });
     }
     // Analytics: screenshot scanned successfully
     trackEvent('screenshot_scanned', {
@@ -5032,7 +5053,12 @@ function _buildScanSummary(ctx) {
   // With the warehouse block present, the first delivery MUST be Flex #2 (the warehouse is #1).
   // If the numbers start higher, a stop before it was lost and the numbers were shifted to fit.
   var badStart = flexN > 0 && ctx.depot && min !== 2;
-  var complete = flexN > 0 && ctx.depot && ctx.end && ctx.unres === 0 && !gapAt && !badStart;
+  // New Flex layout shows the route's total package count on the warehouse row. When we have it, it is the
+  // strongest check there is: the packages we counted must add up to it.
+  var totalKnown = ctx.total != null, totalMatch = totalKnown && pkgs === ctx.total;
+  var countsUnread = !!ctx.newLayout && !ctx.counts;     // new layout, but no stop's package count could be read
+  var complete = flexN > 0 && ctx.depot && ctx.end && ctx.unres === 0 && !gapAt && !badStart &&
+                 (!totalKnown || totalMatch) && !countsUnread && !(ctx.confOpen > 0);
   var merged = mine.filter(function(s) { return s.packageNums && s.packageNums.length > 1; });
   var title, lines = [];
   if (complete) {
@@ -5041,6 +5067,15 @@ function _buildScanSummary(ctx) {
       lines.push((flexN - stops) + ' Flex stop' + (flexN - stops > 1 ? 's' : '') + ' share a building with another one, so FlexRoute shows ' + stops +
         ' stops. Each combined stop lists all of its Flex numbers (for example #' + _formatNumList(merged[0].packageNums.slice().sort(function(a, b) { return a - b; })) + ').');
     }
+    // Which independent readings of the package counts agree with each other?
+    var srcs = [];
+    if (ctx.icon > 0) srcs.push("each stop's package icon");
+    if (ctx.deliver > 0) srcs.push(ctx.icon > 0 ? 'its \u201cDeliver N packages\u201d line' : 'the \u201cDeliver N packages\u201d lines');
+    if (totalKnown) srcs.push("Amazon's route total (" + ctx.total + ")");
+    if (srcs.length >= 2) {
+      lines.push('Package counts confirmed by ' + (srcs.length === 2 ? srcs.join(' and ') : srcs.slice(0, -1).join(', ') + ' and ' + srcs[srcs.length - 1]) + '.');
+    }
+    if (ctx.confFixed > 0) lines.push('The package icon and the \u201cDeliver N packages\u201d line differed on ' + ctx.confFixed + ' stop' + (ctx.confFixed > 1 ? 's' : '') + "; we used the readings that add up to Amazon's total.");
     lines.push('Flex counts the warehouse as stop 1, so its list ends at #' + max + '.');
   } else {
     title = stops + ' stop' + (stops !== 1 ? 's' : '') + ', ' + pkgs + ' package' + (pkgs !== 1 ? 's' : '') + ' scanned';
@@ -5049,10 +5084,15 @@ function _buildScanSummary(ctx) {
     if (gapAt) lines.push('Flex stop numbers jump from #' + gapAt[0] + ' to #' + gapAt[1] + ', so a stop may be missing.');
     if (badStart && !gapAt) lines.push('The first stop after the warehouse should be Flex #2, but the numbers start at #' + min + ', so a stop may be missing.');
     if (ctx.unres > 0) lines.push("Some Flex stop numbers couldn't be read.");
+    if (totalKnown && !totalMatch) lines.push("Amazon's list shows " + ctx.total + " packages, but FlexRoute counted " + pkgs + ". Check the stops with several packages" + (pkgs < ctx.total ? ", or add a screenshot of any part that is missing." : "."));
+    if (countsUnread) lines.push("We couldn't read the package counts from this screenshot, so the package total may be off.");
+    if (ctx.confOpen > 0) lines.push('The package icon and the \u201cDeliver N packages\u201d line disagree on ' + ctx.confOpen + ' stop' + (ctx.confOpen > 1 ? 's' : '') + ' (we used the \u201cDeliver\u201d line). Check those stops.');
     lines.push('Compare with your Flex list and add a screenshot of any part that is missing.');
   }
   trackEvent('scan_summary_shown', { complete: complete ? 1 : 0, stops: stops, packages: pkgs, merged: merged.length,
-    missing_depot: ctx.depot ? 0 : 1, missing_end: ctx.end ? 0 : 1, gap: (gapAt || badStart) ? 1 : 0, in_app: FR_IN_APP });
+    missing_depot: ctx.depot ? 0 : 1, missing_end: ctx.end ? 0 : 1, gap: (gapAt || badStart) ? 1 : 0, in_app: FR_IN_APP,
+    pkg_total_known: totalKnown ? 1 : 0, pkg_total_match: totalMatch ? 1 : 0, counts_read: ctx.counts || 0,
+    count_conflicts: (ctx.confOpen || 0) + (ctx.confFixed || 0) });
   return { complete: complete, title: title, lines: lines };
 }
 
@@ -6691,13 +6731,35 @@ function parseFlexOCR(rawText) {
   // because both consume a number in Amazon's consecutive numbering.
   var _blockLog = [];
   var _depotFirst = false;
+  var _depotIdx = -1;     // line index of "Picked up at ..." (new layout prints the route's package total on that row)
+  // NEW LAYOUT (Flex update, Oct 2026): the "Deliver N packages" line is gone. Each stop's package count is
+  // printed at the right end of the "# D-31.4G" route-code row ("# D-31.4G 2", followed by a package icon that
+  // OCR reads as junk), and the depot row shows the whole route's package total. Everything specific to that
+  // is gated on this flag, so scans of the old layout are processed exactly as before.
+  var _newLayout = !/deliver\s+(?:one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+packages?/i.test(rawText) &&
+                   (rawText.match(/scheduled\s+\d{1,2}:\d{2}/gi) || []).length >= 2;
+  var _CODE_ROW = /^[#@\u00a9\u00ae]?\s*[A-Z0-9]{1,3}\s*-\s*\d{2}\.\d[A-Z0-9]?(?![A-Za-z0-9])(.*)$/i;
+  var _newCounts = 0;     // blocks whose package count was read directly
+  var _loneAt = {};       // line index -> value of a lone count line sitting after a stop's city (read as a column cell)
+  // Digits right after the code ("2", "4", "19", "12"): the package icon next to the count is often read as an
+  // extra character, so a glued 2+ digit run keeps only its first digit (an undercount is caught by the total
+  // check; reading "19" as nineteen packages would not be).
+  function _countFromDigits(d) { var n = d.length >= 2 ? parseInt(d.charAt(0), 10) : parseInt(d, 10); return n >= 1 ? n : 1; }
+  // The number printed beside the package icon on a route-code row ("# D-31.4G 2"); null when the row has none
+  // (the original layout) or when the digits are really part of a time.
+  function _iconFromRow(line) {
+    var m = line.match(_CODE_ROW);
+    if (!m) return null;
+    var d = (m[1] || '').match(/^\s*(\d+)(?![\d:])/);
+    return d ? _countFromDigits(d[1]) : null;
+  }
   var _orphanNext = -1;   // line index where a header-less block begins (see the block scanner)
 
   var i = 0;
   while (i < lines.length) {
     // The depot pickup is circle #1 in Flex; when it heads the list, the first
     // delivery block is #2 (used only as a last-resort anchor for numbering).
-    if (_blockLog.length === 0 && /pick(?:ed)?[\s\-]?up\s+at\b/i.test(lines[i])) _depotFirst = true;
+    if (_blockLog.length === 0 && /pick(?:ed)?[\s\-]?up\s+at\b/i.test(lines[i])) { _depotFirst = true; if (_depotIdx < 0) _depotIdx = i; }
     // Depot detection: "Picked up at 3:48 a.m." / "400 Nugget Avenue" / "Scarborough"
     // The pickup block is not a delivery stop — but it IS the driver's depot.
     // Capture it so the app can auto-fill the Start address when empty.
@@ -6716,6 +6778,9 @@ function parseFlexOCR(rawText) {
     if (isScheduled(lines[i]) || _isOrphan) {
       var addrLine = '', cityLine = '', j = _isOrphan ? i : i + 1;
       var currentPkgCount = 1;  // reset per stop block
+      var _deliverCount = null; // count from a "Deliver N packages" line (original layout)
+      var _iconCount = null;    // count beside the package icon on the route-code row (Oct 2026 layout)
+      var _blockLone = -1;      // line index of a lone count line after this stop's city (new layout), else -1
 
       // ── Inline address extraction ─────────────────────────────────────
       // Google Vision sometimes puts the address on the SAME line as the
@@ -6736,14 +6801,24 @@ function parseFlexOCR(rawText) {
         .replace(/^.*?\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?)\s*/i, '')
         .replace(/^[.·\-–—]+\s*/, '')  // trailing dots/dashes after time
         .trim();
+      // New layout: the package count may come out at the end of the Scheduled row ("... 8:00 a.m. 2").
+      if (_newLayout && _iconCount == null) {
+        var _smD = _schedLine.match(/\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?)\s+(\d{1,2})(?:\s+\S{1,2})?\s*$/i);
+        if (_smD) { _iconCount = _countFromDigits(_smD[1]); _newCounts++; }
+      }
       // If what remains looks like a street address (has a street keyword),
       // pull it out so the block scanner finds it
       if (_afterTime && isStreet(_afterTime)) {
         _inlineAddr = cleanLine(_afterTime);
       }
 
-      // Skip any immediately following scheduled/time lines (multi-line scheduled)
-      while (j < lines.length && isScheduled(lines[j])) j++;
+      // Skip any immediately following scheduled/time lines (multi-line scheduled).
+      // NEW LAYOUT: the route-code row ("# D-31.4G 2") is swallowed here as part of the header, and it is
+      // exactly where the package count now lives, so read it before skipping past it.
+      while (j < lines.length && isScheduled(lines[j])) {
+        if (_iconCount == null) { var _ic0 = _iconFromRow(lines[j]); if (_ic0 != null) { _iconCount = _ic0; _newCounts++; } }
+        j++;
+      }
 
       // If we extracted an inline address, seed addrLine with it
       if (_inlineAddr) {
@@ -6766,8 +6841,32 @@ function parseFlexOCR(rawText) {
           var _n = _deliverM[1].toLowerCase();
           var _words = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
           currentPkgCount = _words[_n] || parseInt(_n) || 1;
+          _deliverCount = currentPkgCount;
           _sawDeliver = true;
           j++; continue;
+        }
+        // Package-icon count: "# D-31.4G 2" -> this stop has 2 packages. Read in EVERY layout (the original
+        // layout's route-code row has no number after it, so nothing is read there).
+        if (_iconCount == null) {
+          var _cm = ln.match(_CODE_ROW);
+          if (_cm) {
+            var _ic1 = _iconFromRow(ln);
+            if (_ic1 != null) { _iconCount = _ic1; _newCounts++; }
+            if (_newLayout) _sawDeliver = true;   // the route-code row plays the role of the "Deliver…" line for header-less stop detection
+            if (_ic1 != null || _newLayout) { j++; continue; }
+          }
+          // Count on its own line straight after the code row. Only when the list has no "Deliver…" lines:
+          // in the original layout stray badge numbers sit exactly there.
+          if (_newLayout && !addrLine && /^\d{1,2}(?:\s*[^\w\s()]{1,3})*$/.test(ln.trim()) && lines[j + 1] && isStreet(lines[j + 1])) {
+            _iconCount = _countFromDigits(ln.trim().match(/^\d+/)[0]); _newCounts++;
+            j++; continue;
+          }
+          // Count on its own line AFTER the stop's address/city (the right-hand column read as a separate cell).
+          // Only a candidate here: it is accepted after the loop, and only if the depot total agrees.
+          if (_newLayout && _blockLone < 0 && addrLine && /^\d{1,2}(?:\s*(?:[^\w\s()]{1,3}|[vV]))*$/.test(ln.trim())) {
+            _blockLone = j; _loneAt[j] = _countFromDigits(ln.trim().match(/^\d+/)[0]);
+            j++; continue;
+          }
         }
         if (isNoise(ln)) { j++; continue; }
         var csm = ln.match(/^([A-Za-z][A-Za-z ]{1,20}),?\s+([A-Z]{2})\s*(\d{5})?$/);
@@ -6835,6 +6934,11 @@ function parseFlexOCR(rawText) {
         }
         j++;
       }
+
+      // Two independent readings of this stop's package count: the explicit "Deliver N packages" line and the
+      // number beside the package icon. The explicit line wins when both exist; the icon number is used when
+      // it is the only one. Disagreements are cross-checked against the route total after the loop.
+      if (_deliverCount == null && _iconCount != null) currentPkgCount = _iconCount;
 
       if (!addrLine) {
         for (var _lk = i + 1; _lk < j && !addrLine; _lk++) {
@@ -6986,7 +7090,7 @@ function parseFlexOCR(rawText) {
         // a duplicated slice from the stitch, not another Amazon stop — it must
         // not take a number. One with a NEW address is a real, recovered stop.
         if (_isOrphan && !_existingResult && typeof trackEvent === 'function') trackEvent('ocr_headerless_stop_recovered', {});
-        if (!(_isOrphan && _existingResult)) _blockLog.push({ kind: 'ok', read: _stopNum, pk: currentPkgCount, ref: _existingResult || results[results.length - 1] });
+        if (!(_isOrphan && _existingResult)) _blockLog.push({ kind: 'ok', read: _stopNum, pk: currentPkgCount, pkD: _deliverCount, pkI: _iconCount, lone: _blockLone, sched: _isOrphan ? undefined : i, ref: _existingResult || results[results.length - 1] });
       } else {
         // Scheduled block found but no address line could be parsed —
         // capture WHICH stop so the driver can find it instead of diffing
@@ -7041,6 +7145,93 @@ function parseFlexOCR(rawText) {
   // from — the numbers the driver looks up in the Flex app. (This used to
   // renumber stops by position in the list, which is always one behind
   // Amazon's own numbering because the depot pickup is #1.)
+  // ── New layout: Amazon's own package total, and counts printed as a separate column ──────────────
+  var _totalPackages = null, _okBlocks = _blockLog.filter(function(e) { return e.kind === 'ok'; }).length;
+  if (_depotIdx >= 0) {
+    var _tc = [];
+    var _tm = lines[_depotIdx].match(/\d{1,2}:\d{2}\s*[ap]\.?m\.?\s+(\d{1,3})(?!\d)/i);
+    if (_tm) _tc.push(parseInt(_tm[1], 10));
+    for (var _q = _depotIdx + 1; _newLayout && _q < Math.min(_depotIdx + 8, lines.length); _q++) {
+      if (isScheduled(lines[_q])) break;
+      var _lm = lines[_q].trim().match(/^(\d{1,3})(?:\s*[^\w\s()]{1,3})*$/);
+      if (_lm) _tc.push(parseInt(_lm[1], 10));
+    }
+    // a route can't hold fewer packages than it has stops
+    _tc = _tc.filter(function(v) { return v >= _okBlocks && _okBlocks > 0; });
+    if (_tc.length) _totalPackages = _tc[0];
+  }
+  var _clusterUsed = false;
+  if (_newLayout && _newCounts === 0 && _totalPackages != null && _okBlocks > 0) {
+    // Vision can print the right-hand count column as its own run of lone numbers. Accept it ONLY when the
+    // run has exactly one number per stop AND adds up to Amazon's total — too strict to match by accident.
+    var _runs = [], _cur = [];
+    lines.forEach(function(l) {
+      var t = l.trim(), m = t.match(/^(\d{1,2})(?:\s*[^\w\s()]{1,3})*$/);
+      if (m) _cur.push(parseInt(m[1], 10));
+      else if (/^[^\w\s]{1,3}$/.test(t)) { /* lone icon/chevron: skip, don't break the run */ }
+      else { if (_cur.length >= 4) _runs.push(_cur); _cur = []; }
+    });
+    if (_cur.length >= 4) _runs.push(_cur);
+    var _fit = _runs.filter(function(r) { return r.length === _okBlocks && r.reduce(function(a, b) { return a + b; }, 0) === _totalPackages; });
+    if (_fit.length === 1) {
+      var _oi = 0;
+      _blockLog.forEach(function(e) { if (e.kind === 'ok') { e.pk = _fit[0][_oi++]; e.pkI = e.pk; } });
+      results.forEach(function(r) { r.pkgCount = 0; });
+      _blockLog.forEach(function(e) { if (e.kind === 'ok') e.ref.pkgCount += e.pk; });
+      results.forEach(function(r) { if (!r.pkgCount) r.pkgCount = 1; });
+      _clusterUsed = true;
+    }
+  }
+  // ── Counts on their own lines after each stop's city ───────────────────────────────────────────────
+  // A lone number between blocks could instead be the NEXT stop's circle number, so it is accepted as a count
+  // only when the depot total agrees (or, with no total, when the values are overwhelmingly small repeats,
+  // which circle numbers never are). The stop numbers are then re-read without those lines.
+  var _lineUsed = false;
+  if (_newLayout && _newCounts === 0 && !_clusterUsed && _okBlocks > 0) {
+    var _okL = _blockLog.filter(function(e) { return e.kind === 'ok'; });
+    var _nLone = _okL.filter(function(e) { return e.lone >= 0; }).length;
+    if (_nLone >= Math.max(1, Math.ceil(_okL.length * 0.5))) {
+      var _lvals = _okL.map(function(e) { return e.lone >= 0 ? _loneAt[e.lone] : 1; });
+      var _lsum = _lvals.reduce(function(a, b) { return a + b; }, 0);
+      var _lok;
+      if (_totalPackages != null) _lok = (_lsum === _totalPackages);
+      else {
+        var _l1 = _lvals.filter(function(v) { return v === 1; }).length;
+        _lok = _l1 >= 0.6 * _nLone && Math.max.apply(null, _lvals) <= 9;
+      }
+      if (_lok) {
+        var _usedL = {}; _okL.forEach(function(e) { if (e.lone >= 0) _usedL[e.lone] = true; });
+        _blockLog.forEach(function(e) {
+          if (e.sched === undefined) return;
+          e.read = extractStopNum(lines[e.sched], _usedL[e.sched - 1] ? '' : lines[e.sched - 1], _usedL[e.sched - 2] ? '' : lines[e.sched - 2]);
+        });
+        _okL.forEach(function(e, q) { e.pk = _lvals[q]; e.pkI = _lvals[q]; });
+        results.forEach(function(r) { r.pkgCount = 0; });
+        _okL.forEach(function(e) { e.ref.pkgCount += e.pk; });
+        results.forEach(function(r) { if (!r.pkgCount) r.pkgCount = 1; });
+        _lineUsed = true;
+      }
+    }
+  }
+  // ── Cross-check: icon number vs "Deliver N packages" vs Amazon's route total ──────────────────────
+  var _okLog = _blockLog.filter(function(e) { return e.kind === 'ok'; });
+  var _iconBlocks = _okLog.filter(function(e) { return e.pkI != null; }).length;
+  var _deliverBlocks = _okLog.filter(function(e) { return e.pkD != null; }).length;
+  var _both = _okLog.filter(function(e) { return e.pkI != null && e.pkD != null; });
+  var _conf = _both.filter(function(e) { return e.pkI !== e.pkD; });
+  var _confFixed = 0;
+  if (_conf.length) {
+    var _sumNow = results.reduce(function(a, r) { return a + (r.pkgCount || 1); }, 0);
+    var _delta = _conf.reduce(function(a, e) { return a + (e.pkI - e.pkD); }, 0);
+    // The explicit "Deliver" lines are used by default. If they do NOT add up to Amazon's total but the icon
+    // numbers for the disagreeing stops DO, the icon numbers are the right ones for those stops.
+    if (_totalPackages != null && _sumNow === _totalPackages) {
+      _confFixed = _conf.length;     // the "Deliver" lines add up to Amazon's total: keep them, the disagreement is settled
+    } else if (_totalPackages != null && _sumNow + _delta === _totalPackages) {
+      _conf.forEach(function(e) { e.ref.pkgCount += (e.pkI - e.pkD); e.pk = e.pkI; });
+      _confFixed = _conf.length;
+    }
+  }
   var _serials = _resolveSerials(_blockLog.map(function(e) { return e.read; }), _depotFirst);
   results.forEach(function(r) { r._sn = []; r._pk = {}; r._unres = 0; });
   _blockLog.forEach(function(e, k) {
@@ -7114,7 +7305,15 @@ function parseFlexOCR(rawText) {
     depotFirst: _depotFirst,
     endMarker: /assigned more stops|see them in your itinerary/i.test(rawText),
     serials: _metaSn,
-    unresolved: _serials.filter(function(v) { return v == null; }).length
+    unresolved: _serials.filter(function(v) { return v == null; }).length,
+    newLayout: _newLayout,
+    totalPackages: _totalPackages,                       // Amazon's own total for the route (new layout), else null
+    countsFound: _okLog.filter(function(e) { return e.pkI != null || e.pkD != null; }).length,  // stops whose package count was actually read
+    iconCounts: _iconBlocks,                              // ...from the number beside the package icon
+    deliverCounts: _deliverBlocks,                        // ...from a "Deliver N packages" line
+    bothCounts: _both.length,                             // ...from both (these cross-check each other)
+    conflictsOpen: _conf.length - _confFixed,             // both readings present but different, not settled by the total
+    conflictsFixed: _confFixed                            // different, settled because one reading adds up to Amazon's total
   };
   return results;
 }
