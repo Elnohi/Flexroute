@@ -13,6 +13,10 @@ const AUTHORIZED_ORIGINS = [
   'www.flexrouteapp.com',
 ];
 
+// Logged once per cold start (module top level) so the Netlify function logs show which Node.js
+// runtime the functions really run on. Safe to delete once confirmed.
+console.log('[FlexRoute] functions runtime: node ' + process.version);
+
 exports.handler = async function(event, context) {
   const headers = {
     'Access-Control-Allow-Origin': 'https://flexrouteapp.com',
