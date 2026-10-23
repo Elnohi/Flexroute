@@ -95,7 +95,8 @@ async function sendEmail(email, code) {
     method: 'POST',
     headers: {
       'Authorization': 'Bearer ' + process.env.RESEND_API_KEY,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Accept-Encoding': 'gzip, deflate'  // never ask for Brotli (Node.js Oct 2026 advisory CVE-2026-111497)
     },
     body: JSON.stringify({
       from: 'FlexRoute <noreply@flexrouteapp.com>',

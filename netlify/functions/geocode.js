@@ -85,7 +85,8 @@ exports.handler = async function(event) {
   }
 
   // Build upstream URL based on provider
-  let url, headers = { 'User-Agent': USER_AGENT, 'Accept': 'application/json' };
+  // Accept-Encoding: never ask upstream for Brotli (Node.js Oct 2026 advisory CVE-2026-111497); gzip/deflate only.
+  let url, headers = { 'User-Agent': USER_AGENT, 'Accept': 'application/json', 'Accept-Encoding': 'gzip, deflate' };
   if (provider === 'nominatim') {
     const params = new URLSearchParams({
       q: query,

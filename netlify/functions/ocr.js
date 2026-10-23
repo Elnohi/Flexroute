@@ -97,7 +97,8 @@ exports.handler = async function(event) {
   try {
     resp = await fetch(GOOGLE_VISION_URL + '?key=' + encodeURIComponent(apiKey), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // Accept-Encoding: never ask for Brotli (Node.js Oct 2026 advisory CVE-2026-111497); gzip/deflate only.
+      headers: { 'Content-Type': 'application/json', 'Accept-Encoding': 'gzip, deflate' },
       body: JSON.stringify(visionRequest),
       signal: ctrl.signal
     });
