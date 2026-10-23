@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v27';   // v27: new Flex layout package counts (row, own line, column run, hybrid, depot-total check) + 5-tap raw OCR + rural letters + city names + Flex stop card + direction geocoding + scan summary + merged counts + fix buttons + email gate
+const CACHE = 'flexroute-v28';   // v28: same-street neighbour check + keep co-located stops together + circle-number count guard + new Flex layout counts + 5-tap raw OCR + rural letters + city names + Flex stop card + direction geocoding + scan summary + merged counts + fix buttons + email gate
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

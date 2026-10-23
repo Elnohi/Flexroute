@@ -4896,7 +4896,7 @@ async function handleFiles(files) {
   S.errMsg = ''; S._ocrWarn = null; render();
   let added = 0, failed = 0, lastErr = '', unreadable = 0, possibleMissing = 0;
   let unreadableDetails = [];
-  let _sumDepot = false, _sumEnd = false, _sumUnres = 0, _sumSn = [], _sumTotal = null, _sumNew = false, _sumCounts = 0,
+  let _sumDepot = false, _sumEnd = false, _sumUnres = 0, _sumSn = [], _sumTotal = null, _sumNew = false, _sumCounts = 0, _sumMode = 'row',
       _sumIcon = 0, _sumDeliver = 0, _sumBoth = 0, _sumConfOpen = 0, _sumConfFixed = 0;
   S._scanSummary = null;
   for (let i = 0; i < imgs.length; i++) {
@@ -4912,6 +4912,7 @@ async function handleFiles(files) {
         _sumUnres += items._meta.unresolved || 0;
         if (items._meta.totalPackages != null && _sumTotal == null) _sumTotal = items._meta.totalPackages;
         _sumNew = _sumNew || !!items._meta.newLayout;
+        if (items._meta.pkgMode === 'lone' || items._meta.pkgMode === 'cluster') _sumMode = items._meta.pkgMode;
         _sumCounts += items._meta.countsFound || 0;
         _sumIcon += items._meta.iconCounts || 0; _sumDeliver += items._meta.deliverCounts || 0; _sumBoth += items._meta.bothCounts || 0;
         _sumConfOpen += items._meta.conflictsOpen || 0; _sumConfFixed += items._meta.conflictsFixed || 0;
@@ -5025,7 +5026,7 @@ async function handleFiles(files) {
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
       S._scanSummary = _buildScanSummary({ depot: _sumDepot, end: _sumEnd, unres: _sumUnres, sn: _sumSn, total: _sumTotal, newLayout: _sumNew, counts: _sumCounts,
-        icon: _sumIcon, deliver: _sumDeliver, both: _sumBoth, confOpen: _sumConfOpen, confFixed: _sumConfFixed });
+        icon: _sumIcon, deliver: _sumDeliver, both: _sumBoth, confOpen: _sumConfOpen, confFixed: _sumConfFixed, pkgMode: _sumMode });
     }
     // Analytics: screenshot scanned successfully
     trackEvent('screenshot_scanned', {
@@ -5076,6 +5077,7 @@ function _buildScanSummary(ctx) {
       lines.push('Package counts confirmed by ' + (srcs.length === 2 ? srcs.join(' and ') : srcs.slice(0, -1).join(', ') + ' and ' + srcs[srcs.length - 1]) + '.');
     }
     if (ctx.confFixed > 0) lines.push('The package icon and the \u201cDeliver N packages\u201d line differed on ' + ctx.confFixed + ' stop' + (ctx.confFixed > 1 ? 's' : '') + "; we used the readings that add up to Amazon's total.");
+    if ((ctx.pkgMode === 'lone' || ctx.pkgMode === 'cluster') && pkgs > stops) lines.push('The package counts were read from a separate column of numbers: the total matches, but double-check which stops have several packages.');
     lines.push('Flex counts the warehouse as stop 1, so its list ends at #' + max + '.');
   } else {
     title = stops + ' stop' + (stops !== 1 ? 's' : '') + ', ' + pkgs + ' package' + (pkgs !== 1 ? 's' : '') + ' scanned';
@@ -5822,6 +5824,9 @@ async function optimize() {
     }
   }
 
+  // Same street + nearby house numbers must be near each other; fix a stop that geocoded across the city.
+  try { await _reconcileSameStreetNeighbors(); } catch (e) { console.warn('[FlexRoute] neighbour check skipped:', e); }
+
   const geocodedStops = S.stops.filter(s => s.coords !== null);
   const failedStops   = S.stops.filter(s => s.coords === null);
 
@@ -5908,6 +5913,21 @@ async function optimize() {
         .sort((a, b) => a.routePos - b.routePos)
         .map(x => orderedForTrip[x.inputIdx])
         .filter(Boolean);
+      // Stops that are physically together are visited together. If that changes the order, re-measure the
+      // route so the distance/time shown are for the order the driver will actually follow.
+      const _grp = _groupColocated(optimizedOrder, s => s.coords, s => s.id === S.lastId);
+      // never accept a regrouping that adds more than 1.5 km of straight-line distance
+      if (_grp.some((s, k) => s !== optimizedOrder[k]) &&
+          _pathKm(_grp, s => s.coords, startPt, S.homeCoords) <= _pathKm(optimizedOrder, s => s.coords, startPt, S.homeCoords) + 1.5) {
+        optimizedOrder = _grp;
+        try {
+          const _nr = await osrmRoute([
+            ...(startPt ? [startPt] : []), ...optimizedOrder.map(s => s.coords), ...(S.homeCoords ? [S.homeCoords] : [])
+          ]);
+          if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; }
+        } catch (_e) { /* keep the OSRM trip figures */ }
+        trackEvent('route_colocated_grouped', { stop_count: optimizedOrder.length, region: S.userState || 'unknown' });
+      }
     }
   } catch (e) {
     console.warn('[FlexRoute] OSRM failed:', e);
@@ -6006,6 +6026,13 @@ async function optimizeWithGemini() {
       }
     }
   }
+
+  // Stops that are physically together are visited together (fallback ordering path).
+  { const _gr = _groupColocated(route, i => geocodedStops[i].coords, null);
+    const _cx = i => geocodedStops[i].coords;
+    if (_gr.some((v, k) => v !== route[k]) && _pathKm(_gr, _cx, S._startPt, S.homeCoords) <= _pathKm(route, _cx, S._startPt, S.homeCoords) + 1.5) {
+      route.length = 0; _gr.forEach(v => route.push(v));
+    } }
 
   // Calculate estimated savings (30 km/h urban average)
   const origIdx = geocodedStops.map((_, i) => i);
@@ -6781,6 +6808,7 @@ function parseFlexOCR(rawText) {
       var _deliverCount = null; // count from a "Deliver N packages" line (original layout)
       var _iconCount = null;    // count beside the package icon on the route-code row (Oct 2026 layout)
       var _blockLone = -1;      // line index of a lone count line after this stop's city (new layout), else -1
+      var _iconSrc = 'row';     // where this block's icon count came from: 'row' (route-code row) or 'lone' (a lone line before the address)
 
       // ── Inline address extraction ─────────────────────────────────────
       // Google Vision sometimes puts the address on the SAME line as the
@@ -6858,7 +6886,7 @@ function parseFlexOCR(rawText) {
           // Count on its own line straight after the code row. Only when the list has no "Deliver…" lines:
           // in the original layout stray badge numbers sit exactly there.
           if (_newLayout && !addrLine && /^\d{1,2}(?:\s*[^\w\s()]{1,3})*$/.test(ln.trim()) && lines[j + 1] && isStreet(lines[j + 1])) {
-            _iconCount = _countFromDigits(ln.trim().match(/^\d+/)[0]); _newCounts++;
+            _iconCount = _countFromDigits(ln.trim().match(/^\d+/)[0]); _newCounts++; _iconSrc = 'lone';
             j++; continue;
           }
           // Count on its own line AFTER the stop's address/city (the right-hand column read as a separate cell).
@@ -7090,7 +7118,7 @@ function parseFlexOCR(rawText) {
         // a duplicated slice from the stitch, not another Amazon stop — it must
         // not take a number. One with a NEW address is a real, recovered stop.
         if (_isOrphan && !_existingResult && typeof trackEvent === 'function') trackEvent('ocr_headerless_stop_recovered', {});
-        if (!(_isOrphan && _existingResult)) _blockLog.push({ kind: 'ok', read: _stopNum, pk: currentPkgCount, pkD: _deliverCount, pkI: _iconCount, lone: _blockLone, sched: _isOrphan ? undefined : i, ref: _existingResult || results[results.length - 1] });
+        if (!(_isOrphan && _existingResult)) _blockLog.push({ kind: 'ok', read: _stopNum, pk: currentPkgCount, pkD: _deliverCount, pkI: _iconCount, src: _iconSrc, lone: _blockLone, sched: _isOrphan ? undefined : i, ref: _existingResult || results[results.length - 1] });
       } else {
         // Scheduled block found but no address line could be parsed —
         // capture WHICH stop so the driver can find it instead of diffing
@@ -7147,6 +7175,25 @@ function parseFlexOCR(rawText) {
   // Amazon's own numbering because the depot pickup is #1.)
   // ── New layout: Amazon's own package total, and counts printed as a separate column ──────────────
   var _totalPackages = null, _okBlocks = _blockLog.filter(function(e) { return e.kind === 'ok'; }).length;
+  // Circle numbers mistaken for counts. A bare circle number can sit exactly where a lone count would, and
+  // read down the list those climb by exactly one (3, 4, 5, 6...), which real package counts essentially
+  // never do. A run of 3+ climbing lone values is therefore treated as circle numbers and dropped.
+  if (_newLayout) {
+    var _okG = _blockLog.filter(function(e) { return e.kind === 'ok'; }), _runAt = -1;
+    var _dropRun = function(from, to) {
+      for (var _k = from; _k < to; _k++) {
+        var _e = _okG[_k]; _e.pkI = null; _e.pk = (_e.pkD != null ? _e.pkD : 1); _e.src = 'dropped'; _newCounts--;
+        var _same = _okG.filter(function(x) { return x.ref === _e.ref; }).length;
+        if (_same === 1) _e.ref.pkgCount = _e.pk;
+      }
+    };
+    for (var _gi = 1; _gi <= _okG.length; _gi++) {
+      var _c = _okG[_gi], _pv = _okG[_gi - 1];
+      var _step = _c && _pv && _c.src === 'lone' && _pv.src === 'lone' && _c.pkI === _pv.pkI + 1;
+      if (_step) { if (_runAt < 0) _runAt = _gi - 1; }
+      else { if (_runAt >= 0 && (_gi - _runAt) >= 3) _dropRun(_runAt, _gi); _runAt = -1; }
+    }
+  }
   if (_depotIdx >= 0) {
     var _tc = [];
     var _tm = lines[_depotIdx].match(/\d{1,2}:\d{2}\s*[ap]\.?m\.?\s+(\d{1,3})(?!\d)/i);
@@ -7307,6 +7354,7 @@ function parseFlexOCR(rawText) {
     serials: _metaSn,
     unresolved: _serials.filter(function(v) { return v == null; }).length,
     newLayout: _newLayout,
+    pkgMode: _clusterUsed ? 'cluster' : (_lineUsed || _okLog.filter(function(e) { return e.src === 'lone' && e.pkI != null; }).length * 2 > _iconBlocks ? 'lone' : (_iconBlocks > 0 ? 'row' : (_deliverBlocks > 0 ? 'deliver' : 'none'))),
     totalPackages: _totalPackages,                       // Amazon's own total for the route (new layout), else null
     countsFound: _okLog.filter(function(e) { return e.pkI != null || e.pkD != null; }).length,  // stops whose package count was actually read
     iconCounts: _iconBlocks,                              // ...from the number beside the package icon
@@ -7785,6 +7833,132 @@ function kmToDisplay(km) {
   return +parseFloat(km).toFixed(1);
 }
 function distUnit() { return S.useImperial ? 'mi' : 'km'; }
+
+// ── Same street, nearby house numbers => same place ───────────────────────────────────────────
+// Real case: "2033 Kennedy rd" and "2031 Kennedy Road" are one building, but one geocoded across the city
+// and the optimizer put them first and last. Two stops on the same street with house numbers a few apart
+// must be close; when they are not, one of them was geocoded wrong.
+var _ST_ABBR = { street:'st', avenue:'ave', road:'rd', drive:'dr', boulevard:'blvd', crescent:'cres', court:'ct', lane:'ln',
+                 place:'pl', terrace:'terr', circle:'cir', trail:'trl', parkway:'pkwy', highway:'hwy', square:'sq',
+                 north:'n', south:'s', east:'e', west:'w' };
+var _UNIT_WORD = /^(apt|apartment|unit|suite|ste|ph|lot|fl|floor|#.*)$/;
+function _cityFamily(city) {
+  var c = String(city || '').toLowerCase().trim();
+  return /^(toronto|scarborough|north york|etobicoke|york|east york)$/.test(c) ? 'toronto' : c;   // Toronto's former cities
+}
+function _streetParts(address) {
+  var parts = String(address || '').split(',');
+  var m = parts[0].replace(/\./g, '').trim().match(/^[A-Za-z]{0,2}(\d{1,6})[A-Za-z]?\s+(.+)$/);
+  if (!m) return null;
+  var words = m[2].toLowerCase().split(/\s+/).map(function(w) { return _ST_ABBR[w] || w; });
+  for (var k = 0; k < words.length; k++) { if (k > 0 && _UNIT_WORD.test(words[k])) { words = words.slice(0, k); break; } }
+  if (words.length < 2) return null;
+  return { num: parseInt(m[1], 10), street: words.join(' '), fam: _cityFamily(parts[1]) };
+}
+function _distKm(a, b) { return haversineKm(a.lat, a.lon, b.lat, b.lon); }
+function _nearestOtherKm(stop, exclude) {
+  var best = Infinity;
+  S.stops.forEach(function(o) {
+    if (!o.coords || o === stop || o === exclude) return;
+    var d = _distKm(stop.coords, o.coords); if (d < best) best = d;
+  });
+  return best;
+}
+async function _reconcileSameStreetNeighbors() {
+  var items = S.stops.filter(function(s) { return s.coords && !s.geoFailed; })
+    .map(function(s) { return { s: s, p: _streetParts(s.address) }; }).filter(function(x) { return x.p; });
+  // Nearest OTHER stop on the same street (house numbers within 300): the odd one out is the one that sits far
+  // from the rest of its own street, even when it happens to land near unrelated stops elsewhere.
+  var streetMin = function(x, partner) {
+    var best = Infinity;
+    items.forEach(function(o) {
+      if (o === x || o === partner || o.p.street !== x.p.street || o.p.fam !== x.p.fam || Math.abs(o.p.num - x.p.num) > 300) return;
+      var d = _distKm(x.s.coords, o.s.coords); if (d < best) best = d;
+    });
+    return best;
+  };
+  var report = function(strategy, dKm) {
+    if (typeof trackEvent === 'function') trackEvent('neighbor_geocode_fixed', { strategy: strategy, km: Math.round(dKm * 10) / 10, region: S.userState || 'unknown' });
+  };
+  for (var a = 0; a < items.length; a++) {
+    for (var b = a + 1; b < items.length; b++) {
+      var A = items[a], B = items[b];
+      if (A.p.street !== B.p.street || A.p.fam !== B.p.fam || Math.abs(A.p.num - B.p.num) > 8) continue;
+      var dKm = _distKm(A.s.coords, B.s.coords);
+      if (dKm <= 0.4) continue;                                   // consistent: same building / neighbours
+      // 1) which one is the odd one out? other stops on the same street first, then plain isolation
+      var bad = null, good = null, sA = streetMin(A, B), sB = streetMin(B, A);
+      if (isFinite(sA) || isFinite(sB)) {
+        if ((isFinite(sA) ? sA : 1e9) > (isFinite(sB) ? sB : 1e9) + 0.5) { bad = A; good = B; }
+        else if ((isFinite(sB) ? sB : 1e9) > (isFinite(sA) ? sA : 1e9) + 0.5) { bad = B; good = A; }
+      }
+      if (!bad) {
+        var nnA = _nearestOtherKm(A.s, B.s), nnB = _nearestOtherKm(B.s, A.s);
+        if (nnA > nnB + 0.5) { bad = A; good = B; } else if (nnB > nnA + 0.5) { bad = B; good = A; }
+      }
+      if (bad) {
+        var r = null;
+        try { r = await geocode(bad.s.address, good.s.coords.lat, good.s.coords.lon); } catch (e) { r = null; }
+        if (r && _distKm(r, good.s.coords) <= 0.4) { bad.s.coords = r; report('bias', dKm); }
+        else if (_nearestOtherKm(good.s, bad.s) <= 2) {            // the partner is well supported: put the pair together
+          bad.s.coords = { lat: good.s.coords.lat, lon: good.s.coords.lon, state: good.s.coords.state, country: good.s.coords.country, snapped: true };
+          report('snap', dKm);
+        }
+        continue;
+      }
+      // 2) can't tell which is wrong: re-geocode each toward the other. If exactly one finds the other's
+      //    neighbourhood, that one was the misplaced one. If both or neither do, leave them alone.
+      var rA = null, rB = null;
+      try { rA = await geocode(A.s.address, B.s.coords.lat, B.s.coords.lon); } catch (e) { rA = null; }
+      try { rB = await geocode(B.s.address, A.s.coords.lat, A.s.coords.lon); } catch (e) { rB = null; }
+      var okA = rA && _distKm(rA, B.s.coords) <= 0.4, okB = rB && _distKm(rB, A.s.coords) <= 0.4;
+      if (okA && !okB) { A.s.coords = rA; report('bias', dKm); } else if (okB && !okA) { B.s.coords = rB; report('bias', dKm); }
+    }
+  }
+}
+
+// ── Keep stops that are physically together next to each other ─────────────────────────────────
+// Stops within ~150 m of each other (one building / one complex) form a cluster. A cluster that is already
+// contiguous in the order is left alone; one that is split up is gathered into a single block at its first
+// stop's position (nearest-neighbour inside the block). The first stop never leaves position 1, a locked
+// stop is never moved, and the caller decides whether the regrouped order is acceptable.
+function _groupColocated(items, coordsOf, isLocked) {
+  var R = 0.15, n = items.length;
+  if (n < 3) return items.slice();
+  var parent = items.map(function(_, i) { return i; });
+  var find = function(x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  var usable = items.map(function(it) { var c = coordsOf(it); return (c && !(isLocked && isLocked(it))) ? c : null; });
+  for (var a = 0; a < n; a++) {
+    if (!usable[a]) continue;
+    for (var b = a + 1; b < n; b++) {
+      if (usable[b] && haversineKm(usable[a].lat, usable[a].lon, usable[b].lat, usable[b].lon) <= R) parent[find(a)] = find(b);
+    }
+  }
+  var groups = {};
+  items.forEach(function(it, i) { if (usable[i]) { var r = find(i); (groups[r] = groups[r] || []).push(it); } });
+  var out = items.slice();
+  Object.keys(groups).map(function(k) { return groups[k]; }).filter(function(g) { return g.length > 1; })
+    .sort(function(g1, g2) { return Math.min.apply(null, g1.map(function(x) { return out.indexOf(x); })) - Math.min.apply(null, g2.map(function(x) { return out.indexOf(x); })); })
+    .forEach(function(g) {
+      var pos = g.map(function(x) { return out.indexOf(x); }), lo = Math.min.apply(null, pos), hi = Math.max.apply(null, pos);
+      if (hi - lo + 1 === g.length) return;                       // already one contiguous run
+      var first = out[lo], rest = g.filter(function(x) { return x !== first; }), block = [first];
+      while (rest.length) {                                       // nearest-neighbour chain from the first member
+        var cur = coordsOf(block[block.length - 1]), bi = 0, bd = Infinity;
+        rest.forEach(function(x, q) { var c = coordsOf(x), d = haversineKm(cur.lat, cur.lon, c.lat, c.lon); if (d < bd) { bd = d; bi = q; } });
+        block.push(rest.splice(bi, 1)[0]);
+      }
+      g.forEach(function(x) { out.splice(out.indexOf(x), 1); });
+      out.splice.apply(out, [lo, 0].concat(block));
+    });
+  return out;
+}
+// Straight-line length of start -> stops -> home, used to make sure regrouping never costs a real detour.
+function _pathKm(order, coordsOf, startPt, homePt) {
+  var pts = [].concat(startPt ? [startPt] : [], order.map(coordsOf).filter(Boolean), homePt ? [homePt] : []), d = 0;
+  for (var i = 0; i < pts.length - 1; i++) d += haversineKm(pts[i].lat, pts[i].lon, pts[i + 1].lat, pts[i + 1].lon);
+  return d;
+}
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
