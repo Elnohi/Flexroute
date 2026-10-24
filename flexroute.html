@@ -3635,7 +3635,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.23-v30</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.23-v31</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -3691,7 +3691,7 @@ function vResult() {
   </button>
   <div id="mapWrap" style="margin-bottom:10px;display:${S._mapOpen ? 'block' : 'none'}">
     <div id="routeMap"></div>
-    <div style="font-size:11px;color:var(--t3);text-align:center;margin-top:6px;font-family:var(--sans);letter-spacing:.5px">TAP A STOP MARKER TO NAVIGATE</div>
+    <div id="routeMapHint" style="font-size:11px;color:var(--t3);text-align:center;margin-top:6px;font-family:var(--sans);letter-spacing:.5px">TAP A STOP MARKER TO NAVIGATE</div>
   </div>
 
   <button class="btn bp" id="startShiftBtn" style="height:54px;margin-bottom:8px">
@@ -4052,6 +4052,32 @@ function loadLeafletThenInit() {
   }
 }
 
+// Real driving route (along the roads) for the preview. The straight line the preview used to draw is only a
+// stand-in until this arrives, and stays if the routing service can't be reached.
+var _roadRouteCache = null;
+async function _roadRouteFor(pts) {
+  if (pts.length < 2 || pts.length > 90) return null;
+  var key = pts.map(function(p) { return p.lat.toFixed(5) + ',' + p.lon.toFixed(5); }).join(';');
+  if (_roadRouteCache && _roadRouteCache.key === key) return _roadRouteCache.data;
+  var ctrl = new AbortController(), t = setTimeout(function() { ctrl.abort(); }, 12000);
+  try {
+    var res = await fetch('https://router.project-osrm.org/route/v1/driving/' +
+      pts.map(function(p) { return p.lon + ',' + p.lat; }).join(';') + '?overview=full&geometries=geojson&steps=false', { signal: ctrl.signal });
+    if (!res.ok) return null;
+    var d = await res.json();
+    if (d.code !== 'Ok' || !d.routes || !d.routes[0] || !d.routes[0].geometry || !d.routes[0].geometry.coordinates) return null;
+    var r = d.routes[0];
+    var data = { coords: r.geometry.coordinates.map(function(c) { return [c[1], c[0]]; }), distance: r.distance, duration: r.duration };
+    _roadRouteCache = { key: key, data: data };
+    return data;
+  } catch (e) { return null; } finally { clearTimeout(t); }
+}
+function _fmtRoadTotals(distance, duration) {
+  var km = (distance / 1000).toFixed(1), mins = Math.round(duration / 60);
+  var t = mins >= 60 ? Math.floor(mins / 60) + ' h ' + (mins % 60) + ' min' : mins + ' min';
+  return km + ' km \u00b7 ' + t;
+}
+
 function initRouteMap() {
   var container = document.getElementById('routeMap');
   if (!container || !window.L) return;
@@ -4108,14 +4134,25 @@ function initRouteMap() {
   var bounds = L.latLngBounds(latlngs);
   _mapInstance.fitBounds(bounds, { padding: [24, 24] });
 
-  // Draw route polyline in orange
-  L.polyline(latlngs, {
+  // Stand-in: straight (as-the-crow-flies) line, faint and dashed. Replaced below by the real road route.
+  var _straight = L.polyline(latlngs, {
     color: '#FF9900',
-    weight: 3,
-    opacity: 0.85,
+    weight: 2,
+    opacity: 0.45,
     lineJoin: 'round',
-    dashArray: null
+    dashArray: '4 6'
   }).addTo(_mapInstance);
+  var _mapRef = _mapInstance;
+  var _roadPts = [].concat(S._startPt ? [S._startPt] : (S.gpsCoords ? [S.gpsCoords] : []),
+    stops.map(function(s) { return s.coords; }), S.homeCoords ? [S.homeCoords] : []);
+  _roadRouteFor(_roadPts).then(function(road) {
+    if (!road || _mapInstance !== _mapRef) return;            // unavailable, or the map was rebuilt meanwhile
+    try { _mapRef.removeLayer(_straight); } catch (e) {}
+    L.polyline(road.coords, { color: '#FF9900', weight: 4, opacity: 0.9, lineJoin: 'round' }).addTo(_mapRef);
+    var hint = document.getElementById('routeMapHint');
+    if (hint) hint.textContent = 'TAP A STOP MARKER TO NAVIGATE  ·  BY ROAD: ' + _fmtRoadTotals(road.distance, road.duration).toUpperCase();
+    trackEvent('road_route_drawn', { km: Math.round(road.distance / 100) / 10, stop_count: stops.length });
+  });
 
   // Start marker (if GPS available)
   if (startLL) {
@@ -5913,6 +5950,8 @@ async function optimize() {
         .sort((a, b) => a.routePos - b.routePos)
         .map(x => orderedForTrip[x.inputIdx])
         .filter(Boolean);
+      // OSRM's own order and figures, kept so every later step can be undone if it would lengthen the drive.
+      const _osrmOrder = optimizedOrder.slice(), _osrmDist = tripDist, _osrmDur = tripDur;
       // 1) Refine OSRM's order with real road times (it is a heuristic: swaps/moves can still save time).
       let _orderChanged = false;
       try {
@@ -5935,7 +5974,11 @@ async function optimize() {
           const _nr = await osrmRoute([
             ...(startPt ? [startPt] : []), ...optimizedOrder.map(s => s.coords), ...(S.homeCoords ? [S.homeCoords] : [])
           ]);
-          if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; }
+          if (_nr && _nr.distance > _osrmDist + 200) {
+            // Safeguard: these changes would make the drive longer than OSRM's own order. Don't ship them.
+            optimizedOrder = _osrmOrder; tripDist = _osrmDist; tripDur = _osrmDur;
+            trackEvent('route_changes_reverted', { extra_m: Math.round(_nr.distance - _osrmDist), region: S.userState || 'unknown' });
+          } else if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; }
         } catch (_e) { /* keep the OSRM trip figures */ }
       }
     }
@@ -7980,39 +8023,50 @@ async function _osrmTable(coords) {
   var ctrl = new AbortController(), t = setTimeout(function() { ctrl.abort(); }, 8000);
   try {
     var res = await fetch('https://router.project-osrm.org/table/v1/driving/' +
-      coords.map(function(c) { return c.lon + ',' + c.lat; }).join(';') + '?annotations=duration', { signal: ctrl.signal });
+      coords.map(function(c) { return c.lon + ',' + c.lat; }).join(';') + '?annotations=duration,distance', { signal: ctrl.signal });
     if (!res.ok) return null;
     var d = await res.json();
-    if (d.code !== 'Ok' || !d.durations || d.durations.length !== coords.length) return null;
-    for (var i = 0; i < d.durations.length; i++) for (var j = 0; j < d.durations.length; j++) if (d.durations[i][j] == null) return null;
-    return d.durations;
+    var n = coords.length;
+    if (d.code !== 'Ok' || !d.durations || !d.distances || d.durations.length !== n || d.distances.length !== n) return null;
+    for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) if (d.durations[i][j] == null || d.distances[i][j] == null) return null;
+    return { dur: d.durations, dist: d.distances };
   } catch (e) { return null; } finally { clearTimeout(t); }
 }
-function _localSearch(seq, D, lockLast) {
+// A change is kept only if it is FASTER on the road AND NOT LONGER (Dd = distance matrix). So a refinement can
+// never trade a longer drive for a quicker one. Dd is optional (time only) for callers that have no distances.
+function _localSearch(seq, D, lockLast, Dd) {
   var n = seq.length, lo = 1, hi = n - 2 - (lockLast ? 1 : 0);
-  var total = function(a) { var t = 0; for (var i = 0; i < a.length - 1; i++) t += D[a[i]][a[i + 1]]; return t; };
-  var best = seq.slice(), bestC = total(best), improved = true, rounds = 0;
+  var tot = function(M, a) { var t = 0; for (var i = 0; i < a.length - 1; i++) t += M[a[i]][a[i + 1]]; return t; };
+  var best = seq.slice(), bestC = tot(D, best), bestM = Dd ? tot(Dd, best) : 0;
+  var startC = bestC, startM = bestM, improved = true, rounds = 0;
+  var accept = function(c) {
+    var cc = tot(D, c);
+    if (!(cc < bestC - 0.5)) return false;
+    var mm = 0;
+    if (Dd) { mm = tot(Dd, c); if (mm > bestM + 0.5) return false; }
+    best = c; bestC = cc; bestM = mm; return true;
+  };
   while (improved && rounds++ < 60) {
     improved = false;
-    var i, j, a, p, len, c, cc;
+    var i, j, a, p, len, c;
     for (i = lo; i <= hi && !improved; i++) for (j = i + 1; j <= hi && !improved; j++) {          // reverse a stretch
-      c = best.slice(0, i).concat(best.slice(i, j + 1).reverse(), best.slice(j + 1)); cc = total(c);
-      if (cc < bestC - 0.5) { best = c; bestC = cc; improved = true; }
+      c = best.slice(0, i).concat(best.slice(i, j + 1).reverse(), best.slice(j + 1));
+      if (accept(c)) improved = true;
     }
     for (len = 1; len <= 3 && !improved; len++) for (a = lo; a + len - 1 <= hi && !improved; a++) {   // move 1-3 stops
       var block = best.slice(a, a + len), rest = best.slice(0, a).concat(best.slice(a + len));
       for (p = lo; p <= hi - len + 1 && !improved; p++) {
         if (p === a) continue;
-        c = rest.slice(0, p).concat(block, rest.slice(p)); cc = total(c);
-        if (cc < bestC - 0.5) { best = c; bestC = cc; improved = true; }
+        c = rest.slice(0, p).concat(block, rest.slice(p));
+        if (accept(c)) improved = true;
       }
     }
     for (i = lo; i <= hi && !improved; i++) for (j = i + 1; j <= hi && !improved; j++) {          // swap two stops
-      c = best.slice(); var tmp = c[i]; c[i] = c[j]; c[j] = tmp; cc = total(c);
-      if (cc < bestC - 0.5) { best = c; bestC = cc; improved = true; }
+      c = best.slice(); var tmp = c[i]; c[i] = c[j]; c[j] = tmp;
+      if (accept(c)) improved = true;
     }
   }
-  return { seq: best, cost: bestC, startCost: total(seq) };
+  return { seq: best, cost: bestC, startCost: startC, meters: bestM, startMeters: startM };
 }
 async function _refineWithRoadTimes(order, startPt, homePt, lockedId) {
   if (order.length < 4) return { order: order, changed: false };
@@ -8022,7 +8076,7 @@ async function _refineWithRoadTimes(order, startPt, homePt, lockedId) {
   if (!D) return { order: order, changed: false };
   var seq = pts.map(function(_, k) { return k; });
   var lockLast = !!(lockedId && homePt && order[order.length - 1].id === lockedId);
-  var r = _localSearch(seq, D, lockLast);
+  var r = _localSearch(seq, D.dur, lockLast, D.dist);
   if (r.cost > r.startCost - 5) return { order: order, changed: false };          // ignore gains under 5 seconds
   var out = [];
   r.seq.forEach(function(k) { var idx = k - off; if (idx >= 0 && idx < order.length) out.push(order[idx]); });
