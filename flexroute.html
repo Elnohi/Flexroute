@@ -3635,7 +3635,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.06.09k</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.23-v30</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -5913,20 +5913,30 @@ async function optimize() {
         .sort((a, b) => a.routePos - b.routePos)
         .map(x => orderedForTrip[x.inputIdx])
         .filter(Boolean);
-      // Stops that are physically together are visited together. If that changes the order, re-measure the
-      // route so the distance/time shown are for the order the driver will actually follow.
+      // 1) Refine OSRM's order with real road times (it is a heuristic: swaps/moves can still save time).
+      let _orderChanged = false;
+      try {
+        const _ref = await _refineWithRoadTimes(optimizedOrder, startPt, S.homeCoords, S.lastId);
+        if (_ref.changed) {
+          optimizedOrder = _ref.order; _orderChanged = true;
+          trackEvent('route_refined_road_times', { stop_count: optimizedOrder.length, saved_s: _ref.savedSec, region: S.userState || 'unknown' });
+        }
+      } catch (_e) { /* keep OSRM's order */ }
+      // 2) Stops that are physically together are visited together (never at a cost of >1.5 km straight-line).
       const _grp = _groupColocated(optimizedOrder, s => s.coords, s => s.id === S.lastId);
-      // never accept a regrouping that adds more than 1.5 km of straight-line distance
       if (_grp.some((s, k) => s !== optimizedOrder[k]) &&
           _pathKm(_grp, s => s.coords, startPt, S.homeCoords) <= _pathKm(optimizedOrder, s => s.coords, startPt, S.homeCoords) + 1.5) {
-        optimizedOrder = _grp;
+        optimizedOrder = _grp; _orderChanged = true;
+        trackEvent('route_colocated_grouped', { stop_count: optimizedOrder.length, region: S.userState || 'unknown' });
+      }
+      // 3) Re-measure once, so the distance/time shown are for the order the driver will actually follow.
+      if (_orderChanged) {
         try {
           const _nr = await osrmRoute([
             ...(startPt ? [startPt] : []), ...optimizedOrder.map(s => s.coords), ...(S.homeCoords ? [S.homeCoords] : [])
           ]);
           if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; }
         } catch (_e) { /* keep the OSRM trip figures */ }
-        trackEvent('route_colocated_grouped', { stop_count: optimizedOrder.length, region: S.userState || 'unknown' });
       }
     }
   } catch (e) {
@@ -7958,6 +7968,66 @@ function _pathKm(order, coordsOf, startPt, homePt) {
   var pts = [].concat(startPt ? [startPt] : [], order.map(coordsOf).filter(Boolean), homePt ? [homePt] : []), d = 0;
   for (var i = 0; i < pts.length - 1; i++) d += haversineKm(pts[i].lat, pts[i].lon, pts[i + 1].lat, pts[i + 1].lon);
   return d;
+}
+
+// ── Refine OSRM's order with real road times ──────────────────────────────────────────────────────
+// OSRM's trip solver is a heuristic: a good route, but not a guaranteed best one, and it never tries small
+// fixes such as swapping two neighbouring stops. This asks OSRM for the full road-time matrix (one request)
+// and runs a local search (reverse a stretch / move 1-3 stops / swap two) on it, keeping only changes that
+// save time on those same roads. The first and last points stay fixed (start, home, a locked last stop).
+async function _osrmTable(coords) {
+  if (coords.length < 4 || coords.length > 90) return null;
+  var ctrl = new AbortController(), t = setTimeout(function() { ctrl.abort(); }, 8000);
+  try {
+    var res = await fetch('https://router.project-osrm.org/table/v1/driving/' +
+      coords.map(function(c) { return c.lon + ',' + c.lat; }).join(';') + '?annotations=duration', { signal: ctrl.signal });
+    if (!res.ok) return null;
+    var d = await res.json();
+    if (d.code !== 'Ok' || !d.durations || d.durations.length !== coords.length) return null;
+    for (var i = 0; i < d.durations.length; i++) for (var j = 0; j < d.durations.length; j++) if (d.durations[i][j] == null) return null;
+    return d.durations;
+  } catch (e) { return null; } finally { clearTimeout(t); }
+}
+function _localSearch(seq, D, lockLast) {
+  var n = seq.length, lo = 1, hi = n - 2 - (lockLast ? 1 : 0);
+  var total = function(a) { var t = 0; for (var i = 0; i < a.length - 1; i++) t += D[a[i]][a[i + 1]]; return t; };
+  var best = seq.slice(), bestC = total(best), improved = true, rounds = 0;
+  while (improved && rounds++ < 60) {
+    improved = false;
+    var i, j, a, p, len, c, cc;
+    for (i = lo; i <= hi && !improved; i++) for (j = i + 1; j <= hi && !improved; j++) {          // reverse a stretch
+      c = best.slice(0, i).concat(best.slice(i, j + 1).reverse(), best.slice(j + 1)); cc = total(c);
+      if (cc < bestC - 0.5) { best = c; bestC = cc; improved = true; }
+    }
+    for (len = 1; len <= 3 && !improved; len++) for (a = lo; a + len - 1 <= hi && !improved; a++) {   // move 1-3 stops
+      var block = best.slice(a, a + len), rest = best.slice(0, a).concat(best.slice(a + len));
+      for (p = lo; p <= hi - len + 1 && !improved; p++) {
+        if (p === a) continue;
+        c = rest.slice(0, p).concat(block, rest.slice(p)); cc = total(c);
+        if (cc < bestC - 0.5) { best = c; bestC = cc; improved = true; }
+      }
+    }
+    for (i = lo; i <= hi && !improved; i++) for (j = i + 1; j <= hi && !improved; j++) {          // swap two stops
+      c = best.slice(); var tmp = c[i]; c[i] = c[j]; c[j] = tmp; cc = total(c);
+      if (cc < bestC - 0.5) { best = c; bestC = cc; improved = true; }
+    }
+  }
+  return { seq: best, cost: bestC, startCost: total(seq) };
+}
+async function _refineWithRoadTimes(order, startPt, homePt, lockedId) {
+  if (order.length < 4) return { order: order, changed: false };
+  var off = startPt ? 1 : 0;
+  var pts = [].concat(startPt ? [startPt] : [], order.map(function(s) { return s.coords; }), homePt ? [homePt] : []);
+  var D = await _osrmTable(pts);
+  if (!D) return { order: order, changed: false };
+  var seq = pts.map(function(_, k) { return k; });
+  var lockLast = !!(lockedId && homePt && order[order.length - 1].id === lockedId);
+  var r = _localSearch(seq, D, lockLast);
+  if (r.cost > r.startCost - 5) return { order: order, changed: false };          // ignore gains under 5 seconds
+  var out = [];
+  r.seq.forEach(function(k) { var idx = k - off; if (idx >= 0 && idx < order.length) out.push(order[idx]); });
+  if (out.length !== order.length) return { order: order, changed: false };
+  return { order: out, changed: true, savedSec: Math.round(r.startCost - r.cost) };
 }
 
 function haversineKm(lat1, lon1, lat2, lon2) {
