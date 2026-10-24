@@ -3635,7 +3635,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.23-v31</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.23-v32</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -3713,6 +3713,7 @@ function vResult() {
   <div style="font-size:11px;color:var(--t3);margin:-4px 0 12px 2px">
     ${S.optimized.reduce(function(sum,s){return sum+(s.pkgCount||1);},0)} packages scanned &mdash; check this against your Flex app before you drive off
   </div>
+  ${(S._routeNotes && S._routeNotes.length) ? '<div id="routeNotes" style="font-size:11px;color:var(--t2);margin:-6px 0 12px 2px;line-height:1.5">' + S._routeNotes.map(function(n){ return '&bull; ' + escH(n); }).join('<br>') + '</div>' : ''}
 
   ${S._trialStopCapped ? `
   <div style="background:var(--acc-d);border:1.5px solid var(--acc);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px">
@@ -5328,6 +5329,7 @@ async function optimize() {
   if (!S.stops.length) { S.errMsg = 'Add at least one stop first.'; render(); return; }
   S.errMsg = ''; S.savings = null; S.geoFailed = []; S.tweakMode = false;
   S.ldStep = 0; S.ldProg = 0; S.phase = 'optimizing'; render();
+  S._routeNotes = [];   // plain-language list of every adjustment made to the router's order, shown on the result screen
   trackEvent('route_optimization_started', {
     stop_count: S.stops.length,
     has_home: !!S.home,
@@ -5958,7 +5960,8 @@ async function optimize() {
         const _ref = await _refineWithRoadTimes(optimizedOrder, startPt, S.homeCoords, S.lastId);
         if (_ref.changed) {
           optimizedOrder = _ref.order; _orderChanged = true;
-          trackEvent('route_refined_road_times', { stop_count: optimizedOrder.length, saved_s: _ref.savedSec, region: S.userState || 'unknown' });
+          S._routeNotes.push('Fine-tuned with road distances: swapped stops ' + _ref.labels.join(', ') + ' (saves ' + (_ref.savedM / 1000).toFixed(1) + ' km).');
+          trackEvent('route_refined_road_times', { stop_count: optimizedOrder.length, swaps: _ref.swaps, saved_m: _ref.savedM, saved_s: _ref.savedSec, region: S.userState || 'unknown' });
         }
       } catch (_e) { /* keep OSRM's order */ }
       // 2) Stops that are physically together are visited together (never at a cost of >1.5 km straight-line).
@@ -5966,6 +5969,7 @@ async function optimize() {
       if (_grp.some((s, k) => s !== optimizedOrder[k]) &&
           _pathKm(_grp, s => s.coords, startPt, S.homeCoords) <= _pathKm(optimizedOrder, s => s.coords, startPt, S.homeCoords) + 1.5) {
         optimizedOrder = _grp; _orderChanged = true;
+        S._routeNotes.push('Kept stops in the same building together.');
         trackEvent('route_colocated_grouped', { stop_count: optimizedOrder.length, region: S.userState || 'unknown' });
       }
       // 3) Re-measure once, so the distance/time shown are for the order the driver will actually follow.
@@ -5977,6 +5981,8 @@ async function optimize() {
           if (_nr && _nr.distance > _osrmDist + 200) {
             // Safeguard: these changes would make the drive longer than OSRM's own order. Don't ship them.
             optimizedOrder = _osrmOrder; tripDist = _osrmDist; tripDur = _osrmDur;
+            S._routeNotes = S._routeNotes.filter(function(n) { return !/^Fine-tuned|^Kept stops/.test(n); });
+            S._routeNotes.push("Kept the router's own order (the fine-tuning would have added driving distance).");
             trackEvent('route_changes_reverted', { extra_m: Math.round(_nr.distance - _osrmDist), region: S.userState || 'unknown' });
           } else if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; }
         } catch (_e) { /* keep the OSRM trip figures */ }
@@ -6085,6 +6091,7 @@ async function optimizeWithGemini() {
     const _cx = i => geocodedStops[i].coords;
     if (_gr.some((v, k) => v !== route[k]) && _pathKm(_gr, _cx, S._startPt, S.homeCoords) <= _pathKm(route, _cx, S._startPt, S.homeCoords) + 1.5) {
       route.length = 0; _gr.forEach(v => route.push(v));
+      (S._routeNotes = S._routeNotes || []).push('Kept stops in the same building together.');
     } }
 
   // Calculate estimated savings (30 km/h urban average)
@@ -7930,7 +7937,9 @@ async function _reconcileSameStreetNeighbors() {
     });
     return best;
   };
-  var report = function(strategy, dKm) {
+  var report = function(strategy, dKm, stop) {
+    (S._routeNotes = S._routeNotes || []).push('Corrected the map position of "' + stop.address + '" (it had landed ' +
+      (Math.round(dKm * 10) / 10) + ' km away from its neighbour on the same street).');
     if (typeof trackEvent === 'function') trackEvent('neighbor_geocode_fixed', { strategy: strategy, km: Math.round(dKm * 10) / 10, region: S.userState || 'unknown' });
   };
   for (var a = 0; a < items.length; a++) {
@@ -7952,10 +7961,10 @@ async function _reconcileSameStreetNeighbors() {
       if (bad) {
         var r = null;
         try { r = await geocode(bad.s.address, good.s.coords.lat, good.s.coords.lon); } catch (e) { r = null; }
-        if (r && _distKm(r, good.s.coords) <= 0.4) { bad.s.coords = r; report('bias', dKm); }
+        if (r && _distKm(r, good.s.coords) <= 0.4) { bad.s.coords = r; report('bias', dKm, bad.s); }
         else if (_nearestOtherKm(good.s, bad.s) <= 2) {            // the partner is well supported: put the pair together
           bad.s.coords = { lat: good.s.coords.lat, lon: good.s.coords.lon, state: good.s.coords.state, country: good.s.coords.country, snapped: true };
-          report('snap', dKm);
+          report('snap', dKm, bad.s);
         }
         continue;
       }
@@ -7965,7 +7974,7 @@ async function _reconcileSameStreetNeighbors() {
       try { rA = await geocode(A.s.address, B.s.coords.lat, B.s.coords.lon); } catch (e) { rA = null; }
       try { rB = await geocode(B.s.address, A.s.coords.lat, A.s.coords.lon); } catch (e) { rB = null; }
       var okA = rA && _distKm(rA, B.s.coords) <= 0.4, okB = rB && _distKm(rB, A.s.coords) <= 0.4;
-      if (okA && !okB) { A.s.coords = rA; report('bias', dKm); } else if (okB && !okA) { B.s.coords = rB; report('bias', dKm); }
+      if (okA && !okB) { A.s.coords = rA; report('bias', dKm, A.s); } else if (okB && !okA) { B.s.coords = rB; report('bias', dKm, B.s); }
     }
   }
 }
@@ -8032,41 +8041,30 @@ async function _osrmTable(coords) {
     return { dur: d.durations, dist: d.distances };
   } catch (e) { return null; } finally { clearTimeout(t); }
 }
-// A change is kept only if it is FASTER on the road AND NOT LONGER (Dd = distance matrix). So a refinement can
-// never trade a longer drive for a quicker one. Dd is optional (time only) for callers that have no distances.
-function _localSearch(seq, D, lockLast, Dd) {
-  var n = seq.length, lo = 1, hi = n - 2 - (lockLast ? 1 : 0);
-  var tot = function(M, a) { var t = 0; for (var i = 0; i < a.length - 1; i++) t += M[a[i]][a[i + 1]]; return t; };
-  var best = seq.slice(), bestC = tot(D, best), bestM = Dd ? tot(Dd, best) : 0;
-  var startC = bestC, startM = bestM, improved = true, rounds = 0;
-  var accept = function(c) {
-    var cc = tot(D, c);
-    if (!(cc < bestC - 0.5)) return false;
-    var mm = 0;
-    if (Dd) { mm = tot(Dd, c); if (mm > bestM + 0.5) return false; }
-    best = c; bestC = cc; bestM = mm; return true;
-  };
-  while (improved && rounds++ < 60) {
-    improved = false;
-    var i, j, a, p, len, c;
-    for (i = lo; i <= hi && !improved; i++) for (j = i + 1; j <= hi && !improved; j++) {          // reverse a stretch
-      c = best.slice(0, i).concat(best.slice(i, j + 1).reverse(), best.slice(j + 1));
-      if (accept(c)) improved = true;
-    }
-    for (len = 1; len <= 3 && !improved; len++) for (a = lo; a + len - 1 <= hi && !improved; a++) {   // move 1-3 stops
-      var block = best.slice(a, a + len), rest = best.slice(0, a).concat(best.slice(a + len));
-      for (p = lo; p <= hi - len + 1 && !improved; p++) {
-        if (p === a) continue;
-        c = rest.slice(0, p).concat(block, rest.slice(p));
-        if (accept(c)) improved = true;
-      }
-    }
-    for (i = lo; i <= hi && !improved; i++) for (j = i + 1; j <= hi && !improved; j++) {          // swap two stops
-      c = best.slice(); var tmp = c[i]; c[i] = c[j]; c[j] = tmp;
-      if (accept(c)) improved = true;
-    }
+// Fine-tuning is deliberately minimal: it only SWAPS TWO NEIGHBOURING STOPS, and only when that swap
+//   - saves at least 30 m of driving, and
+//   - is not slower (road time),
+// judged on OSRM's road distances/times for the three legs the swap touches. Each stop can move at most one
+// place, swaps never overlap, the first/last points (start, home, a locked last stop) never move, and nothing is
+// ever re-routed beyond that. Returns the new sequence plus the swapped pairs.
+function _swapNeighbours(seq, D, Dd, lockLast) {
+  var n = seq.length, lo = 1, hi = n - 2 - (lockLast ? 1 : 0);        // movable positions lo..hi
+  var cand = [];
+  for (var i = lo; i < hi; i++) {                                     // i and i+1 both movable
+    var a = seq[i - 1], b = seq[i], c = seq[i + 1], d = seq[i + 2];
+    var m0 = Dd[a][b] + Dd[b][c] + Dd[c][d], m1 = Dd[a][c] + Dd[c][b] + Dd[b][d];
+    var t0 = D[a][b] + D[b][c] + D[c][d],   t1 = D[a][c] + D[c][b] + D[b][d];
+    if (m0 - m1 >= 30 && t1 <= t0) cand.push({ i: i, saveM: m0 - m1, saveT: t0 - t1 });
   }
-  return { seq: best, cost: bestC, startCost: startC, meters: bestM, startMeters: startM };
+  cand.sort(function(x, y) { return y.saveM - x.saveM; });
+  var out = seq.slice(), taken = [], pairs = [], savedM = 0, savedT = 0;
+  cand.forEach(function(c) {
+    for (var k = 0; k < taken.length; k++) if (Math.abs(taken[k] - c.i) < 3) return;   // windows must not overlap
+    taken.push(c.i); var tmp = out[c.i]; out[c.i] = out[c.i + 1]; out[c.i + 1] = tmp;
+    pairs.push(c.i); savedM += c.saveM; savedT += c.saveT;
+  });
+  pairs.sort(function(x, y) { return x - y; });
+  return { seq: out, pairs: pairs, savedM: savedM, savedT: savedT };
 }
 async function _refineWithRoadTimes(order, startPt, homePt, lockedId) {
   if (order.length < 4) return { order: order, changed: false };
@@ -8076,12 +8074,14 @@ async function _refineWithRoadTimes(order, startPt, homePt, lockedId) {
   if (!D) return { order: order, changed: false };
   var seq = pts.map(function(_, k) { return k; });
   var lockLast = !!(lockedId && homePt && order[order.length - 1].id === lockedId);
-  var r = _localSearch(seq, D.dur, lockLast, D.dist);
-  if (r.cost > r.startCost - 5) return { order: order, changed: false };          // ignore gains under 5 seconds
+  var r = _swapNeighbours(seq, D.dur, D.dist, lockLast);
+  if (!r.pairs.length) return { order: order, changed: false };
   var out = [];
   r.seq.forEach(function(k) { var idx = k - off; if (idx >= 0 && idx < order.length) out.push(order[idx]); });
   if (out.length !== order.length) return { order: order, changed: false };
-  return { order: out, changed: true, savedSec: Math.round(r.startCost - r.cost) };
+  // pair label = the two positions in the stop list that traded places (1-based)
+  var labels = r.pairs.map(function(i) { var pos = i - off + 1; return pos + '\u2194' + (pos + 1); });
+  return { order: out, changed: true, swaps: r.pairs.length, labels: labels, savedM: Math.round(r.savedM), savedSec: Math.round(r.savedT) };
 }
 
 function haversineKm(lat1, lon1, lat2, lon2) {

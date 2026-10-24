@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v31';   // v31: real road route in the map preview + distance-safe road-time refinement (reverts if longer) + same-street neighbour check + keep co-located stops together + circle-number count guard + new Flex layout counts + earlier fixes
+const CACHE = 'flexroute-v32';   // v32: fine-tuning limited to swapping neighbouring stops (only when it saves distance) + notes on what changed + real road route in the map preview + revert if longer + same-street neighbour check + earlier fixes
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
