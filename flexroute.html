@@ -3390,7 +3390,10 @@ function vInput() {
     h += '<div style="margin-bottom:14px">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">';
     h += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:#FF9900;text-transform:uppercase;display:flex;align-items:center;gap:8px">Stops <span style="background:#FF9900;color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px">' + cnt + '</span></div>';
-    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + S.stops.filter(function(s){return s.flexNum!=null||s.scanned;}).length + ' scanned &middot; ' + S.stops.filter(function(s){return s.flexNum==null&&!s.scanned;}).length + ' manual &middot; <strong style="color:#FF9900">' + S.stops.reduce(function(sum,s){return sum+(s.pkgCount||1);},0) + '</strong> packages</span>';
+    var _scn = S.stops.filter(function(s){return s.flexNum!=null||s.scanned;}), _flexSet = {};
+    _scn.forEach(function(s){ (s.packageNums && s.packageNums.length ? s.packageNums : (s.flexNum != null ? [s.flexNum] : [])).forEach(function(n){ _flexSet[n] = 1; }); });
+    var _flexN = Object.keys(_flexSet).length, _combined = _flexN > _scn.length ? _flexN - _scn.length : 0;
+    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + _scn.length + ' scanned' + (_combined ? ' (' + _flexN + ' Flex stops, ' + _combined + ' combined)' : '') + ' &middot; ' + S.stops.filter(function(s){return s.flexNum==null&&!s.scanned;}).length + ' manual &middot; <strong style="color:#FF9900">' + S.stops.reduce(function(sum,s){return sum+(s.pkgCount||1);},0) + '</strong> packages</span>';
     h += '</div>';
     h += '<div style="background:#13131E;border-radius:16px;overflow:hidden;padding:12px 14px">';
     h += '<div class="ir" style="margin-bottom:10px"><div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Add address manually" value="' + escH(S.manVal) + '" style="font-size:14px"/></div>';
@@ -3635,7 +3638,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.23-v32</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.24-v35</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -5096,15 +5099,24 @@ function _buildScanSummary(ctx) {
   // strongest check there is: the packages we counted must add up to it.
   var totalKnown = ctx.total != null, totalMatch = totalKnown && pkgs === ctx.total;
   var countsUnread = !!ctx.newLayout && !ctx.counts;     // new layout, but no stop's package count could be read
+  // Counts read from a separate column of numbers that were NOT confirmed by the route total are unverified.
+  var unverified = (ctx.pkgMode === 'lone' || ctx.pkgMode === 'cluster') && !totalMatch;
   var complete = flexN > 0 && ctx.depot && ctx.end && ctx.unres === 0 && !gapAt && !badStart &&
-                 (!totalKnown || totalMatch) && !countsUnread && !(ctx.confOpen > 0);
+                 (!totalKnown || totalMatch) && !countsUnread && !(ctx.confOpen > 0) && !unverified;
   var merged = mine.filter(function(s) { return s.packageNums && s.packageNums.length > 1; });
+  // Exactly which Flex numbers are missing between the first and last one read
+  var missingNums = [];
+  for (var mi = min; mi !== undefined && mi <= max; mi++) { if (sn.indexOf(mi) < 0) missingNums.push(mi); }
+  // "#7 and 8: 1 Belsize Drive" for each stop that absorbed other Flex stops in the same building
+  var combinedList = merged.slice(0, 6).map(function(s) {
+    return '#' + _formatNumList(s.packageNums.slice().sort(function(a, b) { return a - b; })) + ': ' + String(s.address || '').split(',')[0];
+  }).join('; ') + (merged.length > 6 ? '; and ' + (merged.length - 6) + ' more' : '');
   var title, lines = [];
   if (complete) {
     title = '\u2713 Full list read: ' + flexN + ' Flex stop' + (flexN > 1 ? 's' : '') + ', ' + pkgs + ' package' + (pkgs > 1 ? 's' : '');
     if (merged.length && flexN > stops) {
       lines.push((flexN - stops) + ' Flex stop' + (flexN - stops > 1 ? 's' : '') + ' share a building with another one, so FlexRoute shows ' + stops +
-        ' stops. Each combined stop lists all of its Flex numbers (for example #' + _formatNumList(merged[0].packageNums.slice().sort(function(a, b) { return a - b; })) + ').');
+        ' stops, not ' + flexN + '. Nothing is missing. Combined: ' + combinedList + '.');
     }
     // Which independent readings of the package counts agree with each other?
     var srcs = [];
@@ -5115,17 +5127,19 @@ function _buildScanSummary(ctx) {
       lines.push('Package counts confirmed by ' + (srcs.length === 2 ? srcs.join(' and ') : srcs.slice(0, -1).join(', ') + ' and ' + srcs[srcs.length - 1]) + '.');
     }
     if (ctx.confFixed > 0) lines.push('The package icon and the \u201cDeliver N packages\u201d line differed on ' + ctx.confFixed + ' stop' + (ctx.confFixed > 1 ? 's' : '') + "; we used the readings that add up to Amazon's total.");
-    if ((ctx.pkgMode === 'lone' || ctx.pkgMode === 'cluster') && pkgs > stops) lines.push('The package counts were read from a separate column of numbers: the total matches, but double-check which stops have several packages.');
+    if ((ctx.pkgMode === 'lone' || ctx.pkgMode === 'cluster') && pkgs > stops) lines.push("The package counts were read from a separate column of numbers and add up to Amazon's total (" + ctx.total + "); double-check which stops have several packages.");
     lines.push('Flex counts the warehouse as stop 1, so its list ends at #' + max + '.');
   } else {
-    title = stops + ' stop' + (stops !== 1 ? 's' : '') + ', ' + pkgs + ' package' + (pkgs !== 1 ? 's' : '') + ' scanned';
+    title = stops + ' stop' + (stops !== 1 ? 's' : '') + (flexN > stops ? ' (' + flexN + ' Flex stops)' : '') + ', ' + pkgs + ' package' + (pkgs !== 1 ? 's' : '') + ' scanned';
     if (!ctx.depot) lines.push("We couldn't see the warehouse pickup (\"Picked up at\u2026\") at the top of your Flex list.");
     if (!ctx.end) lines.push("We couldn't see Flex's end-of-list message at the bottom, so we can't confirm the whole list was captured.");
-    if (gapAt) lines.push('Flex stop numbers jump from #' + gapAt[0] + ' to #' + gapAt[1] + ', so a stop may be missing.');
+    if (gapAt) lines.push('Missing Flex numbers: ' + missingNums.slice(0, 12).map(function(n) { return '#' + n; }).join(', ') + (missingNums.length > 12 ? ' \u2026' : '') + ' (not read from the screenshot).');
+    if (merged.length && flexN > stops) lines.push((flexN - stops) + ' Flex stop' + (flexN - stops > 1 ? 's were' : ' was') + ' combined with another stop in the same building (so they are not missing). Combined: ' + combinedList + '.');
     if (badStart && !gapAt) lines.push('The first stop after the warehouse should be Flex #2, but the numbers start at #' + min + ', so a stop may be missing.');
     if (ctx.unres > 0) lines.push("Some Flex stop numbers couldn't be read.");
     if (totalKnown && !totalMatch) lines.push("Amazon's list shows " + ctx.total + " packages, but FlexRoute counted " + pkgs + ". Check the stops with several packages" + (pkgs < ctx.total ? ", or add a screenshot of any part that is missing." : "."));
     if (countsUnread) lines.push("We couldn't read the package counts from this screenshot, so the package total may be off.");
+    if (unverified) lines.push("The package counts come from a separate column of numbers and could not be checked against Amazon's route total, so the package total (" + pkgs + ") may be wrong. Compare it with your Flex app before you drive off.");
     if (ctx.confOpen > 0) lines.push('The package icon and the \u201cDeliver N packages\u201d line disagree on ' + ctx.confOpen + ' stop' + (ctx.confOpen > 1 ? 's' : '') + ' (we used the \u201cDeliver\u201d line). Check those stops.');
     lines.push('Compare with your Flex list and add a screenshot of any part that is missing.');
   }
@@ -7263,12 +7277,22 @@ function parseFlexOCR(rawText) {
       var _lm = lines[_q].trim().match(/^(\d{1,3})(?:\s*[^\w\s()]{1,3})*$/);
       if (_lm) _tc.push(parseInt(_lm[1], 10));
     }
+    // Other placements the OCR can produce: the number just BEFORE the "Picked up" line, further down the
+    // warehouse block, or glued to its address/city line ("400 Nugget Avenue 36").
+    for (var _q2 = Math.max(0, _depotIdx - 3); _newLayout && _q2 < Math.min(_depotIdx + 14, lines.length); _q2++) {
+      if (_q2 === _depotIdx) continue;
+      if (_q2 > _depotIdx && (isScheduled(lines[_q2]) || /next stop/i.test(lines[_q2]))) break;
+      var _l2 = lines[_q2].trim();
+      var _a2 = _l2.match(/^(\d{1,3})(?:\s*[^\w\s()]{1,3})*$/);
+      var _g2 = (_q2 === _depotIdx + 1 || _q2 === _depotIdx + 2) ? _l2.match(/^[A-Za-z0-9].*[A-Za-z]\s+(\d{2,3})(?!\d)\W{0,3}$/) : null;
+      if (_a2) _tc.push(parseInt(_a2[1], 10)); else if (_g2) _tc.push(parseInt(_g2[1], 10));
+    }
     // a route can't hold fewer packages than it has stops
     _tc = _tc.filter(function(v) { return v >= _okBlocks && _okBlocks > 0; });
     if (_tc.length) _totalPackages = _tc[0];
   }
   var _clusterUsed = false;
-  if (_newLayout && _newCounts === 0 && _totalPackages != null && _okBlocks > 0) {
+  if (_newLayout && _newCounts === 0 && _okBlocks > 0) {
     // Vision can print the right-hand count column as its own run of lone numbers. Accept it ONLY when the
     // run has exactly one number per stop AND adds up to Amazon's total — too strict to match by accident.
     var _runs = [], _cur = [];
@@ -7279,10 +7303,32 @@ function parseFlexOCR(rawText) {
       else { if (_cur.length >= 4) _runs.push(_cur); _cur = []; }
     });
     if (_cur.length >= 4) _runs.push(_cur);
-    var _fit = _runs.filter(function(r) { return r.length === _okBlocks && r.reduce(function(a, b) { return a + b; }, 0) === _totalPackages; });
+    var _sumOf = function(r) { return r.reduce(function(a, b) { return a + b; }, 0); };
+    // An EXPANDED group stop lists its packages as sub-rows (each with its own address and number) instead of
+    // one count, so it takes several numbers in the column. Count the street lines in each block: 1 main
+    // address + s sub-rows (s >= 2) means s numbers; any other block means 1.
+    var _okC = _blockLog.filter(function(e) { return e.kind === 'ok'; });
+    var _subRows = _okC.map(function(e, q) {
+      if (e.sched === undefined) return 1;
+      var nxt = (_okC[q + 1] && _okC[q + 1].sched !== undefined) ? _okC[q + 1].sched : lines.length, n = 0;
+      for (var li = e.sched + 1; li < nxt; li++) if (isStreet(lines[li])) n++;
+      return n >= 3 ? n - 1 : 1;
+    });
+    var _slots = _sumOf(_subRows);
+    var _fit = _totalPackages != null ? _runs.filter(function(r) { return r.length === _slots && _sumOf(r) === _totalPackages; }) : [];
+    // No depot total was read: the column may start with it. [total, c1..cN] where total == c1+..+cN is far too
+    // specific to match by accident, and then gives the total AND the counts together.
+    if (!_fit.length) {
+      var _fitT = _runs.filter(function(r) { return r.length === _slots + 1 && r[0] >= _okBlocks && r[0] === _sumOf(r.slice(1)) && (_totalPackages == null || r[0] === _totalPackages); });
+      if (_fitT.length === 1) { _totalPackages = _fitT[0][0]; _fit = [_fitT[0].slice(1)]; }
+    }
     if (_fit.length === 1) {
-      var _oi = 0;
-      _blockLog.forEach(function(e) { if (e.kind === 'ok') { e.pk = _fit[0][_oi++]; e.pkI = e.pk; } });
+      var _oi = 0, _ob = 0;
+      _blockLog.forEach(function(e) {
+        if (e.kind !== 'ok') return;
+        var _s = 0; for (var _z = 0; _z < _subRows[_ob]; _z++) _s += _fit[0][_oi++];   // a group's count = the sum of its sub-row numbers
+        e.pk = _s; e.pkI = _s; _ob++;
+      });
       results.forEach(function(r) { r.pkgCount = 0; });
       _blockLog.forEach(function(e) { if (e.kind === 'ok') e.ref.pkgCount += e.pk; });
       results.forEach(function(r) { if (!r.pkgCount) r.pkgCount = 1; });
@@ -7303,8 +7349,12 @@ function parseFlexOCR(rawText) {
       var _lok;
       if (_totalPackages != null) _lok = (_lsum === _totalPackages);
       else {
-        var _l1 = _lvals.filter(function(v) { return v === 1; }).length;
-        _lok = _l1 >= 0.6 * _nLone && Math.max.apply(null, _lvals) <= 9;
+        // No route total to check against, so be strict: nearly EVERY stop must have its own count line, they
+        // must be overwhelmingly 1, small, and plausible on average. Stray circle numbers fail this.
+        var _loneVals = _okL.filter(function(e) { return e.lone >= 0; }).map(function(e) { return _loneAt[e.lone]; });
+        var _l1 = _loneVals.filter(function(v) { return v === 1; }).length;
+        _lok = _nLone >= 0.9 * _okL.length && _l1 >= 0.75 * _loneVals.length &&
+               Math.max.apply(null, _loneVals) <= 6 && (_lsum / _okL.length) <= 1.6;
       }
       if (_lok) {
         var _usedL = {}; _okL.forEach(function(e) { if (e.lone >= 0) _usedL[e.lone] = true; });
