@@ -279,6 +279,17 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
 .ios-toast-title{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--acc);margin-bottom:3px}
 .ios-toast-sub{font-size:12px;color:var(--t2);line-height:1.5}
 .ios-toast-close{font-size:18px;color:var(--t3);flex-shrink:0;padding:4px}
+.a2hs-card{position:relative;background:linear-gradient(135deg,rgba(255,153,0,.13),rgba(255,153,0,.04));border:1.5px solid rgba(255,153,0,.42);border-radius:16px;padding:15px 16px 13px;margin-bottom:14px}
+.a2hs-head{display:flex;gap:12px;align-items:flex-start}
+.a2hs-emoji{font-size:26px;line-height:1;flex-shrink:0;margin-top:1px}
+.a2hs-title{font-family:var(--sans);font-size:14px;font-weight:800;color:var(--acc);letter-spacing:.3px;margin-bottom:3px;padding-right:18px}
+.a2hs-sub{font-size:12.5px;color:var(--t2);line-height:1.5}
+.a2hs-steps{margin-top:11px;display:flex;flex-direction:column;gap:7px}
+.a2hs-step{display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--t2);line-height:1.4}
+.a2hs-step strong{color:var(--t1)}
+.a2hs-num{flex-shrink:0;width:19px;height:19px;border-radius:50%;background:rgba(255,153,0,.22);color:var(--acc);font-family:var(--sans);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.a2hs-x{position:absolute;top:8px;right:9px;background:transparent;border:none;color:var(--t3);font-size:16px;cursor:pointer;padding:4px 7px;line-height:1;-webkit-tap-highlight-color:transparent}
+.a2hs-x:active{color:var(--t1)}
 .autocomplete-list{position:absolute;top:100%;left:0;right:0;z-index:9999;background:var(--surf2);border:1px solid var(--acc);border-radius:0 0 var(--r) var(--r);box-shadow:0 8px 32px rgba(0,0,0,.6);max-height:220px;overflow-y:auto}
 .ac-item{padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--brd);transition:background .1s;-webkit-tap-highlight-color:transparent}
 .ac-item:last-child{border-bottom:none}
@@ -353,13 +364,30 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   });
 
   // ── FlexRoute custom event helpers ────────────────────────────────────────
+  // How the app is being run, attached to every event so GA4 can compare installed users with browser users.
+  // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
+  var FR_DISPLAY = (window.navigator.standalone === true ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
+  var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
+    : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
+
   function trackEvent(name, params) {
     if (typeof gtag !== 'undefined') {
-      gtag('event', name, params || {});
+      var p = params || {};
+      if (p.display_mode === undefined) p.display_mode = FR_DISPLAY;
+      if (p.platform === undefined) p.platform = FR_PLATFORM;
+      gtag('event', name, p);
     }
   }
   // 1 when opened inside Facebook/Instagram/etc. in-app browsers (same pattern the scanner warnings use).
   var FR_IN_APP = /Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent) ? 1 : 0;
+
+  // User-scoped, so GA4 can segment whole users (not just events) by installed vs browser.
+  if (typeof gtag !== 'undefined') {
+    gtag('set', 'user_properties', { display_mode: FR_DISPLAY, platform: FR_PLATFORM });
+    // One clean event per session to compare session counts per user between the two modes.
+    gtag('event', 'pwa_mode', { display_mode: FR_DISPLAY, platform: FR_PLATFORM, in_app: FR_IN_APP });
+  }
 </script>
 <style>
 .ios-banner{background:linear-gradient(135deg,rgba(255,153,0,.15),rgba(255,153,0,.05));border:1.5px solid rgba(255,153,0,.4);border-radius:12px;padding:13px 15px;margin-bottom:12px;display:flex;align-items:flex-start;gap:12px;position:relative}
@@ -790,6 +818,57 @@ function isIOSSafari() {
 function isAndroidChrome() {
   var ua = navigator.userAgent;
   return /android/i.test(ua) && /chrome/i.test(ua) && !window.matchMedia('(display-mode: standalone)').matches;
+}
+
+// ── "Add to home screen" prompt, shown AFTER a route is optimised ───────────────────────────────
+// iOS has no install prompt of its own, so half the drivers who use FlexRoute have no app-like way to
+// open it. This offers the home-screen route at the one moment the app has just proved its worth.
+// Deliberately restrained: never when already installed, never in an in-app browser (where Add to Home
+// Screen does not exist), at most 3 times, at most once a day, and gone for good once dismissed.
+function _a2hsState() {
+  try { return JSON.parse(localStorage.getItem('fr_a2hs') || '{}'); } catch (e) { return {}; }
+}
+function _a2hsSave(st) { try { localStorage.setItem('fr_a2hs', JSON.stringify(st)); } catch (e) {} }
+function canShowA2HS() {
+  if (FR_DISPLAY === 'standalone') return false;              // already on the home screen
+  if (FR_IN_APP) return false;                                // Facebook/Instagram browser: no A2HS there
+  if (!(isIOSSafari() || isAndroidChrome())) return false;
+  var st = _a2hsState();
+  if (st.dismissed) return false;
+  if ((st.shown || 0) >= 3) return false;
+  if (st.last && Date.now() - st.last < 20 * 60 * 60 * 1000) return false;   // once a day at most
+  return true;
+}
+function dismissA2HS() {
+  var st = _a2hsState(); st.dismissed = true; _a2hsSave(st);
+  S.iosDismissed = true; try { localStorage.setItem('fr_ios_dismissed', '1'); } catch (e) {}
+  trackEvent('a2hs_prompt_dismissed', { where: 'result' });
+  render();
+}
+function a2hsCard() {
+  if (!canShowA2HS()) return '';
+  if (!S._a2hsLogged) {                                        // count one impression per session
+    S._a2hsLogged = true;
+    var st = _a2hsState(); st.shown = (st.shown || 0) + 1; st.last = Date.now(); _a2hsSave(st);
+    trackEvent('a2hs_prompt_shown', { where: 'result', shown_count: st.shown });
+  }
+  var ios = isIOSSafari();
+  var steps = ios
+    ? [['1', 'Tap <strong>Share</strong> &#11023; at the bottom of Safari'],
+       ['2', 'Choose <strong>Add to Home Screen</strong>'],
+       ['3', 'Tap <strong>Add</strong> &mdash; that\'s it']]
+    : [['1', 'Tap <strong>&#8942; Menu</strong> (top right)'],
+       ['2', 'Choose <strong>Add to Home screen</strong>'],
+       ['3', 'Tap <strong>Install</strong>']];
+  var h = '<div class="a2hs-card" id="a2hsCard">';
+  h += '<button class="a2hs-x" id="a2hsX" aria-label="Dismiss">&#10005;</button>';
+  h += '<div class="a2hs-head"><span class="a2hs-emoji">&#128241;</span>';
+  h += '<div><div class="a2hs-title">Keep FlexRoute one tap away</div>';
+  h += '<div class="a2hs-sub">Add it to your home screen: opens full screen, loads instantly, and your routes work even with no signal.</div></div></div>';
+  h += '<div class="a2hs-steps">';
+  steps.forEach(function(st2) { h += '<div class="a2hs-step"><span class="a2hs-num">' + st2[0] + '</span><span>' + st2[1] + '</span></div>'; });
+  h += '</div></div>';
+  return h;
 }
 
 function saveSession() {
@@ -1732,6 +1811,7 @@ const startInp = document.getElementById('startInput');
       e.preventDefault();
       e.stopPropagation();
       S.iosDismissed = true;
+      try { var _st = _a2hsState(); _st.dismissed = true; _a2hsSave(_st); } catch (e) {}
       localStorage.setItem('fr_ios_dismissed', '1');
       _toast.style.display = 'none';
       render();
@@ -1741,6 +1821,15 @@ const startInp = document.getElementById('startInput');
 
   // changeStateBtn via delegation below
   on('changeStateBtn','click', function(){ S.userState=''; localStorage.removeItem('fr_state'); render(); });
+  }
+
+  // "Add to home screen" card close button -- same click+touchend pattern as the toast above,
+  // because a plain click on iOS is unreliable here.
+  var _a2x = document.getElementById('a2hsX');
+  if (_a2x) {
+    var _a2Fn = function(e) { e.preventDefault(); e.stopPropagation(); dismissA2HS(); };
+    _a2x.addEventListener('click', _a2Fn);
+    _a2x.addEventListener('touchend', _a2Fn, { passive: false });
   }
 
   var dz=document.querySelector('.dz');
@@ -3638,7 +3727,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.24-v35</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.25-v36</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -3677,6 +3766,8 @@ function vResult() {
         </div>
       </div>`)
   : ''}
+
+  ${a2hsCard()}
 
   ${S.geoFailed.length ? `
   <div class="geo-warn" style="margin-bottom:10px">
