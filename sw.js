@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v36';   // v36: iOS add-to-home-screen prompt after a route + display_mode/platform on every GA4 event (installed vs browser) + expanded-group package counts + honest scan card + neighbour-swap fine-tuning + real road route in the map preview + earlier fixes
+const CACHE = 'flexroute-v37';   // v37: Shift Mode prev/next stop review + route fine-tuning can move a stop up to 3 places (never longer, never slower) with an honest net-change note + iOS add-to-home-screen prompt + display_mode tracking + earlier fixes
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

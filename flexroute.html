@@ -255,6 +255,14 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
 .comp-flexnums{display:flex;flex-wrap:wrap;justify-content:center;gap:2px 18px;font-family:var(--sans);font-weight:900;color:var(--acc);line-height:1.02;margin:6px 0 8px}
 .comp-flexnums.n1{font-size:76px}.comp-flexnums.n2{font-size:58px}.comp-flexnums.n3{font-size:48px}.comp-flexnums.nm{font-size:38px}
 .comp-flexpk{font-family:var(--sans);font-size:18px;font-weight:700;color:var(--t1)}
+.comp-browse{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}
+.comp-bbtn{flex:0 0 auto;min-width:92px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:10px;padding:11px 14px;color:var(--t2);font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.comp-bbtn:active{background:var(--surf);color:var(--t1)}
+.comp-bbtn[disabled]{opacity:.3;cursor:default}
+.comp-bpos{flex:1;text-align:center;font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:1px;color:var(--t3)}
+.comp-review{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(74,158,255,.1);border:1px solid rgba(74,158,255,.4);border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:12.5px;color:var(--inf);line-height:1.4}
+.comp-rback{flex-shrink:0;background:transparent;border:1px solid rgba(74,158,255,.5);border-radius:7px;padding:6px 10px;color:var(--inf);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);-webkit-tap-highlight-color:transparent}
+.comp-done-back{background:var(--inf);color:#fff}
 .comp-navbtns{display:flex;gap:12px;width:100%;max-width:380px;margin-bottom:14px}
 .comp-waze{flex:1;background:#06D6A0;color:#000;border:none;border-radius:12px;padding:17px;font-size:17px;font-weight:800;font-family:var(--sans);cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px}
 .comp-maps{flex:1;background:#4285F4;color:#fff;border:none;border-radius:12px;padding:17px;font-size:17px;font-weight:800;font-family:var(--sans);cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:7px}
@@ -644,6 +652,10 @@ const S = {
   routeZoom: parseInt(localStorage.getItem('fr_route_zoom') || '0', 10) || 0,
   companion:  false,
   cIdx:       0,
+  // Shift Mode review cursor. null = following the driver's current stop; a number = looking at
+  // another stop with the Prev/Next buttons. Deliberately NOT saved to the session: a reload should
+  // put the driver back on the stop they are actually delivering.
+  cView:      null,
   cDone:      [],
   cShiftStart: null,
   // Which nav app the driver last tapped during Shift Mode ('waze'|'maps'|null).
@@ -1906,6 +1918,9 @@ var LANGS = {
     flex_stop_many: 'Flex stops',
     one_package: '1 package',
     shift_complete: 'Shift Complete!',
+    reviewing_stop: 'Reviewing stop {n}',
+    already_delivered: 'already delivered',
+    back_to_current: 'Back to stop {n}',
     stops_delivered: '{n} stops',
     done_back: '✓ Done — Back to route',
     you_save: 'You save {km} {unit} & ~{min} min',
@@ -2103,6 +2118,9 @@ var LANGS = {
     flex_stop_many: 'Arrêts Flex',
     one_package: '1 colis',
     shift_complete: 'Quart terminé !',
+    reviewing_stop: 'Consultation de l’arrêt {n}',
+    already_delivered: 'déjà livré',
+    back_to_current: 'Retour à l’arrêt {n}',
     stops_delivered: '{n} arrêts',
     done_back: '✓ Terminé — Retour à l\'itinéraire',
     you_save: 'Vous économisez {km} {unit} & ~{min} min',
@@ -2300,6 +2318,9 @@ var LANGS = {
     flex_stop_many: 'Flex-Stopps',
     one_package: '1 Paket',
     shift_complete: 'Schicht abgeschlossen!',
+    reviewing_stop: 'Stopp {n} ansehen',
+    already_delivered: 'bereits zugestellt',
+    back_to_current: 'Zur\u00fcck zu Stopp {n}',
     stops_delivered: '{n} Stopps',
     done_back: '✓ Fertig — Zurück zur Route',
     you_save: 'Sie sparen {km} {unit} & ~{min} Min',
@@ -2497,6 +2518,9 @@ var LANGS = {
     flex_stop_many: 'Paradas Flex',
     one_package: '1 paquete',
     shift_complete: '¡Turno completado!',
+    reviewing_stop: 'Viendo la parada {n}',
+    already_delivered: 'ya entregada',
+    back_to_current: 'Volver a la parada {n}',
     stops_delivered: '{n} paradas',
     done_back: '✓ Listo — Volver a la ruta',
     you_save: 'Ahorras {km} {unit} & ~{min} min',
@@ -3727,7 +3751,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.25-v36</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.25-v37</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -3932,12 +3956,16 @@ function buildNavURL(app, address) {
 
 function vCompanion() {
   var stops = S.optimized.filter(function(s){ return !s.geoFailed; });
-  var idx   = Math.min(S.cIdx, stops.length);
+  var curIdx = Math.min(S.cIdx, stops.length);
+  // Reviewing another stop? Clamp it, and fall back to the current stop if it is out of range.
+  var reviewing = (typeof S.cView === 'number' && S.cView !== curIdx && S.cView >= 0 && S.cView < stops.length);
+  var idx   = reviewing ? S.cView : curIdx;
   var stop  = stops[idx];
   var done  = S.cDone.length;
   var total = stops.length;
   var pct   = Math.round(done / total * 100);
   var isLast = idx === total - 1;
+  var viewDone = S.cDone.indexOf(idx) >= 0;
   var elapsed = '';
   if (S.cShiftStart) {
     var mins = Math.round((Date.now() - S.cShiftStart) / 60000);
@@ -4002,6 +4030,16 @@ function vCompanion() {
         if (stop.scanned) return '<div style="font-size:13px;color:var(--t3);text-align:center;margin:0 0 8px;min-height:20px">&#128230; ' + escH(t('pkg_num_unknown')) + '</div>';
         return '<div style="height:20px"></div>';
       })() +
+      // Prev / Next: look back and ahead along the route without changing what has been delivered.
+      '<div class="comp-browse">' +
+        '<button class="comp-bbtn" id="compPrevBtn"' + (idx <= 0 ? ' disabled' : '') + ' aria-label="Previous stop">&#8249; Prev</button>' +
+        '<div class="comp-bpos">' + (idx + 1) + ' / ' + total + '</div>' +
+        '<button class="comp-bbtn" id="compNextBtn"' + (idx >= total - 1 ? ' disabled' : '') + ' aria-label="Next stop">Next &#8250;</button>' +
+      '</div>' +
+      (reviewing ? '<div class="comp-review">' +
+        '<span>' + escH(t('reviewing_stop').replace('{n}', idx + 1)) + (viewDone ? ' \u00b7 ' + escH(t('already_delivered')) : '') + '</span>' +
+        '<button class="comp-rback" id="compBackCurBtn">' + escH(t('back_to_current').replace('{n}', curIdx + 1)) + '</button>' +
+      '</div>' : '') +
       '<div class="comp-navbtns">' +
         '<a href="' + wazeURL + '" target="_blank" class="comp-waze" id="compWazeBtn">&#9664; Waze</a>' +
         '<a href="' + mapsURL + '" target="_blank" class="comp-maps" id="compMapsBtn">Maps</a>' +
@@ -4009,7 +4047,11 @@ function vCompanion() {
       (S.cAutoNav && !isLast ? '<div id="compAutoHint" style="font-size:12px;color:var(--t3);text-align:center;margin-top:10px;line-height:1.4">' +
         escH(S.cNavApp === 'waze' ? t('autonav_hint_waze') : (S.cNavApp === 'maps' ? t('autonav_hint_maps') : t('autonav_hint_choose'))) +
         '</div>' : '') +
-      '<button class="comp-done" id="compDoneBtn">' + (isLast ? t('finish_shift') : '&#10003; Delivered \u2014 Next Stop') + '</button>' +
+      (reviewing
+        // While reviewing another stop, the big button must not mark anything delivered: it returns
+        // the driver to the stop they are actually on.
+        ? '<button class="comp-done comp-done-back" id="compBackCurBtn2">&#8617; ' + escH(t('back_to_current').replace('{n}', curIdx + 1)) + '</button>'
+        : '<button class="comp-done" id="compDoneBtn">' + (isLast ? t('finish_shift') : '&#10003; Delivered \u2014 Next Stop') + '</button>') +
     '</div>' +
     '<div class="comp-footer">' +
       '<div class="comp-stats">' +
@@ -4030,7 +4072,7 @@ function toggleCompList() {
     var bg = isDone ? 'var(--ok)' : isCurr ? 'var(--acc)' : 'var(--surf2)';
     var tc = (isDone||isCurr) ? '#000' : 'var(--t2)';
     var cls = isDone ? 'cdone' : isCurr ? 'ccurr' : '';
-    return '<div class="comp-mrow ' + cls + '">' +
+    return '<div class="comp-mrow ' + cls + '" data-cjump="' + i + '" style="cursor:pointer">' +
       '<div class="comp-mn" style="background:' + bg + ';color:' + tc + '">' + (isDone ? '&#10003;' : (i+1)) + '</div>' +
       '<div class="comp-ma">' + escH(s.address) + (s.flexNum!=null ? ' <span style="color:var(--acc);font-size:11px">#'+((s.packageNums && s.packageNums.length > 1) ? _formatNumList(s.packageNums.slice().sort(function(a,b){return a-b;})) : s.flexNum)+'</span>' : '') + '</div>' +
       '</div>';
@@ -4047,9 +4089,16 @@ function toggleCompList() {
   document.getElementById('compListClose').addEventListener('click', function(){
     document.body.removeChild(overlay);
   });
+  // Tapping a row reviews that stop (it does not deliver it).
+  overlay.addEventListener('click', function(e){
+    var row = e.target.closest && e.target.closest('[data-cjump]');
+    if (!row) return;
+    document.body.removeChild(overlay);
+    compViewStop(parseInt(row.getAttribute('data-cjump'), 10));
+  });
 }
 
-function exitCompanion() { S.companion = false; S.phase = 'result'; saveSession(); render(); }
+function exitCompanion() { S.companion = false; S.cView = null; S.phase = 'result'; saveSession(); render(); }
 
 function startCompanion() {
   S.companion = true;
@@ -4057,7 +4106,7 @@ function startCompanion() {
   // If user returns from the optimization page mid-shift, resume where they left off.
   var _hasProgress = (S.cDone && S.cDone.length > 0) || S.cIdx > 0;
   if (!S.cShiftStart && !_hasProgress) {
-    S.cIdx = 0; S.cDone = []; S.cShiftStart = Date.now();
+    S.cIdx = 0; S.cDone = []; S.cShiftStart = Date.now(); S.cView = null;
   } else if (!S.cShiftStart) {
     S.cShiftStart = Date.now();   // progress exists but the start time was lost: KEEP the progress
   }
@@ -4066,8 +4115,27 @@ function startCompanion() {
   render();
 }
 
+// Step the review cursor. Never touches S.cDone, so looking around can't mark a stop delivered.
+function compBrowse(delta) {
+  var stops = S.optimized.filter(function(s){ return !s.geoFailed; });
+  var base = (typeof S.cView === 'number') ? S.cView : Math.min(S.cIdx, stops.length);
+  var next = Math.max(0, Math.min(stops.length - 1, base + delta));
+  S.cView = (next === Math.min(S.cIdx, stops.length)) ? null : next;
+  trackEvent('shift_browse', { dir: delta > 0 ? 'next' : 'prev', offset: next - Math.min(S.cIdx, stops.length), stop_count: stops.length });
+  render();
+}
+function compBackToCurrent() { S.cView = null; trackEvent('shift_browse', { dir: 'back_to_current' }); render(); }
+function compViewStop(i) {
+  var stops = S.optimized.filter(function(s){ return !s.geoFailed; });
+  if (i < 0 || i >= stops.length) return;
+  S.cView = (i === Math.min(S.cIdx, stops.length)) ? null : i;
+  trackEvent('shift_browse', { dir: 'list_jump' });
+  render();
+}
+
 function markDelivered() {
   var stops = S.optimized.filter(function(s){ return !s.geoFailed; });
+  S.cView = null;                       // always act on, and return to, the current stop
   if (S.cIdx >= stops.length) return;
   if (S.cDone.indexOf(S.cIdx) < 0) S.cDone.push(S.cIdx);
   var wasLast = S.cIdx >= stops.length - 1;
@@ -4353,6 +4421,10 @@ function bindMap() {
 function bindCompanion() {
   var btn = document.getElementById('compDoneBtn');
   if (btn) btn.addEventListener('click', markDelivered);
+  on('compPrevBtn', 'click', function(){ compBrowse(-1); });
+  on('compNextBtn', 'click', function(){ compBrowse(1); });
+  on('compBackCurBtn',  'click', compBackToCurrent);
+  on('compBackCurBtn2', 'click', compBackToCurrent);
   // Back/exit button — needed because onclick="exitCompanion()" requires global scope
   var bkC = document.getElementById('compBkBtn');
   if (bkC) bkC.addEventListener('click', exitCompanion);
@@ -4808,7 +4880,7 @@ function clrAll() {
   if (!confirm('Clear all stops?')) return;
   S.stops = []; S.lastId = null; S.errMsg = ''; S._ocrWarn = null; S._lastOcrWarnAt = null;
   S.savings = null; S.optimized = []; S.geoFailed = [];
-  S.companion = false; S.cIdx = 0; S.cDone = []; S.cShiftStart = null;
+  S.companion = false; S.cIdx = 0; S.cDone = []; S.cShiftStart = null; S.cView = null;
   clearSession(); render();
 }
 // Full-name → 2-letter code map. Shared between stateFromPhoton() and the
@@ -6060,22 +6132,16 @@ async function optimize() {
       // OSRM's own order and figures, kept so every later step can be undone if it would lengthen the drive.
       const _osrmOrder = optimizedOrder.slice(), _osrmDist = tripDist, _osrmDur = tripDur;
       // 1) Refine OSRM's order with real road times (it is a heuristic: swaps/moves can still save time).
-      let _orderChanged = false;
+      let _orderChanged = false, _groupedTogether = false, _refSavedS = 0;
       try {
         const _ref = await _refineWithRoadTimes(optimizedOrder, startPt, S.homeCoords, S.lastId);
-        if (_ref.changed) {
-          optimizedOrder = _ref.order; _orderChanged = true;
-          S._routeNotes.push('Fine-tuned with road distances: swapped stops ' + _ref.labels.join(', ') + ' (saves ' + (_ref.savedM / 1000).toFixed(1) + ' km).');
-          trackEvent('route_refined_road_times', { stop_count: optimizedOrder.length, swaps: _ref.swaps, saved_m: _ref.savedM, saved_s: _ref.savedSec, region: S.userState || 'unknown' });
-        }
+        if (_ref.changed) { optimizedOrder = _ref.order; _orderChanged = true; _refSavedS = _ref.savedSec; }
       } catch (_e) { /* keep OSRM's order */ }
       // 2) Stops that are physically together are visited together (never at a cost of >1.5 km straight-line).
       const _grp = _groupColocated(optimizedOrder, s => s.coords, s => s.id === S.lastId);
       if (_grp.some((s, k) => s !== optimizedOrder[k]) &&
           _pathKm(_grp, s => s.coords, startPt, S.homeCoords) <= _pathKm(optimizedOrder, s => s.coords, startPt, S.homeCoords) + 1.5) {
-        optimizedOrder = _grp; _orderChanged = true;
-        S._routeNotes.push('Kept stops in the same building together.');
-        trackEvent('route_colocated_grouped', { stop_count: optimizedOrder.length, region: S.userState || 'unknown' });
+        optimizedOrder = _grp; _orderChanged = true; _groupedTogether = true;
       }
       // 3) Re-measure once, so the distance/time shown are for the order the driver will actually follow.
       if (_orderChanged) {
@@ -6086,11 +6152,27 @@ async function optimize() {
           if (_nr && _nr.distance > _osrmDist + 200) {
             // Safeguard: these changes would make the drive longer than OSRM's own order. Don't ship them.
             optimizedOrder = _osrmOrder; tripDist = _osrmDist; tripDur = _osrmDur;
-            S._routeNotes = S._routeNotes.filter(function(n) { return !/^Fine-tuned|^Kept stops/.test(n); });
+            _orderChanged = false; _groupedTogether = false;
             S._routeNotes.push("Kept the router's own order (the fine-tuning would have added driving distance).");
             trackEvent('route_changes_reverted', { extra_m: Math.round(_nr.distance - _osrmDist), region: S.userState || 'unknown' });
           } else if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; }
         } catch (_e) { /* keep the OSRM trip figures */ }
+      }
+      // Say what changed, measured against the order the router gave and the route actually re-measured,
+      // so the note can never describe a step that a later step undid.
+      // Nothing is reported unless the order the driver actually gets differs from the router's own:
+      // intermediate steps that a later step undid are not changes, and must not be announced.
+      if (_orderChanged) {
+        const _lbl = _netOrderLabels(_osrmOrder, optimizedOrder);
+        if (_lbl.length) {
+          const _savedM = Math.max(0, Math.round(_osrmDist - tripDist));
+          S._routeNotes.push('Fine-tuned with road distances: moved stops ' + _lbl.join(', ') +
+            (_savedM >= 50 ? ' (saves ' + (_savedM / 1000).toFixed(1) + ' km)' : '') + '.');
+          if (_groupedTogether) S._routeNotes.push('Kept stops in the same building together.');
+          trackEvent('route_refined_road_times', { stop_count: optimizedOrder.length, swaps: _lbl.length,
+            saved_m: _savedM, saved_s: _refSavedS, grouped: _groupedTogether ? 1 : 0, region: S.userState || 'unknown' });
+          if (_groupedTogether) trackEvent('route_colocated_grouped', { stop_count: optimizedOrder.length, region: S.userState || 'unknown' });
+        }
       }
     }
   } catch (e) {
@@ -6101,7 +6183,7 @@ async function optimize() {
 
   S.optimized = [...optimizedOrder, ...failedStops];
   // New route = new shift — reset companion progress so it starts fresh
-  S.cIdx = 0; S.cDone = []; S.cShiftStart = null;
+  S.cIdx = 0; S.cDone = []; S.cShiftStart = null; S.cView = null;
 
   if (origDist != null && tripDist != null) {
     const savedKm  = Math.max(0, round1((origDist - tripDist) / 1000));
@@ -8182,31 +8264,77 @@ async function _osrmTable(coords) {
     return { dur: d.durations, dist: d.distances };
   } catch (e) { return null; } finally { clearTimeout(t); }
 }
-// Fine-tuning is deliberately minimal: it only SWAPS TWO NEIGHBOURING STOPS, and only when that swap
+// Fine-tuning is deliberately LOCAL. It repeatedly moves ONE stop to a nearby position (up to
+// MAX_MOVE places away, which covers a simple swap with a neighbour), and keeps a move only when it
 //   - saves at least 30 m of driving, and
 //   - is not slower (road time),
-// judged on OSRM's road distances/times for the three legs the swap touches. Each stop can move at most one
-// place, swaps never overlap, the first/last points (start, home, a locked last stop) never move, and nothing is
-// ever re-routed beyond that. Returns the new sequence plus the swapped pairs.
-function _swapNeighbours(seq, D, Dd, lockLast) {
-  var n = seq.length, lo = 1, hi = n - 2 - (lockLast ? 1 : 0);        // movable positions lo..hi
-  var cand = [];
-  for (var i = lo; i < hi; i++) {                                     // i and i+1 both movable
-    var a = seq[i - 1], b = seq[i], c = seq[i + 1], d = seq[i + 2];
-    var m0 = Dd[a][b] + Dd[b][c] + Dd[c][d], m1 = Dd[a][c] + Dd[c][b] + Dd[b][d];
-    var t0 = D[a][b] + D[b][c] + D[c][d],   t1 = D[a][c] + D[c][b] + D[b][d];
-    if (m0 - m1 >= 30 && t1 <= t0) cand.push({ i: i, saveM: m0 - m1, saveT: t0 - t1 });
+// judged on OSRM's real road distances/times. No stop ever ends up more than MAX_SPAN places from
+// where the router put it, the first/last points (start, home, a locked last stop) never move, and
+// every accepted move strictly shortens the drive, so this always terminates. Returns the new
+// sequence plus each move, so the result screen can say exactly what changed.
+var MAX_MOVE = 3;   // furthest a stop may travel in a single move
+var MAX_SPAN = 3;   // furthest a stop may end up from its original position, overall
+function _improveOrderLocal(seq, D, Dd, lockLast) {
+  var n = seq.length, lo = 1, hi = n - 2 - (lockLast ? 1 : 0);
+  if (hi <= lo) return { seq: seq.slice(), moves: [], savedM: 0, savedT: 0 };
+  var tot = function(M, a) { var x = 0; for (var k = 0; k < a.length - 1; k++) x += M[a[k]][a[k + 1]]; return x; };
+  var home = {};                                   // element -> the position the router gave it
+  seq.forEach(function(el, k) { home[el] = k; });
+  var within = function(c) {
+    for (var k = lo; k <= hi; k++) if (Math.abs(k - home[c[k]]) > MAX_SPAN) return false;
+    return true;
+  };
+  var out = seq.slice(), moves = [], savedM = 0, savedT = 0, guard = 0;
+  while (guard++ < 60) {
+    var baseM = tot(Dd, out), baseT = tot(D, out), best = null;
+    for (var i = lo; i <= hi; i++) {
+      for (var j = Math.max(lo, i - MAX_MOVE); j <= Math.min(hi, i + MAX_MOVE); j++) {
+        if (j === i) continue;
+        var c = out.slice();
+        c.splice(j, 0, c.splice(i, 1)[0]);
+        if (!within(c)) continue;
+        var m = tot(Dd, c);
+        if (baseM - m < 30) continue;              // must save real distance
+        var tt = tot(D, c);
+        if (tt > baseT) continue;                  // must not be slower
+        if (!best || baseM - m > best.saveM) best = { from: i, to: j, cand: c, saveM: baseM - m, saveT: baseT - tt };
+      }
+    }
+    if (!best) break;
+    out = best.cand; moves.push({ from: best.from, to: best.to });
+    savedM += best.saveM; savedT += best.saveT;
   }
-  cand.sort(function(x, y) { return y.saveM - x.saveM; });
-  var out = seq.slice(), taken = [], pairs = [], savedM = 0, savedT = 0;
-  cand.forEach(function(c) {
-    for (var k = 0; k < taken.length; k++) if (Math.abs(taken[k] - c.i) < 3) return;   // windows must not overlap
-    taken.push(c.i); var tmp = out[c.i]; out[c.i] = out[c.i + 1]; out[c.i + 1] = tmp;
-    pairs.push(c.i); savedM += c.saveM; savedT += c.saveT;
-  });
-  pairs.sort(function(x, y) { return x - y; });
-  return { seq: out, pairs: pairs, savedM: savedM, savedT: savedT };
+  return { seq: out, moves: moves, savedM: savedM, savedT: savedT };
 }
+// Describe, in stop-list positions (1-based), how the FINAL order differs from the router's order.
+// Always computed from before/after so the note can never disagree with the route the driver sees.
+// Two stops that simply traded places read as "3\u21944"; anything else reads as "7\u21924".
+function _netOrderLabels(before, after) {
+  var was = new Map(), now = new Map();
+  before.forEach(function(s, k) { was.set(s, k + 1); });
+  after.forEach(function(s, k) { now.set(s, k + 1); });
+  var changed = before.filter(function(s) { return now.has(s) && now.get(s) !== was.get(s); });
+  var used = new Set(), out = [];
+  changed.forEach(function(s) {
+    if (used.has(s)) return;
+    var partner = null;
+    for (var q = 0; q < changed.length; q++) {
+      var o = changed[q];
+      if (o !== s && !used.has(o) && was.get(o) === now.get(s) && now.get(o) === was.get(s)) { partner = o; break; }
+    }
+    if (partner) {
+      used.add(s); used.add(partner);
+      var a = Math.min(was.get(s), was.get(partner)), b = Math.max(was.get(s), was.get(partner));
+      out.push({ at: a, s: a + '\u2194' + b });
+    } else {
+      used.add(s);
+      out.push({ at: was.get(s), s: was.get(s) + '\u2192' + now.get(s) });
+    }
+  });
+  out.sort(function(x, y) { return x.at - y.at; });
+  return out.map(function(x) { return x.s; });
+}
+
 async function _refineWithRoadTimes(order, startPt, homePt, lockedId) {
   if (order.length < 4) return { order: order, changed: false };
   var off = startPt ? 1 : 0;
@@ -8215,14 +8343,12 @@ async function _refineWithRoadTimes(order, startPt, homePt, lockedId) {
   if (!D) return { order: order, changed: false };
   var seq = pts.map(function(_, k) { return k; });
   var lockLast = !!(lockedId && homePt && order[order.length - 1].id === lockedId);
-  var r = _swapNeighbours(seq, D.dur, D.dist, lockLast);
-  if (!r.pairs.length) return { order: order, changed: false };
+  var r = _improveOrderLocal(seq, D.dur, D.dist, lockLast);
+  if (!r.moves.length) return { order: order, changed: false };
   var out = [];
   r.seq.forEach(function(k) { var idx = k - off; if (idx >= 0 && idx < order.length) out.push(order[idx]); });
   if (out.length !== order.length) return { order: order, changed: false };
-  // pair label = the two positions in the stop list that traded places (1-based)
-  var labels = r.pairs.map(function(i) { var pos = i - off + 1; return pos + '\u2194' + (pos + 1); });
-  return { order: out, changed: true, swaps: r.pairs.length, labels: labels, savedM: Math.round(r.savedM), savedSec: Math.round(r.savedT) };
+  return { order: out, changed: true, swaps: r.moves.length, savedM: Math.round(r.savedM), savedSec: Math.round(r.savedT) };
 }
 
 function haversineKm(lat1, lon1, lat2, lon2) {
