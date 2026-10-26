@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v38';   // v38: international address formats (Brazil, Spain, Germany, Portugal, Italy, France, Netherlands, LatAm) read correctly and kept in native form + postcode/city lines never become stops + Shift Mode prev/next + earlier fixes
+const CACHE = 'flexroute-v39';   // v39: scan card tells stops-complete from packages-unconfirmed, no false warehouse warning when numbering starts at Flex #2, clearer missing-stop and package wording + international address formats + Shift Mode prev/next + earlier fixes
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
