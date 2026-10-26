@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v37';   // v37: Shift Mode prev/next stop review + route fine-tuning can move a stop up to 3 places (never longer, never slower) with an honest net-change note + iOS add-to-home-screen prompt + display_mode tracking + earlier fixes
+const CACHE = 'flexroute-v38';   // v38: international address formats (Brazil, Spain, Germany, Portugal, Italy, France, Netherlands, LatAm) read correctly and kept in native form + postcode/city lines never become stops + Shift Mode prev/next + earlier fixes
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

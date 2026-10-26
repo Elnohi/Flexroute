@@ -3751,7 +3751,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.25-v37</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.25-v38</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -6549,6 +6549,54 @@ async function geminiExtract(b64, mediaType) {
 // Parse Amazon Flex itinerary text extracted by Tesseract
 function parseFlexOCR(rawText) {
   var lines = rawText.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
+
+  // ── International address formats ──────────────────────────────────────────────────────────────
+  // Most of the world writes the street FIRST and the number last, often with a comma:
+  //   Brazil/Portugal  "Rua das Flores, 123"      Spain  "Calle Mayor, 12" / "C/ Gran Via, 28"
+  //   Germany          "Hauptstrasse 5"           Italy  "Via Roma 12"     Netherlands "Kerkstraat 12"
+  // These are recognised here and then left ALONE by cleanLine, whose "strip everything before the
+  // first digit" rule would otherwise reduce "Calle Mayor, 12" to just "12".
+  var INTL_HEAD = /^(?:rua|r|avenida|avda|av|travessa|tv|alameda|al|rodovia|estrada|pra(?:\u00e7|c)a|praceta|largo|viela|quadra|calle|carrer|carrera|cra|camino|caminho|paseo|passeig|plaza|pla(?:\u00e7|c)a|pza|ronda|traves(?:\u00ed|i)a|glorieta|callej(?:\u00f3|o)n|privada|andador|calzada|eje|pasaje|diagonal|transversal|via|viale|corso|piazza(?:le)?|vicolo|strada|contrada|lungomare|borgo|salita|rue|ruelle|chemin|impasse|all(?:\u00e9|e)e|route|rang|mont(?:\u00e9|e)e|c(?:\u00f4|o)te|boulevard|bd|quai|cours|passage|cit(?:\u00e9|e)|ulica|ul|aleja|plac|osiedle|rondo|stra(?:\u00df|ss)e)\s*[.\u00ba]?[\s,]/i;
+  var INTL_CSLASH = /^c\s*\/\s*\S/i;                                   // Spanish "C/ Gran Via, 28"
+  // Street name and number fused the German/Dutch/Nordic way: "Bahnhofstr. 12a", "Kerkstraat 12".
+  var INTL_TAIL = /(?:stra(?:\u00df|ss)e|str|gasse|allee|weg|platz|ring|damm|ufer|steig|chaussee|markt|straat|laan|plein|dijk|kade|dreef|singel|steeg|gracht|gatan|gade|veien|vegen|katu|tie)\.?\s+\d/i;
+  // Letters first, number last, accents and apostrophes allowed: "Grosse Bleichen 21", "Am Sandtorkai 30".
+  var INTL_NUMLAST;
+  try { INTL_NUMLAST = new RegExp("^\\p{L}[\\p{L}\\p{M}'\u2019.\\-/]*\\s+[\\p{L}\\p{M}\\s'\u2019.\\-/]{2,}[,\\s]+\\d{1,6}[a-z]?(?:\\s*[-\u2013/]\\s*\\d{1,6}[a-z]?)?\\s*$", "iu"); }
+  catch (e) { INTL_NUMLAST = /^[A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F'.\-\/]*\s+[A-Za-z\u00C0-\u024F\s'.\-\/]{2,}[,\s]+\d{1,6}[a-z]?(?:\s*[-\u2013\/]\s*\d{1,6}[a-z]?)?\s*$/i; }
+  function _hasEnglishStreetWord(v) {
+    var low = ' ' + String(v || '').toLowerCase();
+    for (var k = 0; k < STREET_KW.length; k++) if (low.indexOf(STREET_KW[k]) >= 0) return true;
+    return false;
+  }
+  function isIntlNative(line) {                                 // leave this one in its original order
+    var v = String(line || '').trim();
+    if (INTL_HEAD.test(v) || INTL_CSLASH.test(v) || INTL_TAIL.test(v)) return true;
+    return INTL_NUMLAST.test(v) && !_hasEnglishStreetWord(v);
+  }
+  function isIntlStreet(line) {
+    var v = String(line || '').trim()
+      .replace(/^\(\s*\d{1,3}\s*\)\s*/, '')
+      .replace(/^\d{1,3}\s*[.)\]]\s*/, '');
+    if (v.length < 6) return false;
+    if (isScheduled(v) || isNoise(v)) return false;
+    return INTL_HEAD.test(v) || INTL_CSLASH.test(v) || INTL_TAIL.test(v) || INTL_NUMLAST.test(v);
+  }
+  // Is this whole itinerary an international one? Two or more international street lines is enough,
+  // and it gates the postcode rule below so nothing changes for North American lists.
+  var _intlScan = lines.filter(function(l) { return isIntlStreet(l); }).length >= 2;
+  // "10115 Berlin", "01310-100 Sao Paulo", "1012 AB Amsterdam": a POSTCODE AND CITY line, never a stop.
+  var INTL_POSTCITY = /^\d{4,6}(?:\s*-\s*\d{3})?(?:\s+[A-Z]{2})?\s+([^\d,;()]{2,28})$/;
+  function isPostCity(line) {
+    if (!_intlScan) return false;
+    var m = String(line || '').trim().match(INTL_POSTCITY);
+    if (!m) return false;
+    var tail = m[1].trim();
+    if (tail.split(/\s+/).length > 3) return false;            // a place name, not a long address tail
+    var low = ' ' + tail.toLowerCase();
+    for (var k = 0; k < STREET_KW.length; k++) if (low.indexOf(STREET_KW[k]) >= 0) return false;
+    return !INTL_HEAD.test(tail) && !INTL_TAIL.test(tail);
+  }
   var results = [];
   var _skippedBlocks = 0;
   var _skippedDetails = [];
@@ -6639,6 +6687,8 @@ function parseFlexOCR(rawText) {
   function isCity(line) {
     var low = line.toLowerCase().trim();
     if (CITIES.indexOf(low) >= 0) return true;
+    if (isPostCity(line)) return true;           // "28013 Madrid", "01310-100 Sao Paulo"
+    if (isIntlStreet(line)) return false;        // a street, however city-like it looks
     // Soft: short, no digits, not a street — catches cities not in list
     if (low.length >= 3 && low.length <= 35 && !/\d/.test(low)) {
       // A street line ends in a street-type word ("Maple Street", "Rotary Drive"). The previous
@@ -6736,6 +6786,9 @@ function parseFlexOCR(rawText) {
     if (/^[A-Za-z][A-Za-z\s\-\.']{3,}\s+\d+[a-z]?$/i.test(s.trim()) && s.trim().length > 8) {
       return s.trim();
     }
+    // 3.55 International street formats ("Rua das Flores, 123", "Calle Mayor, 12", "Hauptstrasse 5"):
+    //      step 4 below strips everything before the first digit, which would leave just "123".
+    if (isIntlStreet(s)) return s.trim();
     // 3.6 Rural grid / fire-number address: return intact (step 4 below would delete the
     //     letter and leave a DIFFERENT address: "W1234 County Rd B" -> "1234 County Rd B").
     if (_GRIDNUM.test(s.trim())) return s.trim();
@@ -6774,6 +6827,8 @@ function parseFlexOCR(rawText) {
       .replace(/^\(\s*\d{1,3}\s*\)\s*/, '')
       .replace(/^\d{1,3}\s*[.)\]]\s*/, '')
       .replace(/^[©®«»+@\-–•·)*,|]+\s*/, '');
+    if (isPostCity(orig)) return false;          // "10115 Berlin" is a city line, not a stop
+    if (isIntlStreet(orig)) return true;
     var intlOk = (
       // French: Rue X, Boulevard X, Chemin X, Allée X
       /^(rue|ruelle|chemin|impasse|all[eé]e|route|rang|mont[eé]e|c[oô]te)\s/i.test(orig) ||
@@ -7179,6 +7234,10 @@ function parseFlexOCR(rawText) {
           var _lnClean0 = cleanLine(ln);
           var _lnCorr = _lnClean0;
           var _numLast = _lnClean0.trim().match(/^([A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F\s\-\.]{3,})\s+(\d+[a-z]?)$/i);
+          // Only reorder when the name carries an ENGLISH street word ("Rotary drive 38" -- an OCR
+          // slip in a North American list). A real international address is left exactly as Amazon
+          // shows it: that is the form the driver reads and the form the geocoder handles best.
+          if (_numLast && isIntlNative(_lnClean0)) _numLast = null;
           if (_numLast && _lnClean0.trim().length > 8) {
             _lnCorr = _numLast[2] + ' ' + _numLast[1].trim();
             console.log('[FlexRoute] Intl format corrected:', ln.trim(), '→', _lnCorr);
