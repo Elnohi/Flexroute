@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v42';   // v42: package-count column read even when broken by chevrons, icon numbers or a stray line, plus a "Why" line when counts still cannot be confirmed + address styles across US/UK/Europe + earlier fixes
+const CACHE = 'flexroute-v43';   // v43: tap the scanned line 5x for a parse report (count source, route total, per-stop packages) + column counts survive chevrons, icon numbers and split runs + address styles across US/UK/Europe + earlier fixes
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

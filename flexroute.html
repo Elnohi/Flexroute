@@ -1776,8 +1776,19 @@ function bind() {
       if (!p) return;
       p.style.display = p.style.display === 'none' ? 'block' : 'none';
       if (p.style.display === 'block') {
-        p.textContent = S._lastOCR || '';
-        try { if (navigator.clipboard && S._lastOCR) navigator.clipboard.writeText(S._lastOCR).then(function() { toast('Raw OCR text copied'); }, function() {}); } catch (e) {}
+        var _m = S._lastMeta || {}, _hdr = '';
+        try {
+          var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
+          _hdr = '--- FlexRoute parse report ---\n'
+            + 'build v2026.10.26-v43\n'
+            + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
+            + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
+            + (_m.pkgWhy ? 'why unconfirmed: ' + _m.pkgWhy + '\n' : '')
+            + 'per stop (flex#:packages): ' + _cnt + '\n'
+            + '--- raw text below ---\n\n';
+        } catch (e) { _hdr = ''; }
+        p.textContent = _hdr + (S._lastOCR || '');
+        try { if (navigator.clipboard && S._lastOCR) navigator.clipboard.writeText(p.textContent).then(function() { toast('Raw OCR text copied'); }, function() {}); } catch (e) {}
       }
     };
     var _dbgTimer = null, _dbgTaps = [];
@@ -3753,7 +3764,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.26-v42</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.26-v43</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -5119,6 +5130,7 @@ async function handleFiles(files) {
         if (items._meta.totalPackages != null && _sumTotal == null) _sumTotal = items._meta.totalPackages;
         _sumNew = _sumNew || !!items._meta.newLayout;
         if (!_sumWhy && items._meta.pkgWhy) _sumWhy = items._meta.pkgWhy;
+        S._lastMeta = items._meta;
         if (items._meta.pkgMode === 'lone' || items._meta.pkgMode === 'cluster') _sumMode = items._meta.pkgMode;
         _sumCounts += items._meta.countsFound || 0;
         _sumIcon += items._meta.iconCounts || 0; _sumDeliver += items._meta.deliverCounts || 0; _sumBoth += items._meta.bothCounts || 0;
