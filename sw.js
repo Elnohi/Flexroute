@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v41';   // v41: address styles across the US, UK and Europe - UK/Irish flat prefixes keep their street, streets with no house number, rural routes, Wisconsin grid, Alaska mile markers, Nordic/Greek/Czech/Belgian/Romanian streets + package counts from the right-hand column + earlier fixes
+const CACHE = 'flexroute-v42';   // v42: package-count column read even when broken by chevrons, icon numbers or a stray line, plus a "Why" line when counts still cannot be confirmed + address styles across US/UK/Europe + earlier fixes
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
