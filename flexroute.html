@@ -3753,7 +3753,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.26-v39</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.26-v41</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -6574,10 +6574,10 @@ function parseFlexOCR(rawText) {
   //   Germany          "Hauptstrasse 5"           Italy  "Via Roma 12"     Netherlands "Kerkstraat 12"
   // These are recognised here and then left ALONE by cleanLine, whose "strip everything before the
   // first digit" rule would otherwise reduce "Calle Mayor, 12" to just "12".
-  var INTL_HEAD = /^(?:rua|r|avenida|avda|av|travessa|tv|alameda|al|rodovia|estrada|pra(?:\u00e7|c)a|praceta|largo|viela|quadra|calle|carrer|carrera|cra|camino|caminho|paseo|passeig|plaza|pla(?:\u00e7|c)a|pza|ronda|traves(?:\u00ed|i)a|glorieta|callej(?:\u00f3|o)n|privada|andador|calzada|eje|pasaje|diagonal|transversal|via|viale|corso|piazza(?:le)?|vicolo|strada|contrada|lungomare|borgo|salita|rue|ruelle|chemin|impasse|all(?:\u00e9|e)e|route|rang|mont(?:\u00e9|e)e|c(?:\u00f4|o)te|boulevard|bd|quai|cours|passage|cit(?:\u00e9|e)|ulica|ul|aleja|plac|osiedle|rondo|stra(?:\u00df|ss)e)\s*[.\u00ba]?[\s,]/i;
+  var INTL_HEAD = /^(?:rua|r|avenida|avda|av|travessa|tv|alameda|al|rodovia|estrada|pra(?:\u00e7|c)a|praceta|largo|viela|quadra|calle|carrer|carrera|cra|camino|caminho|paseo|passeig|plaza|pla(?:\u00e7|c)a|pza|ronda|traves(?:\u00ed|i)a|glorieta|callej(?:\u00f3|o)n|privada|andador|calzada|eje|pasaje|diagonal|transversal|via|viale|corso|piazza(?:le)?|vicolo|strada|contrada|lungomare|borgo|salita|rue|ruelle|avenue|boulevard|chemin|impasse|all(?:\u00e9|e)e|route|rang|mont(?:\u00e9|e)e|c(?:\u00f4|o)te|boulevard|bd|quai|cours|passage|cit(?:\u00e9|e)|ulica|ul|aleja|plac|osiedle|rondo|bulevardul|strada|soseaua|leoforos|odos|utca|ulice|n\u00e1m\u011bst\u00ed|namesti|nabrezi|trg|stra(?:\u00df|ss)e)\s*[.\u00ba]?[\s,]/i;
   var INTL_CSLASH = /^c\s*\/\s*\S/i;                                   // Spanish "C/ Gran Via, 28"
   // Street name and number fused the German/Dutch/Nordic way: "Bahnhofstr. 12a", "Kerkstraat 12".
-  var INTL_TAIL = /(?:stra(?:\u00df|ss)e|str|gasse|allee|weg|platz|ring|damm|ufer|steig|chaussee|markt|straat|laan|plein|dijk|kade|dreef|singel|steeg|gracht|gatan|gade|veien|vegen|katu|tie)\.?\s+\d/i;
+  var INTL_TAIL = /(?:stra(?:\u00df|ss)e|str|gasse|allee|weg|platz|ring|damm|ufer|steig|chaussee|markt|straat|laan|plein|dijk|kade|dreef|singel|steeg|gracht|gatan|gata|gatan|v\u00e4gen|v\u00e4g|vagen|gade|gate|veien|vegen|vej|all\u00e9|plass|torg|katu|tie|utca|k\u00f6r\u00fat)\.?\s+\d/i;
   // Letters first, number last, accents and apostrophes allowed: "Grosse Bleichen 21", "Am Sandtorkai 30".
   var INTL_NUMLAST;
   try { INTL_NUMLAST = new RegExp("^\\p{L}[\\p{L}\\p{M}'\u2019.\\-/]*\\s+[\\p{L}\\p{M}\\s'\u2019.\\-/]{2,}[,\\s]+\\d{1,6}[a-z]?(?:\\s*[-\u2013/]\\s*\\d{1,6}[a-z]?)?\\s*$", "iu"); }
@@ -6590,19 +6590,78 @@ function parseFlexOCR(rawText) {
   function isIntlNative(line) {                                 // leave this one in its original order
     var v = String(line || '').trim();
     if (INTL_HEAD.test(v) || INTL_CSLASH.test(v) || INTL_TAIL.test(v)) return true;
+    if (_intlScan && INTL_ONEWORD.test(v) && !_hasEnglishStreetWord(v)) return true;   // "Ermou 15"
     return INTL_NUMLAST.test(v) && !_hasEnglishStreetWord(v);
   }
+  // "Flat 3, 42 Victoria Road", "Apt 5, The Granary, Main Street", "Unit 7, Brunel Industrial Estate".
+  // Very common in the UK and Ireland. The old rule stripped everything before the first digit and left
+  // just "3", losing the street entirely. The unit is dropped and the real address kept.
+  var UNIT_PREFIX = /^(?:flat|apartment|apt|unit|suite|ste|room|rm|studio|basement\s+flat|ground\s+floor\s+flat|block|door)\b[\s.:]*[0-9a-z\-]{0,6}\s*,\s*(?=\S)/i;
+  function stripUnitPrefix(v) {
+    var t = String(v || '').trim();
+    if (!UNIT_PREFIX.test(t)) return t;
+    var rest = t.replace(UNIT_PREFIX, '').trim();
+    return rest.length >= 5 ? rest : t;           // never strip down to nothing useful
+  }
+  // Address shapes that must be passed through untouched: the "strip to the first digit" rule damages
+  // every one of them.
+  var KEEP_INTACT = [
+    // (Hawaii's "45-1234 Kamehameha Hwy" is NOT listed: it is indistinguishable from the Canadian
+    //  unit-dash form "211-11 William Carson Crescent", where the unit must still be stripped. The
+    //  street number alone geocodes correctly in both.)
+    /^[NSEW]\d{1,3}[NSEW]\d{3,6}\b/i,                 // Wisconsin grid: "N6W23001 Bluemound Rd"
+    /^(?:rr|hc|rural\s+route|star\s+route)\b[\s.]*\d/i, // "RR 2 Box 123", "HC 60 Box 12"
+    /^p\.?\s?o\.?\s*box\b/i,                         // "PO Box 1234"
+    /^mile\s+\d/i,                                    // Alaska: "Mile 12 Richardson Highway"
+    /^carr\.?\s+\d/i                                  // Puerto Rico: "Carr 189 Km 2.5"
+  ];
+  function keepIntact(v) {
+    var t = String(v || '').trim();
+    for (var k = 0; k < KEEP_INTACT.length; k++) if (KEEP_INTACT[k].test(t)) return true;
+    return false;
+  }
+  // A street with NO house number at all: "Church Lane", "Rose Cottage, Church Lane", "One Microsoft Way".
+  // Safe because it requires the LAST word to be an unambiguous street type, which no city name ends with.
+  var ST_LAST = /^(?:ave|avenue|st|street|rd|road|dr|drive|blvd|boulevard|cres|crescent|court|ct|way|pl|place|lane|ln|terrace|ter|terr|trail|trl|pkwy|parkway|hwy|highway|cir|circle|sq|square|pike|loop|gate|path|close|mews|plaza|plz|route|rte|row|walk|rise|gardens|gdns|wharf|quay|estate|parade|embankment|causeway|approach|broadway|mews|close)$/;
+  function isNumberlessStreet(line) {
+    var t = String(line || '').trim();
+    if (!t || /\d/.test(t)) return false;
+    if (t.length < 6 || t.length > 60) return false;
+    if (isScheduled(t) || isNoise(t)) return false;
+    var seg = t.split(',').pop().trim().toLowerCase().replace(/[.]+$/, '');
+    var w = seg.split(/\s+/);
+    while (w.length > 1 && /^(?:n|s|e|w|ne|nw|se|sw|north|south|east|west)$/.test(w[w.length - 1])) w.pop();
+    return w.length >= 2 && ST_LAST.test(w[w.length - 1]);
+  }
+
   function isIntlStreet(line) {
     var v = String(line || '').trim()
       .replace(/^\(\s*\d{1,3}\s*\)\s*/, '')
       .replace(/^\d{1,3}\s*[.)\]]\s*/, '');
     if (v.length < 6) return false;
     if (isScheduled(v) || isNoise(v)) return false;
-    return INTL_HEAD.test(v) || INTL_CSLASH.test(v) || INTL_TAIL.test(v) || INTL_NUMLAST.test(v);
+    if (INTL_HEAD.test(v) || INTL_CSLASH.test(v) || INTL_TAIL.test(v) || INTL_NUMLAST.test(v)) return true;
+    // Once two other lines have proved this is an international list, a single word plus a number
+    // ("Ermou 15", "Storgata 5A", "N\u00e1dra\u017en\u00ed 12/5") is a street too. Kept behind that gate so a
+    // North American list can never read an Amazon label pill ("Green 447") as an address.
+    return !!_intlScan && INTL_ONEWORD.test(v);
   }
+  var INTL_ONEWORD;
+  try { INTL_ONEWORD = new RegExp("^\\p{L}{4,}[\\s,]+\\d{1,6}[a-z]?(?:\\s*[-\u2013/]\\s*\\d{1,6}[a-z]?)?\\s*$", "iu"); }
+  catch (e) { INTL_ONEWORD = /^[A-Za-z\u00C0-\u024F]{4,}[\s,]+\d{1,6}[a-z]?(?:\s*[-\u2013\/]\s*\d{1,6}[a-z]?)?\s*$/i; }
   // Is this whole itinerary an international one? Two or more international street lines is enough,
   // and it gates the postcode rule below so nothing changes for North American lists.
-  var _intlScan = lines.filter(function(l) { return isIntlStreet(l); }).length >= 2;
+  // Two or more clearly international street lines mark the whole list as international. Many countries
+  // (Greece, Czechia, the Nordics) write most streets as ONE word plus a number, which on its own is
+  // indistinguishable from an Amazon label pill ("Green 447"), so those count only when they sit where an
+  // address sits: directly after the route-code row or the "Scheduled" row. A pill never does.
+  var _strictIntl = lines.filter(function(l) { return isIntlStreet(l); }).length;
+  var _onewordIntl = lines.filter(function(l, i) {
+    if (!INTL_ONEWORD.test(String(l).trim())) return false;
+    var prev = i > 0 ? String(lines[i - 1]).trim() : '';
+    return /^[#@\u00a9\u00ae]?\s*[A-Z0-9]{1,3}\s*-\s*\d{2}\.\d[A-Z0-9]?(?![A-Za-z0-9])/i.test(prev) || isScheduled(prev);
+  }).length;
+  var _intlScan = _strictIntl >= 2 || (_strictIntl >= 1 && _onewordIntl >= 2);
   // "10115 Berlin", "01310-100 Sao Paulo", "1012 AB Amsterdam": a POSTCODE AND CITY line, never a stop.
   var INTL_POSTCITY = /^\d{4,6}(?:\s*-\s*\d{3})?(?:\s+[A-Z]{2})?\s+([^\d,;()]{2,28})$/;
   function isPostCity(line) {
@@ -6707,6 +6766,7 @@ function parseFlexOCR(rawText) {
     if (CITIES.indexOf(low) >= 0) return true;
     if (isPostCity(line)) return true;           // "28013 Madrid", "01310-100 Sao Paulo"
     if (isIntlStreet(line)) return false;        // a street, however city-like it looks
+    if (isNumberlessStreet(line)) return false;  // "Church Lane" is a street, not a city
     // Soft: short, no digits, not a street — catches cities not in list
     if (low.length >= 3 && low.length <= 35 && !/\d/.test(low)) {
       // A street line ends in a street-type word ("Maple Street", "Rotary Drive"). The previous
@@ -6730,6 +6790,9 @@ function parseFlexOCR(rawText) {
   // "1250 Brimley Road Unit 63" → "1250 Brimley Road Unit 63" (unit preserved)
   // "101-2260 Lawrence Avenue East" → "101-2260 Lawrence Avenue East" (direction preserved)
   function truncateAfterStreetType(addr) {
+    // An international address is already in its proper form; cutting it at a word that merely looks
+    // like an English street type ("gate", "close") would drop its house number.
+    if (isIntlNative(addr) || keepIntact(addr)) return String(addr || '').trim();
     var types = 'avenue|ave|street|str|st|road|rd|drive|dr|boulevard|blvd|crescent|cres'
       + '|court|crt|ct|way|place|pl|lane|ln|terrace|terr|trail|trl|parkway|pkwy'
       + '|gate|grove|grv|path|park|square|sq|circle|cir|close|bend|mews'
@@ -6804,6 +6867,11 @@ function parseFlexOCR(rawText) {
     if (/^[A-Za-z][A-Za-z\s\-\.']{3,}\s+\d+[a-z]?$/i.test(s.trim()) && s.trim().length > 8) {
       return s.trim();
     }
+    // 3.54 "Flat 3, 42 Victoria Road" -> keep the street, drop the unit.
+    var _noUnit = stripUnitPrefix(s);
+    if (_noUnit !== s.trim()) s = _noUnit;
+    // 3.545 Shapes that must never be cut down to their first number.
+    if (keepIntact(s) || isNumberlessStreet(s)) return s.trim();
     // 3.55 International street formats ("Rua das Flores, 123", "Calle Mayor, 12", "Hauptstrasse 5"):
     //      step 4 below strips everything before the first digit, which would leave just "123".
     if (isIntlStreet(s)) return s.trim();
@@ -6846,6 +6914,9 @@ function parseFlexOCR(rawText) {
       .replace(/^\d{1,3}\s*[.)\]]\s*/, '')
       .replace(/^[©®«»+@\-–•·)*,|]+\s*/, '');
     if (isPostCity(orig)) return false;          // "10115 Berlin" is a city line, not a stop
+    var _noU = stripUnitPrefix(orig);            // "Apt 5, The Granary, Main Street" -> judge the street
+    if (keepIntact(_noU)) return true;           // RR / HC / PO Box / Mile / Carr / Hawaii / Wisconsin grid
+    if (isNumberlessStreet(_noU)) return true;   // "Church Lane", "Rose Cottage, Church Lane"
     if (isIntlStreet(orig)) return true;
     var intlOk = (
       // French: Rue X, Boulevard X, Chemin X, Allée X
@@ -7097,7 +7168,10 @@ function parseFlexOCR(rawText) {
   function _iconFromRow(line) {
     var m = line.match(_CODE_ROW);
     if (!m) return null;
-    var d = (m[1] || '').match(/^\s*(\d+)(?![\d:])/);
+    // A stop can carry more than one route code ("# E-39.3Y, E-39.1G 3"). Drop the extra codes first,
+    // otherwise the count printed after them is never reached and the stop silently reads as 1.
+    var tail = (m[1] || '').replace(/^[,;\s]*(?:[A-Z0-9]{1,3}\s*-\s*\d{2}\.\d[A-Z0-9]?(?![A-Za-z0-9])[,;\s]*)+/i, '');
+    var d = tail.match(/^\s*(\d+)(?![\d:])/);
     return d ? _countFromDigits(d[1]) : null;
   }
   var _orphanNext = -1;   // line index where a header-less block begins (see the block scanner)
@@ -7571,6 +7645,22 @@ function parseFlexOCR(rawText) {
     if (!_fit.length) {
       var _fitT = _runs.filter(function(r) { return r.length === _slots + 1 && r[0] >= _okBlocks && r[0] === _sumOf(r.slice(1)) && (_totalPackages == null || r[0] === _totalPackages); });
       if (_fitT.length === 1) { _totalPackages = _fitT[0][0]; _fit = [_fitT[0].slice(1)]; }
+    }
+    // Still nothing, and no route total to check against (the driver scrolled past the warehouse row).
+    // A run with exactly one number per stop is strong evidence on its own, so use it rather than
+    // silently calling every stop 1 package -- which is what hid the multi-package stops. The circle
+    // numbers beside each stop are the one thing that could look like this, and they climb by exactly
+    // one and never repeat, so they are rejected. The scan card still says the total is unconfirmed.
+    if (!_fit.length && _totalPackages == null) {
+      var _plaus = _runs.filter(function(r) {
+        if (r.length !== _slots) return false;
+        var ones = r.filter(function(v) { return v === 1; }).length;
+        if (ones < r.length * 0.5) return false;                       // a count column is mostly 1s
+        if (Math.max.apply(null, r) > 9) return false;
+        var climbing = r.every(function(v, q) { return q === 0 || v === r[q - 1] + 1; });
+        return !climbing;                                             // that would be the stop numbers
+      });
+      if (_plaus.length === 1) _fit = [_plaus[0]];
     }
     if (_fit.length === 1) {
       var _oi = 0, _ob = 0;
