@@ -13,7 +13,7 @@
 // Contract:
 //   POST /.netlify/functions/ocr
 //   Body: { image: "<base64 image, no data: prefix>" }
-//   Response: { text: "<extracted text>" } on success
+//   Response: { text: "<extracted text>", words: [[t,x0,y0,x1,y1],...], w: <page width> } on success
 //             { error: "...", code: "..." } on failure (HTTP 4xx/5xx)
 
 const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
@@ -21,6 +21,51 @@ const { isAuthorizedOrigin, logRejected } = require('./_originCheck');
 const GOOGLE_VISION_URL = 'https://vision.googleapis.com/v1/images:annotate';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;  // 10 MB — Google's limit is 20MB, we cap lower
 const TIMEOUT_MS = 25000;                  // 25s — Netlify function max is 26s on free tier
+
+// ── Geometry helpers ────────────────────────────────────────────────────────────────────────────────
+// Edit distance, used to recognise "Scheduled" / "Picked" even when OCR garbles a letter or two.
+function lev(a, b) {
+  const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+  let prev = new Array(n + 1), cur = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    cur[0] = i;
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    const t = prev; prev = cur; cur = t;
+  }
+  return prev[n];
+}
+function isAnchorWord(t) {
+  const w = String(t || '').toLowerCase().replace(/[^a-z]/g, '');
+  return (w.length >= 7 && w.length <= 11 && lev(w, 'scheduled') <= 3) || (w.length >= 5 && w.length <= 7 && lev(w, 'picked') <= 2);
+}
+// Pull compact word boxes out of Vision's response: [text, x0, y0, x1, y1] for numbers and anchor labels.
+function extractGeometry(result) {
+  const out = [];
+  const page = result.fullTextAnnotation && result.fullTextAnnotation.pages && result.fullTextAnnotation.pages[0];
+  const box = (vs) => {
+    if (!vs || !vs.length) return null;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    vs.forEach(v => { const x = v.x || 0, y = v.y || 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; });
+    return [Math.round(x0), Math.round(y0), Math.round(x1), Math.round(y1)];
+  };
+  const keep = (t) => (/\d/.test(t) && t.length <= 6) || isAnchorWord(t);
+  if (page && page.blocks) {
+    page.blocks.forEach(b => (b.paragraphs || []).forEach(p => (p.words || []).forEach(w => {
+      const t = (w.symbols || []).map(s => s.text || '').join('');
+      if (!t || !keep(t)) return;
+      const bb = box(w.boundingBox && w.boundingBox.vertices); if (bb) out.push([t].concat(bb));
+    })));
+  } else if (result.textAnnotations && result.textAnnotations.length > 1) {      // legacy per-word entries
+    result.textAnnotations.slice(1).forEach(a => {
+      const t = a.description || ''; if (!t || !keep(t)) return;
+      const bb = box(a.boundingPoly && a.boundingPoly.vertices); if (bb) out.push([t].concat(bb));
+    });
+  }
+  let width = (page && page.width) || 0;
+  if (!width) out.forEach(w => { if (w[3] > width) width = w[3]; });
+  return { words: out, width: width };
+}
 
 exports.handler = async function(event) {
   // CORS preflight
@@ -159,9 +204,16 @@ exports.handler = async function(event) {
             || (result.textAnnotations && result.textAnnotations[0] && result.textAnnotations[0].description)
             || '';
 
+  // POSITIONS, not just text. The flat text string loses where each number sat on screen, and the order
+  // Vision emits the right-hand column of package counts in is unpredictable, so the app reads counts,
+  // circle numbers and the warehouse total from their position instead. Only what is needed is returned
+  // (numbers and the "Scheduled" / "Picked up" labels), never addresses, to keep the response small.
+  let words = [], width = 0;
+  try { const g = extractGeometry(result); words = g.words; width = g.width; } catch (e) { words = []; }
+
   return {
     statusCode: 200,
     headers: cors,
-    body: JSON.stringify({ text: text })
+    body: JSON.stringify({ text: text, words: words, w: width })
   };
 };
