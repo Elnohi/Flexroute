@@ -376,6 +376,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
+  var FR_BUILD = 'v2026.10.27-v47';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1780,7 +1781,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.27-v46\n'
+            + 'build v2026.10.27-v47\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -3520,8 +3521,9 @@ function vInput() {
     var _scn = S.stops.filter(function(s){return s.flexNum!=null||s.scanned;}), _flexSet = {};
     _scn.forEach(function(s){ (s.packageNums && s.packageNums.length ? s.packageNums : (s.flexNum != null ? [s.flexNum] : [])).forEach(function(n){ _flexSet[n] = 1; }); });
     var _flexN = Object.keys(_flexSet).length, _combined = _flexN > _scn.length ? _flexN - _scn.length : 0;
-    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + _scn.length + ' scanned' + (_combined ? ' (' + _flexN + ' Flex stops, ' + _combined + ' combined)' : '') + ' &middot; ' + S.stops.filter(function(s){return s.flexNum==null&&!s.scanned;}).length + ' manual &middot; <strong style="color:#FF9900">' + S.stops.reduce(function(sum,s){return sum+(s.pkgCount||1);},0) + '</strong> packages</span>';
+    h += '<span id="scanCountLbl" style="font-size:11px;color:#7878A0">' + _scn.length + ' scanned' + (_combined ? ' (' + _flexN + ' Flex stops, ' + _combined + ' combined)' : '') + ' &middot; ' + S.stops.filter(function(s){return s.flexNum==null&&!s.scanned;}).length + ' manual &middot; ' + (function(){ var _sh = _pkgShown(S.stops.reduce(function(sum,s){return sum+(s.pkgCount||1);},0), S.stops.length); return '<strong style="color:#FF9900">' + _sh.n + '</strong> packages' + (_sh.flex ? ' <span style="color:#FFB300">(Amazon\'s total)</span>' : ''); })() + '</span>';
     h += '</div>';
+    h += _buildTagHtml();
     h += '<div style="background:#13131E;border-radius:16px;overflow:hidden;padding:12px 14px">';
     h += '<div class="ir" style="margin-bottom:10px"><div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Add address manually" value="' + escH(S.manVal) + '" style="font-size:14px"/></div>';
     h += '<button class="badd" id="addBtn" style="height:42px;font-size:20px;padding:0 14px">+</button></div>';
@@ -3767,7 +3769,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.27-v46</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.27-v47</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -3845,7 +3847,7 @@ function vResult() {
     </div>
   </div>
   <div style="font-size:11px;color:var(--t3);margin:-4px 0 12px 2px">
-    ${S.optimized.reduce(function(sum,s){return sum+(s.pkgCount||1);},0)} packages scanned &mdash; check this against your Flex app before you drive off
+    ${(function(){ var _sh = _pkgShown(S.optimized.reduce(function(sum,s){return sum+(s.pkgCount||1);},0), S.stops.length); return _sh.n + (_sh.flex ? ' (Amazon\'s total; per-stop counts unconfirmed)' : '') + ' packages scanned'; })()} &mdash; check this against your Flex app before you drive off
   </div>
   ${(S._routeNotes && S._routeNotes.length) ? '<div id="routeNotes" style="font-size:11px;color:var(--t2);margin:-6px 0 12px 2px;line-height:1.5">' + S._routeNotes.map(function(n){ return '&bull; ' + escH(n); }).join('<br>') + '</div>' : ''}
 
@@ -5119,7 +5121,7 @@ async function handleFiles(files) {
   let unreadableDetails = [];
   let _sumDepot = false, _sumEnd = false, _sumUnres = 0, _sumSn = [], _sumTotal = null, _sumNew = false, _sumCounts = 0, _sumMode = 'row', _sumWhy = '',
       _sumIcon = 0, _sumDeliver = 0, _sumBoth = 0, _sumConfOpen = 0, _sumConfFixed = 0;
-  S._scanSummary = null;
+  S._scanSummary = null; S._lastHighCounts = []; S._flexTotal = null;
   for (let i = 0; i < imgs.length; i++) {
     S.sc = { done: i, total: imgs.length, msg: `Scanning image ${i + 1} of ${imgs.length}...` };
     render();
@@ -5135,6 +5137,7 @@ async function handleFiles(files) {
         _sumNew = _sumNew || !!items._meta.newLayout;
         if (!_sumWhy && items._meta.pkgWhy) _sumWhy = items._meta.pkgWhy;
         S._lastMeta = items._meta;
+        if (items._meta.highCounts && items._meta.highCounts.length) S._lastHighCounts = (S._lastHighCounts || []).concat(items._meta.highCounts);
         if (items._meta.pkgMode === 'lone' || items._meta.pkgMode === 'cluster') _sumMode = items._meta.pkgMode;
         _sumCounts += items._meta.countsFound || 0;
         _sumIcon += items._meta.iconCounts || 0; _sumDeliver += items._meta.deliverCounts || 0; _sumBoth += items._meta.bothCounts || 0;
@@ -5249,8 +5252,9 @@ async function handleFiles(files) {
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
       S._scanSummary = _buildScanSummary({ depot: _sumDepot, end: _sumEnd, unres: _sumUnres, sn: _sumSn, total: _sumTotal, newLayout: _sumNew, counts: _sumCounts,
-        icon: _sumIcon, deliver: _sumDeliver, both: _sumBoth, confOpen: _sumConfOpen, confFixed: _sumConfFixed, pkgMode: _sumMode, pkgWhy: _sumWhy });
+        icon: _sumIcon, deliver: _sumDeliver, both: _sumBoth, confOpen: _sumConfOpen, confFixed: _sumConfFixed, pkgMode: _sumMode, pkgWhy: _sumWhy, high: S._lastHighCounts || [] });
     }
+    S._flexTotal = _sumTotal; S._flexTotalStops = S.stops.length;     // Amazon's own total for this scan, if it was visible
     // Analytics: screenshot scanned successfully
     trackEvent('screenshot_scanned', {
       stops_found: added,
@@ -5285,7 +5289,8 @@ function _buildScanSummary(ctx) {
   var totalKnown = ctx.total != null, totalMatch = totalKnown && pkgs === ctx.total;
   var countsUnread = !!ctx.newLayout && !ctx.counts;     // new layout, but no stop's package count could be read
   // Counts read from a separate column of numbers that were NOT confirmed by the route total are unverified.
-  var unverified = (ctx.pkgMode === 'lone' || ctx.pkgMode === 'cluster') && !totalMatch;
+  var hasHigh = !!(ctx.high && ctx.high.length);
+  var unverified = ((ctx.pkgMode === 'lone' || ctx.pkgMode === 'cluster') && !totalMatch) || hasHigh;
   // Two separate questions, and the driver cares far more about the first:
   //   stopsComplete - is every stop on the Flex list here? (numbering contiguous from #2 to the end marker)
   //   complete      - that, AND the package counts independently confirmed.
@@ -5330,6 +5335,7 @@ function _buildScanSummary(ctx) {
     if (ctx.unres > 0) lines.push("Some Flex stop numbers couldn't be read.");
     if (stopsComplete) lines.push('Flex counts the warehouse as stop 1, so its list ends at #' + max + '.');
     if (totalKnown && !totalMatch) lines.push("Amazon's list shows " + ctx.total + " packages, but FlexRoute counted " + pkgs + ". Check the stops with several packages" + (pkgs < ctx.total ? ", or add a screenshot of any part that is missing." : "."));
+    if (hasHigh) ctx.high.slice(0, 3).forEach(function(h) { lines.push('\u201c' + h.address + '\u201d was read as ' + h.was + ' packages, which is unusual, so it was set to 1. Check it in your Flex app.'); });
     if (countsUnread) lines.push("We couldn't read the package counts from this screenshot, so the package total may be off.");
     if (unverified) lines.push(pkgs === stops
       ? "No stop showed more than one package, and Amazon's route total wasn't visible to check against. If your Flex app shows more than " + pkgs + " packages, a multi-package stop was missed."
@@ -7141,7 +7147,8 @@ function parseFlexOCR(rawText, geo) {
     // "213 Connaught Avenue, LTE" on stop #1, which then geocoded to
     // nothing. Match only short standalone tokens so real streets like
     // "Wifi Way" or "GPS Boulevard" aren't affected.
-    if (/^(lte|5g|4g|3g|lte\+|5g\+|wifi|wi-fi|gps|vpn|sos|hd|volte|no\s*service)$/i.test(l)) return true;
+    if (/^(lte|5g|4g|3g|lte\+|5g\+|wifi|wi-fi|gps|vpn|sos|hd|volte|no\s*service)(\s*\d{1,3}\s*%?)?$/i.test(l)) return true;
+    if (/^\d{1,3}\s*%$/.test(l)) return true;     // a bare battery percentage ("94%")
     if (/them in your|in your itinerary|you.ll see them/i.test(l)) return true; // Amazon bottom message
     if (/^(after you|assigned more|more stops)/i.test(l)) return true; // Amazon bottom message
     // Amazon Flex package/route tracking codes — never addresses:
@@ -7951,6 +7958,24 @@ function parseFlexOCR(rawText, geo) {
       }
     }
   }
+  // ── Implausible counts ──────────────────────────────────────────────────────────────────────────────
+  // The package icon, a battery level or a time can be read as a digit, and that is how a 1 became a 9. A single
+  // stop with 6 or more packages is rare, so it is only trusted when it is CORROBORATED: Amazon's route total
+  // adds up with it, or the stop says "Deliver N packages" in so many words. Otherwise it is set to 1 and
+  // reported, so a driver is told to check it instead of being shown a confident wrong number.
+  var _hiList = [];
+  if (_newLayout) {
+    var _sumHi = results.reduce(function(a, r) { return a + (r.pkgCount || 1); }, 0);
+    var _corroborated = (_totalPackages != null && _sumHi === _totalPackages);
+    if (!_corroborated) {
+      _blockLog.filter(function(e) { return e.kind === 'ok' && e.pkI != null && e.pkD == null && e.pk >= 6; })
+        .sort(function(a, b) { return b.pk - a.pk; })
+        .forEach(function(e) {
+          var was = e.pk; e.ref.pkgCount = Math.max(1, (e.ref.pkgCount || 1) - (was - 1)); e.pk = 1; e.pkI = 1;
+          _hiList.push({ address: String(e.ref.address || '').split(',')[0], was: was });
+        });
+    }
+  }
   // ── Cross-check: icon number vs "Deliver N packages" vs Amazon's route total ──────────────────────
   var _okLog = _blockLog.filter(function(e) { return e.kind === 'ok'; });
   var _iconBlocks = _okLog.filter(function(e) { return e.pkI != null; }).length;
@@ -8067,6 +8092,7 @@ function parseFlexOCR(rawText, geo) {
     serials: _metaSn,
     unresolved: _serials.filter(function(v) { return v == null; }).length,
     newLayout: _newLayout,
+    highCounts: _hiList,
     pkgWhy: _pkgWhy,
     geoUsed: _geoUsed, geoBadges: _geoBadges, geoWhy: _geoWhy,
     pkgMode: _geoUsed ? 'geo' : _clusterUsed ? 'cluster' : (_lineUsed || _okLog.filter(function(e) { return e.src === 'lone' && e.pkI != null; }).length * 2 > _iconBlocks ? 'lone' : (_iconBlocks > 0 ? 'row' : (_deliverBlocks > 0 ? 'deliver' : 'none'))),
@@ -8806,6 +8832,24 @@ function _optElapsed() { return Date.now() - (S._optT0 || Date.now()); }
 var OPT_SKIP_RETRIES_AFTER = 70000;     // no bulk-retry pass once a run is this old
 var OPT_SKIP_RESCUE_AFTER  = 100000;    // no outlier rescue once a run is this old
 var OPT_STOP_GEOCODING_AFTER = 85000;   // stop geocoding NEW stops; the rest go to the "couldn't place" list
+
+// The package total to display. Amazon prints the route total on the warehouse row; when it was visible for this
+// scan and the per-stop counts do not add up to it, the per-stop sum is a guess and Amazon's figure is the fact.
+function _pkgShown(sumOfStops, stopCount) {
+  var T = S._flexTotal;
+  if (T != null && S._flexTotalStops === stopCount && T !== sumOfStops) return { n: T, flex: true };
+  return { n: sumOfStops, flex: false };
+}
+function _buildTagHtml() {
+  var m = S._lastMeta; if (!m) return '';
+  var g = S._lastGeoInfo || { anchors: 0, words: 0 };
+  var modes = { geo: 'screen positions', row: 'route-code row', lone: 'own line', cluster: 'number column', deliver: '\u201cDeliver\u201d text', none: 'none read' };
+  var pos = !g.words ? 'positions NOT received (OCR function not updated)'
+          : (m.geoUsed ? 'positions used' : 'positions received but not used' + (m.geoWhy ? ' (' + m.geoWhy + ')' : ''));
+  return '<div id="buildTag" style="font-size:9.5px;color:#585878;margin:2px 0 8px 2px;line-height:1.4">build ' + escH(FR_BUILD) +
+         ' \u00b7 counts from: ' + escH(modes[m.pkgMode] || m.pkgMode || '?') + ' \u00b7 Amazon total: ' + (m.totalPackages == null ? 'not seen' : m.totalPackages) +
+         ' \u00b7 ' + escH(pos) + '</div>';
+}
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371;

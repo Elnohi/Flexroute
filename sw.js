@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v46';   // v46: a stray route-code fragment is no longer counted as an "unreadable stop" (it shifted the numbering of the stops before it) + positions-based counts/circle numbers/total + every network step in optimise has a timeout and time budget + earlier fixes
+const CACHE = 'flexroute-v47';   // v47: a package count of 6+ is only trusted when Amazon's own total or a "Deliver N" line backs it up, otherwise set to 1 and reported; Amazon's route total is what the header shows when the per-stop counts disagree; a visible build + count-source tag on the scan screen
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
