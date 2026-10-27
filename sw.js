@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v44';   // v44: package icon read as a digit no longer inflates counts (1 9 -> 1, not 9); counts found whatever shape the icon takes; neighbour-correction time capped so optimise cannot stall + parse report on 5 taps + earlier fixes
+const CACHE = 'flexroute-v46';   // v46: a stray route-code fragment is no longer counted as an "unreadable stop" (it shifted the numbering of the stops before it) + positions-based counts/circle numbers/total + every network step in optimise has a timeout and time budget + earlier fixes
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

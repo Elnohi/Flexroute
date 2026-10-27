@@ -1780,9 +1780,12 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.27-v44\n'
+            + 'build v2026.10.27-v46\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
+            + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
+            + ' | rows seen ' + ((S._lastGeoInfo && S._lastGeoInfo.anchors) || 0) + ', words received ' + ((S._lastGeoInfo && S._lastGeoInfo.words) || 0)
+            + (_m.geoWhy ? ' | ' + _m.geoWhy : '') + '\n'
             + (_m.pkgWhy ? 'why unconfirmed: ' + _m.pkgWhy + '\n' : '')
             + 'per stop (flex#:packages): ' + _cnt + '\n'
             + '--- raw text below ---\n\n';
@@ -3764,7 +3767,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.27-v44</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.27-v46</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -4237,10 +4240,11 @@ async function _roadRouteFor(pts) {
   if (_roadRouteCache && _roadRouteCache.key === key) return _roadRouteCache.data;
   var ctrl = new AbortController(), t = setTimeout(function() { ctrl.abort(); }, 12000);
   try {
-    var res = await fetch('https://router.project-osrm.org/route/v1/driving/' +
-      pts.map(function(p) { return p.lon + ',' + p.lat; }).join(';') + '?overview=full&geometries=geojson&steps=false', { signal: ctrl.signal });
-    if (!res.ok) return null;
-    var d = await res.json();
+    var res = await _tmo(fetch('https://router.project-osrm.org/route/v1/driving/' +
+      pts.map(function(p) { return p.lon + ',' + p.lat; }).join(';') + '?overview=full&geometries=geojson&steps=false', { signal: ctrl.signal }), 14000, null);
+    if (!res || !res.ok) return null;
+    var d = await _tmo(res.json(), 8000, null);
+    if (!d) return null;
     if (d.code !== 'Ok' || !d.routes || !d.routes[0] || !d.routes[0].geometry || !d.routes[0].geometry.coordinates) return null;
     var r = d.routes[0];
     var data = { coords: r.geometry.coordinates.map(function(c) { return [c[1], c[0]]; }), distance: r.distance, duration: r.duration };
@@ -5576,7 +5580,7 @@ async function optimize() {
     return true;
   }
   if (S.home) {
-    const homePreview = await geocode(S.home);
+    const homePreview = await _tmo(geocode(S.home), 12000, null);
     if (homePreview && _inCountry(homePreview.lat, homePreview.lon, S.userState)) {
       biasLat = homePreview.lat; biasLon = homePreview.lon;
     }
@@ -5584,6 +5588,13 @@ async function optimize() {
   // Sequential geocoding — one at a time to avoid rate-limiting Photon/Nominatim
   for (let i = 0; i < toGeocode.length; i++) {
     const x = toGeocode[i];
+    if (_optElapsed() > OPT_STOP_GEOCODING_AFTER && x.key !== '__home__' && x.key !== '__start__') {
+      // The run has used its time. Mark this and every remaining stop as not placed so the screen moves on to
+      // the "couldn't place" list instead of spinning; the stops already located are kept for the next try.
+      coordMap[x.key] = null; done++; S.ldProg = Math.round(done / toGeocode.length * 100);
+      trackEvent('geocode_time_budget', { remaining: toGeocode.length - i, region: S.userState || 'unknown' });
+      continue;
+    }
     var addr = x.address;
     // Only force-append the driver's region when the address has NO state /
     // province code anywhere. Two problems with the old check:
@@ -5612,6 +5623,10 @@ async function optimize() {
       if (!_inCountry(result.lat, result.lon, S.userState)) _validResult = null;
     }
     coordMap[x.key] = _validResult;
+    if (_validResult && x.key !== '__home__' && x.key !== '__start__') {
+      var _stNow = S.stops.find(function(q) { return q.id === x.key; });
+      if (_stNow) _stNow.coords = _validResult;            // survives an interrupted run
+    }
     if (_validResult && x.key === '__home__' && !biasLat) {
       biasLat = _validResult.lat; biasLon = _validResult.lon; // bootstrap bias from home
     } else if (_validResult && x.key === '__start__' && !biasLat) {
@@ -5640,7 +5655,7 @@ async function optimize() {
         // Use the running cluster bias to validate — if we have one. Allow
         // generous 75km radius since the cluster may still be small at this
         // point in the loop. The outlier pass later does tighter validation.
-        _censusResult = await tryCensusBureau(x.address, _state, biasLat, biasLon, biasLat ? 75 : null);
+        _censusResult = await _tmo(tryCensusBureau(x.address, _state, biasLat, biasLon, biasLat ? 75 : null), 10000, null);
         if (_censusResult) {
           console.log('[FlexRoute] Census Bureau rescued mid-loop:', x.address);
           if (typeof trackEvent === 'function') {
@@ -5700,7 +5715,7 @@ async function optimize() {
   if (S.geoFailed.length > 0) {
     var _backoffs = [3000, 8000, 20000];
     var _retryT0 = Date.now(), _initFailed = S.geoFailed.length, _recPer = [];
-    for (var _attempt = 0; _attempt < _backoffs.length && S.geoFailed.length > 0; _attempt++) {
+    for (var _attempt = 0; _attempt < _backoffs.length && S.geoFailed.length > 0 && _optElapsed() < OPT_SKIP_RETRIES_AFTER; _attempt++) {
       var _failedBefore = S.geoFailed.length;
       console.log('[FlexRoute] Geocode failure (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ') — retry ' + (_attempt + 1) + '/' + _backoffs.length + ' after ' + _backoffs[_attempt] + 'ms');
       if (typeof trackEvent === 'function') {
@@ -5747,8 +5762,9 @@ async function optimize() {
   if (!S.userState && biasLat && biasLon) {
     (async function() {
       try {
-        var _rr = await fetch('https://photon.komoot.io/reverse?lon=' + biasLon + '&lat=' + biasLat);
-        var _rd = await _rr.json();
+        var _rr = await _tmo(fetch('https://photon.komoot.io/reverse?lon=' + biasLon + '&lat=' + biasLat), 8000, null);
+        if (!_rr) throw new Error('reverse lookup timed out');
+        var _rd = await _tmo(_rr.json(), 5000, {});
         var _rp = _rd.features && _rd.features[0] && _rd.features[0].properties;
         var _rc = stateFromPhoton(_rp);
         if (_rc) { var _rl = (_rp && (_rp.state || _rp.country)) || _rc; applyAutoRegion(_rc, _rl); }
@@ -5760,7 +5776,7 @@ async function optimize() {
   S.homeCoords = coordMap['__home__'] || null;
   let startCoords = S.gpsCoords ? { lon: S.gpsCoords.lon, lat: S.gpsCoords.lat } : null;
   if (!startCoords && S.startAddr && S.startAddr.trim()) {
-    startCoords = coordMap['__start__'] || await geocode(S.startAddr, biasLat, biasLon);
+    startCoords = coordMap['__start__'] || await _tmo(geocode(S.startAddr, biasLat, biasLon), 12000, null);
     localStorage.setItem('fr_sa', S.startAddr);
   }
   // coordMap[s.id] is set from pre-seeded existing coords OR the geocoding loop above.
@@ -5788,11 +5804,12 @@ async function optimize() {
       if (_outliers.length > 0) {
         console.log('[FlexRoute] Attempting silent rescue of', _outliers.length, 'outlier stop(s)');
         for (const _os of _outliers) {
+      if (_optElapsed() > OPT_SKIP_RESCUE_AFTER) { trackEvent('rescue_time_budget', { skipped: 1 }); break; }
           console.warn('[FlexRoute] Outlier detected:', _os.address,
             _ds[_og.indexOf(_os)].toFixed(0)+'km from cluster — trying to rescue');
 
           // Strategy 1: Re-geocode with strong centroid bias (forces results near delivery area)
-          var _rescued = await geocode(_os.address, _mLat, _mLon);
+          var _rescued = await _tmo(geocode(_os.address, _mLat, _mLon), 10000, null);
           if (_rescued && haversineKm(_rescued.lat, _rescued.lon, _mLat, _mLon) <= _cut) {
             console.log('[FlexRoute] Rescued via centroid bias:', _os.address);
             _os.coords = _rescued; continue;
@@ -5805,7 +5822,7 @@ async function optimize() {
             .replace(/\s+\d{3,4}(\s*,|$)/, '$2')
             .replace(/\s{2,}/g,' ').trim();
           if (_stripped !== _os.address) {
-            var _r2 = await geocode(_stripped, _mLat, _mLon);
+            var _r2 = await _tmo(geocode(_stripped, _mLat, _mLon), 10000, null);
             if (_r2 && haversineKm(_r2.lat, _r2.lon, _mLat, _mLon) <= _cut) {
               console.log('[FlexRoute] Rescued via strip:', _os.address, '→', _stripped);
               _os.coords = _r2; continue;
@@ -5820,7 +5837,7 @@ async function optimize() {
             .replace(/,.*$/, '')                    // strip city
             .trim();
           if (_streetPart && _cityPart) {
-            var _r3 = await geocode(_streetPart + ', ' + _cityPart, _mLat, _mLon);
+            var _r3 = await _tmo(geocode(_streetPart + ', ' + _cityPart, _mLat, _mLon), 10000, null);
             if (_r3 && haversineKm(_r3.lat, _r3.lon, _mLat, _mLon) <= _cut) {
               console.log('[FlexRoute] Rescued via street+city:', _os.address, '→', _streetPart + ', ' + _cityPart);
               _os.coords = _r3;
@@ -5835,7 +5852,9 @@ async function optimize() {
             var _viewboxStr = (_mLon-_bb).toFixed(4) + ',' + (_mLat+_bb).toFixed(4)
                             + ',' + (_mLon+_bb).toFixed(4) + ',' + (_mLat-_bb).toFixed(4);
             // Via Netlify proxy (browser→Nominatim direct gets CORS-blocked on 429)
+            var _nrCtl = new AbortController(); var _nrT = setTimeout(function() { _nrCtl.abort(); }, 10000);
             var _nr = await fetch('/.netlify/functions/geocode', {
+              signal: _nrCtl.signal,
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -5846,8 +5865,9 @@ async function optimize() {
                 // but viewbox biasing produces similar results in practice for rescue.
               })
             });
+            clearTimeout(_nrT);
             if (_nr.ok) {
-              var _nd = (await _nr.json()).results || [];
+              var _nd = ((await _tmo(_nr.json(), 5000, {})) || {}).results || [];
               if (_nd.length > 0) {
                 var _best = _nd.reduce(function(b, c) {
                   var bd = haversineKm(b.lat, b.lon, _mLat, _mLon);
@@ -5877,7 +5897,7 @@ async function optimize() {
                   );
           if (_isUS) {
             // Use the same helper as the main-loop path — goes through Netlify proxy
-            var _r5 = await tryCensusBureau(_os.address, _ctxState, _mLat, _mLon, _cut);
+            var _r5 = await _tmo(tryCensusBureau(_os.address, _ctxState, _mLat, _mLon, _cut), 10000, null);
             if (_r5) {
               console.log('[FlexRoute] Rescued via Census Bureau (outlier pass):', _os.address);
               if (typeof trackEvent === 'function') {
@@ -5908,7 +5928,7 @@ async function optimize() {
                     if (S.userState && !new RegExp(S.userState + '\\s*$').test(_ma)) {
                       _ma += ', ' + S.userState;
                     }
-                    var _r6 = await geocode(_ma, biasLat, biasLon);
+                    var _r6 = await _tmo(geocode(_ma, biasLat, biasLon), 10000, null);
                     if (_r6 && haversineKm(_r6.lat, _r6.lon, _mLat, _mLon) <= _cut) {
                       console.log('[FlexRoute] OCR merge rescued:', _os.address, '→', _ma);
                       _os.coords = _r6; break;
@@ -5932,7 +5952,7 @@ async function optimize() {
             var _suffixRe7 = /\s+(ST|RD|AVE|DR|BLVD|LN|WAY|PL|CT|CIR|CRT|CRES|COURT|DRIVE|ROAD|AVENUE|LANE|PLACE|CIRCLE|LOOP|TRAIL|TRL|PKWY|HWY|HIGHWAY|STREET|PARKWAY)\b\.?(?=\s*,|\s*$)/i;
             if (_suffixRe7.test(_baseAddr7)) {
               var _stripped7 = _baseAddr7.replace(_suffixRe7, '');
-              var _r7 = await geocode(_stripped7, _mLat, _mLon);
+              var _r7 = await _tmo(geocode(_stripped7, _mLat, _mLon), 10000, null);
               if (_r7 && haversineKm(_r7.lat, _r7.lon, _mLat, _mLon) <= _cut) {
                 console.log('[FlexRoute] Rescued via suffix strip:', _os.address, '→', _stripped7);
                 if (typeof trackEvent === 'function') {
@@ -5954,7 +5974,7 @@ async function optimize() {
             if (_adminRe8.test(_baseAddr8)) {
               var _stripped8 = _baseAddr8.replace(_adminRe8, '').replace(/\s{2,}/g, ' ').replace(/,\s*,/g, ',').trim();
               if (_stripped8 !== _baseAddr8) {
-                var _r8 = await geocode(_stripped8, _mLat, _mLon);
+                var _r8 = await _tmo(geocode(_stripped8, _mLat, _mLon), 10000, null);
                 if (_r8 && haversineKm(_r8.lat, _r8.lon, _mLat, _mLon) <= _cut) {
                   console.log('[FlexRoute] Rescued via admin-word strip:', _os.address, '→', _stripped8);
                   if (typeof trackEvent === 'function') {
@@ -6037,7 +6057,7 @@ async function optimize() {
             if (_aug === _fs.address) continue;
 
             try {
-              var _rs = await geocode(_aug, _mLat, _mLon);
+              var _rs = await _tmo(geocode(_aug, _mLat, _mLon), 10000, null);
               if (_rs && haversineKm(_rs.lat, _rs.lon, _mLat, _mLon) <= _cut) {
                 console.log('[FlexRoute] Rescued failed stop via peer context:', _fs.address, '→', _aug);
                 _fs.coords = _rs;
@@ -6514,7 +6534,9 @@ async function googleVisionOCR(b64) {
   }
   const data = await resp.json();
   if (typeof data.text !== 'string') throw new Error('GOOGLE_VISION_FAILED:NO_TEXT');
-  return data.text;
+  // data.words: [[text, x0, y0, x1, y1], ...] (numbers and the Scheduled/Picked labels) and data.w: page width.
+  // Older deployments of the OCR function send neither; the app then reads the text alone, as before.
+  return { text: data.text, words: Array.isArray(data.words) ? data.words : [], w: +data.w || 0 };
 }
 
 // ─── OCR pipeline (primary: Google Vision, fallback: Tesseract.js) ─────────
@@ -6525,12 +6547,13 @@ async function googleVisionOCR(b64) {
 async function geminiExtract(b64, mediaType) {
   // Allow users to opt out of cloud OCR (stored as 'fr_local_ocr' in localStorage)
   const useLocalOnly = localStorage.getItem('fr_local_ocr') === '1';
-  let text = null;
+  let text = null, words = [], pageW = 0;
   let engine = 'tesseract';  // for telemetry
 
   if (!useLocalOnly) {
     try {
-      text = await googleVisionOCR(b64);
+      const _gv = await googleVisionOCR(b64);
+      text = _gv.text; words = _gv.words; pageW = _gv.w;
       engine = 'google_vision';
       console.log('[FlexRoute OCR] engine: Google Cloud Vision');
       if (typeof trackEvent === 'function') trackEvent('ocr_engine_used', { engine: 'google_vision' });
@@ -6552,6 +6575,11 @@ async function geminiExtract(b64, mediaType) {
       const worker = await getTesseract();
       const result = await worker.recognize(url);
       text = result.data.text;
+      try {   // the in-browser engine knows where every word is too
+        const _tw = (result.data.words || []);
+        pageW = _tw.reduce((m, w) => Math.max(m, (w.bbox && w.bbox.x1) || 0), 0);
+        words = geoFilterWords(_tw);
+      } catch (_e) { words = []; pageW = 0; }
       URL.revokeObjectURL(url);
       console.log('[FlexRoute OCR] engine: Tesseract.js' + (useLocalOnly ? ' (user preference)' : ' (fallback)'));
       if (typeof trackEvent === 'function' && useLocalOnly) trackEvent('ocr_engine_used', { engine: 'tesseract_local' });
@@ -6568,7 +6596,10 @@ async function geminiExtract(b64, mediaType) {
 
   // Store raw text for debug ("Show raw OCR text" feature)
   S._lastOCR = text;
-  const parsed = parseFlexOCR(text);
+  let geo = null;
+  try { geo = geoFromWords(words, pageW); } catch (_e) { geo = null; }
+  S._lastGeoInfo = geo ? { anchors: geo.anchors, total: geo.total, words: words.length } : { anchors: 0, total: null, words: words.length };
+  const parsed = parseFlexOCR(text, geo);
   const allLines = text.split('\n').filter(l => l.trim());
   console.log('[FlexRoute OCR] raw lines:', allLines.length, 'parsed stops:', parsed.length, 'engine:', engine);
   // Log full text in chunks of 50 lines so nothing is truncated
@@ -6578,8 +6609,108 @@ async function geminiExtract(b64, mediaType) {
   return parsed;
 }
 
+// ─── Position-based reading ────────────────────────────────────────────────────────────────────────
+// The flat OCR text loses WHERE each number sat, and the order the OCR engine emits the right-hand column
+// of package counts in is unpredictable. Position is not: on every Flex stop the package count is at the far
+// right of that stop's own row, the circle number at the far left, and the route total on the warehouse row.
+// geoFromWords() reads those from word boxes: [[text, x0, y0, x1, y1], ...] (the server sends only numbers
+// and the "Scheduled"/"Picked up" labels). It returns null when it cannot do the job.
+function _geoLev(a, b) {
+  var m = a.length, n = b.length; if (!m) return n; if (!n) return m;
+  var prev = [], cur = [], i, j;
+  for (j = 0; j <= n; j++) prev[j] = j;
+  for (i = 1; i <= m; i++) {
+    cur = [i];
+    for (j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+function _geoIsSched(t) { var w = String(t || '').toLowerCase().replace(/[^a-z]/g, ''); return w.length >= 7 && w.length <= 11 && _geoLev(w, 'scheduled') <= 3; }
+function _geoIsPicked(t) { var w = String(t || '').toLowerCase().replace(/[^a-z]/g, ''); return w.length >= 5 && w.length <= 7 && _geoLev(w, 'picked') <= 2; }
+// A stop's package count: a 1-2 digit number; two digits means the icon was glued on, so the first is the count.
+function _geoCountOf(t) {
+  var v = String(t || '').trim();
+  if (/[:\/]/.test(v)) return null;                                  // a time, not a count
+  var d = v.replace(/[^0-9]/g, '');
+  if (!d || d.length > 2) return null;
+  if (v.replace(/[0-9]/g, '').replace(/[^A-Za-z0-9]/g, '').length > 2) return null;
+  return parseInt(d.charAt(0), 10) || null;
+}
+// A circle number: a whole 1-2 digit number, brackets allowed ("(15)", "[8]", "{4}").
+function _geoBadgeOf(t) {
+  var v = String(t || '').trim().replace(/^[\(\[\{<]+|[\)\]\}>]+$/g, '');
+  return /^\d{1,2}$/.test(v) ? parseInt(v, 10) : null;
+}
+function geoFromWords(words, pageW) {
+  if (!Array.isArray(words) || words.length < 6) return null;
+  var ws = [];
+  words.forEach(function(w) {
+    var o = Array.isArray(w) ? { t: String(w[0]), x0: +w[1], y0: +w[2], x1: +w[3], y1: +w[4] } : w;
+    if (o && isFinite(o.x0) && isFinite(o.y0) && isFinite(o.x1) && isFinite(o.y1)) { o.cx = (o.x0 + o.x1) / 2; o.cy = (o.y0 + o.y1) / 2; o.h = o.y1 - o.y0; ws.push(o); }
+  });
+  if (ws.length < 6) return null;
+  var W = pageW || Math.max.apply(null, ws.map(function(w) { return w.x1; }));
+  if (!W || W < 50) return null;
+  var hs = ws.map(function(w) { return w.h; }).filter(function(h) { return h > 0; }).sort(function(a, b) { return a - b; });
+  var mh = hs.length ? hs[hs.length >> 1] : 12; if (mh < 4) mh = 4;
+  var RIGHT = W * 0.74, LEFT = W * 0.30;
+
+  // One anchor per stop: the "Scheduled" label. Two hits on the same row are one anchor.
+  var raw = ws.filter(function(w) { return _geoIsSched(w.t); }).sort(function(a, b) { return a.cy - b.cy; });
+  var anchors = [];
+  raw.forEach(function(w) { if (!anchors.length || w.cy - anchors[anchors.length - 1].cy > 0.8 * mh) anchors.push(w); });
+  if (anchors.length < 2) return null;
+
+  var out = { anchors: anchors.length, counts: [], alts: [], badges: [], total: null, W: W, mh: mh };
+  anchors.forEach(function(a, i) {
+    var top = a.cy - 0.9 * mh;
+    var bot = i + 1 < anchors.length ? anchors[i + 1].cy - 0.9 * mh : a.cy + 24 * mh;
+    // circle number: rightmost 1-2 digit number in the left zone, on the anchor's own row
+    var badge = null, bx = -1;
+    ws.forEach(function(w) { if (w.cx < LEFT && Math.abs(w.cy - a.cy) <= 0.9 * mh && w.cx > bx) { var b = _geoBadgeOf(w.t); if (b !== null) { badge = b; bx = w.cx; } } });
+    out.badges.push(badge);
+    // package count: right zone, below the anchor row, inside this stop's band. Tokens are grouped into rows;
+    // on each row the LEFTMOST number is the count (anything to its right is the package icon read as a digit).
+    // An expanded group lists a number per sub-row, so the stop's count is the sum over its rows.
+    var toks = ws.filter(function(w) { return w.cx > RIGHT && w.cy > a.cy + 0.5 * mh && w.cy >= top && w.cy < bot && _geoCountOf(w.t) !== null; })
+                 .sort(function(p, q) { return p.cy - q.cy; });
+    var rows = [];
+    toks.forEach(function(w) {
+      var last = rows[rows.length - 1];
+      if (last && Math.abs(w.cy - last.cy) <= 0.7 * mh) { if (w.cx < last.best.cx) last.best = w; }
+      else rows.push({ cy: w.cy, best: w });
+    });
+    out.counts.push(rows.length ? rows.reduce(function(sum, r) { return sum + _geoCountOf(r.best.t); }, 0) : null);
+    // "10" is either ten packages or a 1 with the icon glued on. Keep the full reading as an alternative; it is
+    // only used when the route total says the first-digit reading is short by exactly that difference.
+    var _d2 = rows.length === 1 ? String(rows[0].best.t).replace(/[^0-9]/g, '') : '';
+    out.alts.push(_d2.length === 2 && /^\d{2}$/.test(_d2) && parseInt(_d2, 10) <= 40 ? parseInt(_d2, 10) : null);
+  });
+
+  // The route total, printed at the far right of the warehouse row (only when that row is in the screenshot).
+  var pk = ws.filter(function(w) { return _geoIsPicked(w.t); }).sort(function(a, b) { return a.cy - b.cy; })[0];
+  if (pk && pk.cy < anchors[0].cy) {
+    var cand = ws.filter(function(w) { return w.cx > RIGHT && w.cy >= pk.cy - 0.9 * mh && w.cy < anchors[0].cy - 0.9 * mh && /^\d{1,3}\D{0,2}$/.test(String(w.t).trim()); })
+                 .sort(function(p, q) { return p.cy - q.cy || p.cx - q.cx; });
+    if (cand.length) { var tv = parseInt(String(cand[0].t).replace(/\D/g, ''), 10); if (tv >= out.anchors) out.total = tv; }
+  }
+  return out;
+}
+// Reduce a full word list to what geoFromWords needs (used for the in-browser OCR fallback; the server
+// already sends only these).
+function geoFilterWords(list) {
+  var out = [];
+  (list || []).forEach(function(w) {
+    var t = String(w.text || w.t || '').trim(); if (!t) return;
+    var bb = w.bbox || w; if (!bb) return;
+    if ((/\d/.test(t) && t.length <= 6) || _geoIsSched(t) || _geoIsPicked(t)) out.push([t, bb.x0, bb.y0, bb.x1, bb.y1]);
+  });
+  return out;
+}
+
 // Parse Amazon Flex itinerary text extracted by Tesseract
-function parseFlexOCR(rawText) {
+function parseFlexOCR(rawText, geo) {
   var lines = rawText.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
 
   // ── International address formats ──────────────────────────────────────────────────────────────
@@ -7581,7 +7712,7 @@ function parseFlexOCR(rawText) {
         if (_skipRaw || _skipHasDeliver) {
           var _skipDetail = { num: _skipNum, raw: _skipRaw };
           _skippedDetails.push(_skipDetail);
-          _blockLog.push({ kind: 'skip', read: _skipNum, ref: _skipDetail });
+          _blockLog.push({ kind: 'skip', read: _skipNum, sched: i, ref: _skipDetail });
         } else {
           _skippedBlocks--; // undo the increment — not a real skip
         }
@@ -7752,6 +7883,74 @@ function parseFlexOCR(rawText) {
       }
     }
   }
+  // ── Position-based reading (when word boxes were supplied) ─────────────────────────────────────────
+  // Overrides the text-order guesses above ONLY when it passes strict checks, and says why when it doesn't.
+  // A fragment that was logged as an "unreadable stop": a lone route code with junk after it, which takes a number
+  // slot in the list. Remove it from the block log and from the unreadable-stops report.
+  function _dropBlock(entry) {
+    var k = _blockLog.indexOf(entry); if (k >= 0) _blockLog.splice(k, 1);
+    var d = _skippedDetails.indexOf(entry.ref); if (d >= 0) _skippedDetails.splice(d, 1);
+    _skippedBlocks = Math.max(0, _skippedBlocks - 1);
+    if (typeof trackEvent === 'function') trackEvent('ocr_fragment_dropped', { raw_len: String((entry.ref && entry.ref.raw) || '').length });
+  }
+  function _fragScore(entry) {      // how much a skipped block looks like a stray code row
+    var raw = String((entry.ref && entry.ref.raw) || '');
+    return (/^[A-Z0-9]{1,3}\s*-\s*\d{2}\.\d/i.test(raw) ? 2 : 0) + (raw.length <= 24 ? 1 : 0);
+  }
+  var _geoUsed = false, _geoWhy = '', _geoBadges = false;
+  if (geo && geo.anchors) {
+    var _al = _blockLog.filter(function(e) { return e.sched !== undefined; });
+    if (_al.length > geo.anchors) {
+      // More text blocks than stop rows on screen: the extras can only be fragments. Only skipped (unreadable)
+      // blocks are ever dropped, most fragment-like first; a block that produced a real address never is.
+      var _extra = _al.length - geo.anchors;
+      var _sk = _al.filter(function(e) { return e.kind === 'skip'; }).sort(function(a, b) { return _fragScore(b) - _fragScore(a); });
+      if (_sk.length >= _extra) {
+        _sk.slice(0, _extra).forEach(_dropBlock);
+        _al = _blockLog.filter(function(e) { return e.sched !== undefined; });
+      }
+    }
+    if (_al.length !== geo.anchors) {
+      _geoWhy = 'the screenshot has ' + geo.anchors + ' stop rows but the text produced ' + _al.length + ' blocks';
+    } else {
+      // (a) circle numbers: exact serials, straight from the left edge of each row
+      var _bd = geo.badges, _nn = _bd.filter(function(b) { return b !== null; }), _inc = true, _steps = 0, _prevB = null;
+      _bd.forEach(function(b) { if (b === null) return; if (_prevB !== null) { if (b <= _prevB) _inc = false; else _steps += (b - _prevB - 1); } _prevB = b; });
+      if (_nn.length >= 0.85 * _bd.length && _inc && _steps <= 2) {
+        _al.forEach(function(e, q) { e.read = _bd[q]; });
+        _geoBadges = true;
+      }
+      // (b) package counts: from each row's right edge
+      var _cn = geo.counts, _have = _cn.filter(function(c) { return c !== null; }).length;
+      var _gsum = _cn.reduce(function(a, c) { return a + (c === null ? 1 : c); }, 0);
+      var _tsum = _okBlocks ? _blockLog.filter(function(e) { return e.kind === 'ok'; }).reduce(function(a, e) { return a + e.pk; }, 0) : 0;
+      var _tot = (_totalPackages != null) ? _totalPackages : geo.total;
+      if (_have < 0.9 * _cn.length) {
+        _geoWhy = 'only ' + _have + ' of ' + _cn.length + ' rows had a readable package number';
+      } else if (_totalPackages != null && _tsum === _totalPackages && _gsum !== _totalPackages) {
+        _geoWhy = 'kept the text reading, which adds up to Amazon\u2019s total (' + _totalPackages + '); positions added to ' + _gsum;
+      } else {
+        var _use = _cn.slice();
+        // A two-digit number may be one count with the icon glued on, or a real 10+ package stop. If the first-digit
+        // reading does not reach Amazon's total, try making exactly ONE such stop its full value.
+        if (_tot != null && _gsum !== _tot && geo.alts) {
+          for (var _ai = 0; _ai < _use.length; _ai++) {
+            if (geo.alts[_ai] != null && _use[_ai] !== null && _gsum - _use[_ai] + geo.alts[_ai] === _tot) { _use[_ai] = geo.alts[_ai]; break; }
+          }
+        }
+        _al.forEach(function(e, q) {
+          if (e.kind !== 'ok') return;
+          e.pk = _use[q] === null ? 1 : _use[q]; e.pkI = e.pk; e.src = 'geo';
+        });
+        results.forEach(function(r) { r.pkgCount = 0; });
+        _blockLog.forEach(function(e) { if (e.kind === 'ok') e.ref.pkgCount += e.pk; });
+        results.forEach(function(r) { if (!r.pkgCount) r.pkgCount = 1; });
+        if (_totalPackages == null && geo.total != null) _totalPackages = geo.total;
+        _clusterUsed = false; _lineUsed = false; _pkgWhy = '';
+        _geoUsed = true;
+      }
+    }
+  }
   // ── Cross-check: icon number vs "Deliver N packages" vs Amazon's route total ──────────────────────
   var _okLog = _blockLog.filter(function(e) { return e.kind === 'ok'; });
   var _iconBlocks = _okLog.filter(function(e) { return e.pkI != null; }).length;
@@ -7771,6 +7970,28 @@ function parseFlexOCR(rawText) {
       _confFixed = _conf.length;
     }
   }
+  // A fragment can also be exposed by the circle numbers alone. Between a stop numbered 16 and the next numbered
+  // 17 there is room for ZERO other stops, so a skipped block sitting between them is not a stop. (A real
+  // unreadable stop leaves a visible gap instead: 16, ?, 18.) Both neighbours must be corroborated by THEIR
+  // neighbours, so one misread circle number can never hide a genuinely missing stop.
+  (function() {
+    var withRead = []; _blockLog.forEach(function(e, k) { if (e.read != null) withRead.push(k); });
+    var toDrop = [];
+    for (var q = 0; q + 1 < withRead.length; q++) {
+      var a = withRead[q], b = withRead[q + 1], slots = b - a - 1;
+      if (slots <= 0) continue;
+      var allowed = _blockLog[b].read - _blockLog[a].read - 1;
+      if (allowed < 0 || allowed >= slots) continue;
+      var leftOk  = (q === 0) || (withRead[q - 1] === a - 1 && _blockLog[a - 1].read === _blockLog[a].read - 1);
+      var rightOk = (q + 2 >= withRead.length) || (withRead[q + 2] === b + 1 && _blockLog[b + 1].read === _blockLog[b].read + 1);
+      if (!leftOk || !rightOk) continue;
+      var cands = [];
+      for (var k = a + 1; k < b; k++) if (_blockLog[k].kind === 'skip' && _blockLog[k].read == null) cands.push(_blockLog[k]);
+      var excess = slots - allowed;
+      if (cands.length >= excess) cands.sort(function(x, y) { return _fragScore(y) - _fragScore(x); }).slice(0, excess).forEach(function(c) { toDrop.push(c); });
+    }
+    toDrop.forEach(_dropBlock);
+  })();
   var _serials = _resolveSerials(_blockLog.map(function(e) { return e.read; }), _depotFirst);
   results.forEach(function(r) { r._sn = []; r._pk = {}; r._unres = 0; });
   _blockLog.forEach(function(e, k) {
@@ -7847,7 +8068,8 @@ function parseFlexOCR(rawText) {
     unresolved: _serials.filter(function(v) { return v == null; }).length,
     newLayout: _newLayout,
     pkgWhy: _pkgWhy,
-    pkgMode: _clusterUsed ? 'cluster' : (_lineUsed || _okLog.filter(function(e) { return e.src === 'lone' && e.pkI != null; }).length * 2 > _iconBlocks ? 'lone' : (_iconBlocks > 0 ? 'row' : (_deliverBlocks > 0 ? 'deliver' : 'none'))),
+    geoUsed: _geoUsed, geoBadges: _geoBadges, geoWhy: _geoWhy,
+    pkgMode: _geoUsed ? 'geo' : _clusterUsed ? 'cluster' : (_lineUsed || _okLog.filter(function(e) { return e.src === 'lone' && e.pkI != null; }).length * 2 > _iconBlocks ? 'lone' : (_iconBlocks > 0 ? 'row' : (_deliverBlocks > 0 ? 'deliver' : 'none'))),
     totalPackages: _totalPackages,                       // Amazon's own total for the route (new layout), else null
     countsFound: _okLog.filter(function(e) { return e.pkI != null || e.pkD != null; }).length,  // stops whose package count was actually read
     iconCounts: _iconBlocks,                              // ...from the number beside the package icon
@@ -8471,10 +8693,11 @@ async function _osrmTable(coords) {
   if (coords.length < 4 || coords.length > 90) return null;
   var ctrl = new AbortController(), t = setTimeout(function() { ctrl.abort(); }, 8000);
   try {
-    var res = await fetch('https://router.project-osrm.org/table/v1/driving/' +
-      coords.map(function(c) { return c.lon + ',' + c.lat; }).join(';') + '?annotations=duration,distance', { signal: ctrl.signal });
-    if (!res.ok) return null;
-    var d = await res.json();
+    var res = await _tmo(fetch('https://router.project-osrm.org/table/v1/driving/' +
+      coords.map(function(c) { return c.lon + ',' + c.lat; }).join(';') + '?annotations=duration,distance', { signal: ctrl.signal }), 9000, null);
+    if (!res || !res.ok) return null;
+    var d = await _tmo(res.json(), 6000, null);
+    if (!d) return null;
     var n = coords.length;
     if (d.code !== 'Ok' || !d.durations || !d.distances || d.durations.length !== n || d.distances.length !== n) return null;
     for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) if (d.durations[i][j] == null || d.distances[i][j] == null) return null;
@@ -8567,6 +8790,22 @@ async function _refineWithRoadTimes(order, startPt, homePt, lockedId) {
   if (out.length !== order.length) return { order: order, changed: false };
   return { order: out, changed: true, swaps: r.moves.length, savedM: Math.round(r.savedM), savedSec: Math.round(r.savedT) };
 }
+
+// Resolve with `fallback` if `p` has not settled within `ms`. A browser fetch has NO timeout of its own, so one
+// stalled request used to leave the optimise screen spinning forever; every awaited network step in
+// optimize() now goes through this.
+function _tmo(p, ms, fallback) {
+  return new Promise(function(resolve) {
+    var done = false, t = setTimeout(function() { if (!done) { done = true; resolve(fallback); } }, ms);
+    Promise.resolve(p).then(function(v) { if (!done) { done = true; clearTimeout(t); resolve(v); } },
+                            function()  { if (!done) { done = true; clearTimeout(t); resolve(fallback); } });
+  });
+}
+// How long this optimise run has been going, and the points after which optional work is skipped.
+function _optElapsed() { return Date.now() - (S._optT0 || Date.now()); }
+var OPT_SKIP_RETRIES_AFTER = 70000;     // no bulk-retry pass once a run is this old
+var OPT_SKIP_RESCUE_AFTER  = 100000;    // no outlier rescue once a run is this old
+var OPT_STOP_GEOCODING_AFTER = 85000;   // stop geocoding NEW stops; the rest go to the "couldn't place" list
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
