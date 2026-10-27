@@ -1780,7 +1780,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.26-v43\n'
+            + 'build v2026.10.27-v44\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + (_m.pkgWhy ? 'why unconfirmed: ' + _m.pkgWhy + '\n' : '')
@@ -3764,7 +3764,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.26-v43</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.27-v44</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -7176,6 +7176,16 @@ function parseFlexOCR(rawText) {
   // Digits right after the code ("2", "4", "19", "12"): the package icon next to the count is often read as an
   // extra character, so a glued 2+ digit run keeps only its first digit (an undercount is caught by the total
   // check; reading "19" as nineteen packages would not be).
+  // A count line as Flex prints it: the number, then the package icon. The icon may come through as
+  // nothing, as a symbol, as a chevron, or as its own digits ("1 9"). Returns the count, or null.
+  function _loneCount(t, allowChevron) {
+    var v = String(t || '').trim();
+    var m = v.match(allowChevron ? /^(\d{1,2})(?:\s*(?:[^\w\s()]{1,3}|[vV]))*$/ : /^(\d{1,2})(?:\s*[^\w\s()]{1,3})*$/);
+    if (m) return _countFromDigits(m[1]);
+    var pair = v.match(/^(\d{1,3})\s+(\d{1,2})$/);          // "1 9" = count then icon; "99 3" = icon then count
+    if (pair) return _countFromDigits(parseInt(pair[1], 10) <= 9 ? pair[1] : pair[2]);
+    return null;
+  }
   function _countFromDigits(d) { var n = d.length >= 2 ? parseInt(d.charAt(0), 10) : parseInt(d, 10); return n >= 1 ? n : 1; }
   // The number printed beside the package icon on a route-code row ("# D-31.4G 2"); null when the row has none
   // (the original layout) or when the digits are really part of a time.
@@ -7293,14 +7303,16 @@ function parseFlexOCR(rawText) {
           }
           // Count on its own line straight after the code row. Only when the list has no "Deliver…" lines:
           // in the original layout stray badge numbers sit exactly there.
-          if (_newLayout && !addrLine && /^\d{1,2}(?:\s*[^\w\s()]{1,3})*$/.test(ln.trim()) && lines[j + 1] && isStreet(lines[j + 1])) {
-            _iconCount = _countFromDigits(ln.trim().match(/^\d+/)[0]); _newCounts++; _iconSrc = 'lone';
+          var _lc1 = (_newLayout && !addrLine && lines[j + 1] && isStreet(lines[j + 1])) ? _loneCount(ln, false) : null;
+          if (_lc1 !== null) {
+            _iconCount = _lc1; _newCounts++; _iconSrc = 'lone';
             j++; continue;
           }
           // Count on its own line AFTER the stop's address/city (the right-hand column read as a separate cell).
           // Only a candidate here: it is accepted after the loop, and only if the depot total agrees.
-          if (_newLayout && _blockLone < 0 && addrLine && /^\d{1,2}(?:\s*(?:[^\w\s()]{1,3}|[vV]))*$/.test(ln.trim())) {
-            _blockLone = j; _loneAt[j] = _countFromDigits(ln.trim().match(/^\d+/)[0]);
+          var _lc2 = (_newLayout && _blockLone < 0 && addrLine) ? _loneCount(ln, true) : null;
+          if (_lc2 !== null) {
+            _blockLone = j; _loneAt[j] = _lc2;
             j++; continue;
           }
         }
@@ -7637,9 +7649,13 @@ function parseFlexOCR(rawText) {
     lines.forEach(function(l) {
       var t = l.trim();
       var m = t.match(/^(\d{1,2})(?:\s*[^\w\s()]{1,3})*$/);
-      // The package icon in front of a count can come through as its own number ("99 3", "4 2"):
-      // when a line is two small numbers, the COUNT is the last one.
-      if (!m) m = t.match(/^\d{1,3}\s+(\d{1,2})$/);
+      // Two numbers on one line means the package icon came through as a digit. Flex prints the count
+      // FIRST and the icon after it ("1 [icon]" -> "1 9"), so the count is the FIRST number. Only when
+      // the first number is too large to be a package count (an icon read as "99") is it the last one.
+      if (!m) {
+        var pair = t.match(/^(\d{1,3})\s+(\d{1,2})$/);
+        if (pair) m = [t, parseInt(pair[1], 10) <= 9 ? pair[1] : pair[2]];
+      }
       if (m) _cur.push(parseInt(m[1], 10));
       else if (/^[^\w\s]{1,3}$/.test(t) || /^[vV\u2304\u02c5>\u203a\u00bb~^]$/.test(t)) {
         /* lone icon or chevron: skip, don't break the run */
@@ -8342,6 +8358,10 @@ function _nearestOtherKm(stop, exclude) {
   return best;
 }
 async function _reconcileSameStreetNeighbors() {
+  // This is the only step that makes extra geocoding calls inside a loop, and those calls are rate
+  // limited, so on a long route it could keep the optimise screen spinning. Hard caps: at most 6
+  // corrections and at most 20 seconds in here, then it gives up and the route is built as normal.
+  var _budget = Date.now() + 20000, _fixes = 0;
   var items = S.stops.filter(function(s) { return s.coords && !s.geoFailed; })
     .map(function(s) { return { s: s, p: _streetParts(s.address) }; }).filter(function(x) { return x.p; });
   // Nearest OTHER stop on the same street (house numbers within 300): the odd one out is the one that sits far
@@ -8355,12 +8375,15 @@ async function _reconcileSameStreetNeighbors() {
     return best;
   };
   var report = function(strategy, dKm, stop) {
+    _fixes++;
     (S._routeNotes = S._routeNotes || []).push('Corrected the map position of "' + stop.address + '" (it had landed ' +
       (Math.round(dKm * 10) / 10) + ' km away from its neighbour on the same street).');
     if (typeof trackEvent === 'function') trackEvent('neighbor_geocode_fixed', { strategy: strategy, km: Math.round(dKm * 10) / 10, region: S.userState || 'unknown' });
   };
   for (var a = 0; a < items.length; a++) {
+    if (_fixes >= 6 || Date.now() > _budget) break;
     for (var b = a + 1; b < items.length; b++) {
+      if (_fixes >= 6 || Date.now() > _budget) break;
       var A = items[a], B = items[b];
       if (A.p.street !== B.p.street || A.p.fam !== B.p.fam || Math.abs(A.p.num - B.p.num) > 8) continue;
       var dKm = _distKm(A.s.coords, B.s.coords);
