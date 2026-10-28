@@ -376,7 +376,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.27-v47';
+  var FR_BUILD = 'v2026.10.27-v48';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1781,7 +1781,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.27-v47\n'
+            + 'build v2026.10.27-v48\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -3769,7 +3769,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.27-v47</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.27-v48</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -6725,7 +6725,7 @@ function parseFlexOCR(rawText, geo) {
   //   Germany          "Hauptstrasse 5"           Italy  "Via Roma 12"     Netherlands "Kerkstraat 12"
   // These are recognised here and then left ALONE by cleanLine, whose "strip everything before the
   // first digit" rule would otherwise reduce "Calle Mayor, 12" to just "12".
-  var INTL_HEAD = /^(?:rua|r|avenida|avda|av|travessa|tv|alameda|al|rodovia|estrada|pra(?:\u00e7|c)a|praceta|largo|viela|quadra|calle|carrer|carrera|cra|camino|caminho|paseo|passeig|plaza|pla(?:\u00e7|c)a|pza|ronda|traves(?:\u00ed|i)a|glorieta|callej(?:\u00f3|o)n|privada|andador|calzada|eje|pasaje|diagonal|transversal|via|viale|corso|piazza(?:le)?|vicolo|strada|contrada|lungomare|borgo|salita|rue|ruelle|avenue|boulevard|chemin|impasse|all(?:\u00e9|e)e|route|rang|mont(?:\u00e9|e)e|c(?:\u00f4|o)te|boulevard|bd|quai|cours|passage|cit(?:\u00e9|e)|ulica|ul|aleja|plac|osiedle|rondo|bulevardul|strada|soseaua|leoforos|odos|utca|ulice|n\u00e1m\u011bst\u00ed|namesti|nabrezi|trg|stra(?:\u00df|ss)e)\s*[.\u00ba]?[\s,]/i;
+  var INTL_HEAD = /^(?:rua|r|avenida|avda|av|travessa|tv|alameda|al|rodovia|estrada|pra(?:\u00e7|c)a|praceta|largo|viela|quadra|calle|carrer|carrera|cra|camino|caminho|paseo|passeig|plaza|pla(?:\u00e7|c)a|pza|ronda|traves(?:\u00ed|i)a|glorieta|callej(?:\u00f3|o)n|privada|andador|calzada|eje|pasaje|diagonal|transversal|via|viale|corso|piazza(?:le)?|vicolo|strada|contrada|lungomare|borgo|salita|rue|ruelle|avenue|boulevard|jalan|jln|jl|chemin|impasse|all(?:\u00e9|e)e|route|rang|mont(?:\u00e9|e)e|c(?:\u00f4|o)te|boulevard|bd|quai|cours|passage|cit(?:\u00e9|e)|ulica|ul|aleja|plac|osiedle|rondo|bulevardul|strada|soseaua|leoforos|odos|utca|ulice|n\u00e1m\u011bst\u00ed|namesti|nabrezi|trg|stra(?:\u00df|ss)e)\s*[.\u00ba]?[\s,]/i;
   var INTL_CSLASH = /^c\s*\/\s*\S/i;                                   // Spanish "C/ Gran Via, 28"
   // Street name and number fused the German/Dutch/Nordic way: "Bahnhofstr. 12a", "Kerkstraat 12".
   var INTL_TAIL = /(?:stra(?:\u00df|ss)e|str|gasse|allee|weg|platz|ring|damm|ufer|steig|chaussee|markt|straat|laan|plein|dijk|kade|dreef|singel|steeg|gracht|gatan|gata|gatan|v\u00e4gen|v\u00e4g|vagen|gade|gate|veien|vegen|vej|all\u00e9|plass|torg|katu|tie|utca|k\u00f6r\u00fat)\.?\s+\d/i;
@@ -6735,7 +6735,11 @@ function parseFlexOCR(rawText, geo) {
   catch (e) { INTL_NUMLAST = /^[A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F'.\-\/]*\s+[A-Za-z\u00C0-\u024F\s'.\-\/]{2,}[,\s]+\d{1,6}[a-z]?(?:\s*[-\u2013\/]\s*\d{1,6}[a-z]?)?\s*$/i; }
   function _hasEnglishStreetWord(v) {
     var low = ' ' + String(v || '').toLowerCase();
-    for (var k = 0; k < STREET_KW.length; k++) if (low.indexOf(STREET_KW[k]) >= 0) return true;
+    // STREET_KW is declared further down, so this can run before it is assigned (the whole-list scan that
+    // decides whether the itinerary is international). Fall back to the common endings until it exists.
+    var kws = (typeof STREET_KW !== 'undefined' && STREET_KW) ? STREET_KW
+      : [' st', ' street', ' rd', ' road', ' ave', ' avenue', ' dr', ' drive', ' blvd', ' lane', ' way', ' court', ' place', ' quay', ' jalan'];
+    for (var k = 0; k < kws.length; k++) if (low.indexOf(kws[k]) >= 0) return true;
     return false;
   }
   function isIntlNative(line) {                                 // leave this one in its original order
@@ -6747,12 +6751,35 @@ function parseFlexOCR(rawText, geo) {
   // "Flat 3, 42 Victoria Road", "Apt 5, The Granary, Main Street", "Unit 7, Brunel Industrial Estate".
   // Very common in the UK and Ireland. The old rule stripped everything before the first digit and left
   // just "3", losing the street entirely. The unit is dropped and the real address kept.
-  var UNIT_PREFIX = /^(?:flat|apartment|apt|unit|suite|ste|room|rm|studio|basement\s+flat|ground\s+floor\s+flat|block|door)\b[\s.:]*[0-9a-z\-]{0,6}\s*,\s*(?=\S)/i;
+  // Prefixes that sit in front of the real address: UK/Irish flats, and the forms used across Asia,
+  // Australia and the Gulf ("Level 3, 100 Collins Street", "Shop 12, 200 Queen Street", "Flat A, 12/F, 100
+  // Nathan Road", "Office 1203, Sheikh Zayed Road").
+  var UNIT_PREFIX = /^(?:flat|apartment|apt|unit|suite|ste|room|rm|studio|basement\s+flat|ground\s+floor\s+flat|block|door|level|lvl|shop|office|stall|kiosk|bay|tower|floor|fl)\b[\s.:#]*[0-9a-z\-\/]{0,8}\s*,\s*(?=\S)/i;
+  // "No. 5, Jalan Ampang", "Lot 10, Jalan Bukit Bintang", "Villa 23, Street 12", "Plot No. 45, Sector 18":
+  // here the number after the word IS the house number, so the line is kept whole instead.
+  // Requires the comma form ("No. 5, Jalan Ampang"), which is how Asia and the Gulf write it. Without the
+  // comma ("Lot 12 Pine Rd" in the US) the number is an ordinary house number and is handled as before.
+  var NUMBER_WORD = /^(?:no|num|nos|house\s*no|h\s*no|plot(?:\s*no)?|lot|blk|block|villa|bldg|building|door\s*no|survey\s*no)\b[\s.:#]*\d+[A-Za-z]?\s*,/i;
+  var FLOOR_PREFIX = /^\d{1,3}\s*\/\s*F\b\s*,\s*(?=\S)/i;          // Hong Kong: "12/F, 100 Nathan Road"
   function stripUnitPrefix(v) {
     var t = String(v || '').trim();
-    if (!UNIT_PREFIX.test(t)) return t;
-    var rest = t.replace(UNIT_PREFIX, '').trim();
-    return rest.length >= 5 ? rest : t;           // never strip down to nothing useful
+    if (NUMBER_WORD.test(t)) return t;            // the prefix carries the house number: keep it
+    for (var pass = 0; pass < 3; pass++) {        // a unit AND a floor can both sit in front
+      var m = UNIT_PREFIX.test(t) || FLOOR_PREFIX.test(t);
+      if (!m) break;
+      var rest = t.replace(UNIT_PREFIX, '').replace(FLOOR_PREFIX, '').trim();
+      // Only drop the prefix when what is left still has an address of its own; otherwise keep the whole
+      // line, because the prefix held the only number in it.
+      if (rest.length < 5) break;
+      if (!/^[#\d]/.test(rest) && !/[A-Za-z]{3}/.test(rest)) break;
+      t = rest;
+    }
+    return t;
+  }
+  // True when a line begins with any of those prefixes, so cleanLine can keep what is left of it intact.
+  function hasAddrPrefix(v) {
+    var t = String(v || '').trim();
+    return NUMBER_WORD.test(t) || UNIT_PREFIX.test(t) || FLOOR_PREFIX.test(t);
   }
   // Address shapes that must be passed through untouched: the "strip to the first digit" rule damages
   // every one of them.
@@ -6764,6 +6791,11 @@ function parseFlexOCR(rawText, geo) {
     /^(?:rr|hc|rural\s+route|star\s+route)\b[\s.]*\d/i, // "RR 2 Box 123", "HC 60 Box 12"
     /^p\.?\s?o\.?\s*box\b/i,                         // "PO Box 1234"
     /^mile\s+\d/i,                                    // Alaska: "Mile 12 Richardson Highway"
+    /^\d{1,4}-\d{1,4}-\d{1,4}\b/,                      // Japan: "1-2-3 Shibuya"
+    /^\d{1,4}-(?:chome|chōme)\b/i,                     // Japan: "4-chome-2-8 Ginza"
+    /^\d{1,4}-\d{1,4}\s+\S*(?:-dong|-ro|-gil|-gu)\b/i,  // Korea: "78-9 Itaewon-dong"
+    /^(?:no|num|nos|house\s*no|plot(?:\s*no)?|lot|blk|block|villa|bldg|building)\b[\s.:#]*\d+[A-Za-z]?\s*,/i,
+    /^(?:jl|jln|jalan)\b/i,                           // Indonesia / Malaysia: "Jl. Sudirman No. 52"
     /^carr\.?\s+\d/i                                  // Puerto Rico: "Carr 189 Km 2.5"
   ];
   function keepIntact(v) {
@@ -6773,24 +6805,50 @@ function parseFlexOCR(rawText, geo) {
   }
   // A street with NO house number at all: "Church Lane", "Rose Cottage, Church Lane", "One Microsoft Way".
   // Safe because it requires the LAST word to be an unambiguous street type, which no city name ends with.
-  var ST_LAST = /^(?:ave|avenue|st|street|rd|road|dr|drive|blvd|boulevard|cres|crescent|court|ct|way|pl|place|lane|ln|terrace|ter|terr|trail|trl|pkwy|parkway|hwy|highway|cir|circle|sq|square|pike|loop|gate|path|close|mews|plaza|plz|route|rte|row|walk|rise|gardens|gdns|wharf|quay|estate|parade|embankment|causeway|approach|broadway|mews|close)$/;
+  var ST_LAST = /^(?:ave|avenue|st|street|rd|road|dr|drive|blvd|boulevard|cres|crescent|court|ct|way|pl|place|lane|ln|terrace|ter|terr|trail|trl|pkwy|parkway|hwy|highway|cir|circle|sq|square|pike|loop|gate|path|close|mews|plaza|plz|route|rte|row|walk|rise|gardens|gdns|wharf|quay|estate|parade|embankment|causeway|approach|broadway|mews|close|quay|esplanade|jalan|lorong|persiaran|marg|nagar)$/;
   function isNumberlessStreet(line) {
     var t = String(line || '').trim();
     if (!t || /\d/.test(t)) return false;
     if (t.length < 6 || t.length > 60) return false;
     if (isScheduled(t) || isNoise(t)) return false;
-    var seg = t.split(',').pop().trim().toLowerCase().replace(/[.]+$/, '');
-    var w = seg.split(/\s+/);
-    while (w.length > 1 && /^(?:n|s|e|w|ne|nw|se|sw|north|south|east|west)$/.test(w[w.length - 1])) w.pop();
-    return w.length >= 2 && ST_LAST.test(w[w.length - 1]);
+    // ANY comma-separated part may be the street: "King Fahd Road, Al Olaya" and "Rose Cottage, Church Lane"
+    // put it in different places.
+    var parts = t.split(',');
+    for (var pi = 0; pi < parts.length; pi++) {
+      var seg = parts[pi].trim().toLowerCase().replace(/[.]+$/, '');
+      if (!seg) continue;
+      var w = seg.split(/\s+/);
+      while (w.length > 1 && /^(?:n|s|e|w|ne|nw|se|sw|north|south|east|west)$/.test(w[w.length - 1])) w.pop();
+      if (w.length >= 2 && ST_LAST.test(w[w.length - 1])) return true;
+    }
+    return false;
   }
 
+  // "Sydney NSW 2000", "Riyadh 12214", "Auckland 1010", "Seoul 06234", "Singapore 048616": a place name
+  // followed by a POSTCODE. Letters-then-number makes it look exactly like "Ermou 15", so it has to be ruled
+  // out explicitly or the city line is taken for the address. A 4+ digit tail with no street word anywhere is
+  // a postcode; a house number that long always comes with a street word ("12345 US Highway 59").
+  var AU_STATE = /\b(?:nsw|vic|qld|sa|wa|tas|nt|act)\b/i;
+  // Amazon's own label pills are a colour and a number ("Navy 3019", "Green 447") and look identical to
+  // "Riyadh 12214"; so do PO boxes and rural routes. All of those are ruled out first.
+  var PILL_WORD = /^(?:green|navy|black|blue|red|yellow|orange|purple|pink|white|grey|gray|brown|teal|silver|gold|violet|indigo|cyan|magenta|lime|olive|maroon|beige|tan|aqua)\b/i;
+  function isCityPostal(line) {
+    var t = String(line || '').trim();
+    var m = t.match(/^([^\d]{2,40}?)[\s,]+(\d{4,6})$/);
+    if (!m) return false;
+    if (m[1].split(/\s+/).filter(Boolean).length > 4) return false;
+    if (PILL_WORD.test(t)) return false;                       // an Amazon label pill
+    if (keepIntact(t) || NUMBER_WORD.test(t)) return false;    // "PO Box 1234", "RR 2 Box 123", "Lot 1234"
+    if (_hasEnglishStreetWord(t) || INTL_HEAD.test(t) || INTL_TAIL.test(t)) return false;
+    return true;
+  }
   function isIntlStreet(line) {
     var v = String(line || '').trim()
       .replace(/^\(\s*\d{1,3}\s*\)\s*/, '')
       .replace(/^\d{1,3}\s*[.)\]]\s*/, '');
     if (v.length < 6) return false;
     if (isScheduled(v) || isNoise(v)) return false;
+    if (isCityPostal(v)) return false;                 // "Riyadh 12214" is a city line, not a street
     if (INTL_HEAD.test(v) || INTL_CSLASH.test(v) || INTL_TAIL.test(v) || INTL_NUMLAST.test(v)) return true;
     // Once two other lines have proved this is an international list, a single word plus a number
     // ("Ermou 15", "Storgata 5A", "N\u00e1dra\u017en\u00ed 12/5") is a street too. Kept behind that gate so a
@@ -6865,7 +6923,9 @@ function parseFlexOCR(rawText, geo) {
   'Singapore','Woodlands','Tampines','Jurong','Queenstown','Bedok'];
 
   // Street keywords — no trailing spaces (caused end-of-string miss for "Kingswood Rd")
-  var STREET_KW = [' ave',' avenue',' st',' street',' rd',' road',' dr',' drive',
+  var STREET_KW = ['-daero','-ro,','-ro ','-gil',' jalan',' jln',' lorong',' persiaran',' lebuh',' lebuhraya',' quay',' esplanade',' parade',
+    ' daero',' -ro',' -gil',' soi',' thanon',' marg',' nagar',' sector',' chome',' section',' kav',
+    ' ave',' avenue',' st',' street',' rd',' road',' dr',' drive',
     ' blvd',' boulevard',' cres',' crescent',' court',' way',' place',' park',
     ' lane',' terrace',' trail',' pkwy',' parkway',' gate',' grove',' path',
     ' square',' sq',' circle',' cir',' close',' bend',' mews',' heights',' gardens',' glen',
@@ -6915,7 +6975,7 @@ function parseFlexOCR(rawText, geo) {
   function isCity(line) {
     var low = line.toLowerCase().trim();
     if (CITIES.indexOf(low) >= 0) return true;
-    if (isPostCity(line)) return true;           // "28013 Madrid", "01310-100 Sao Paulo"
+    if (isPostCity(line) || isCityPostal(line)) return true;   // "28013 Madrid", "Riyadh 12214", "Sydney NSW 2000"
     if (isIntlStreet(line)) return false;        // a street, however city-like it looks
     if (isNumberlessStreet(line)) return false;  // "Church Lane" is a street, not a city
     // Soft: short, no digits, not a street — catches cities not in list
@@ -7019,6 +7079,7 @@ function parseFlexOCR(rawText, geo) {
       return s.trim();
     }
     // 3.54 "Flat 3, 42 Victoria Road" -> keep the street, drop the unit.
+    if (hasAddrPrefix(s)) return stripUnitPrefix(s).trim();
     var _noUnit = stripUnitPrefix(s);
     if (_noUnit !== s.trim()) s = _noUnit;
     // 3.545 Shapes that must never be cut down to their first number.
@@ -7064,7 +7125,7 @@ function parseFlexOCR(rawText, geo) {
       .replace(/^\(\s*\d{1,3}\s*\)\s*/, '')
       .replace(/^\d{1,3}\s*[.)\]]\s*/, '')
       .replace(/^[©®«»+@\-–•·)*,|]+\s*/, '');
-    if (isPostCity(orig)) return false;          // "10115 Berlin" is a city line, not a stop
+    if (isPostCity(orig) || isCityPostal(orig)) return false;   // a city line, not a stop
     var _noU = stripUnitPrefix(orig);            // "Apt 5, The Granary, Main Street" -> judge the street
     if (keepIntact(_noU)) return true;           // RR / HC / PO Box / Mile / Carr / Hawaii / Wisconsin grid
     if (isNumberlessStreet(_noU)) return true;   // "Church Lane", "Rose Cottage, Church Lane"

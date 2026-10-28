@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v47';   // v47: a package count of 6+ is only trusted when Amazon's own total or a "Deliver N" line backs it up, otherwise set to 1 and reported; Amazon's route total is what the header shows when the per-stop counts disagree; a visible build + count-source tag on the scan screen
+const CACHE = 'flexroute-v48';   // v48: Asia + Australia address formats (unit/level/shop/office/floor prefixes keep the street, No./Lot/Villa/Blk forms kept whole, Japanese and Korean numbering, jalan/lorong/daero streets) and a city line with a postcode is never taken for the address
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
