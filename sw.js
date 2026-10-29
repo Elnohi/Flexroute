@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v49';   // v49: after a completed shift, an invitation to rate on Google Play plus an optional 3-question survey - both offered to everyone, no satisfaction question anywhere (Play forbids review gating) + new feedback function
+const CACHE = 'flexroute-v50';   // v50: Portuguese (Brazil) + translated home screen, Shift Mode and survey for all languages, a pay-once 30-day pass on the paywall, and an internal-traffic flag so your own testing is excluded from GA4
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

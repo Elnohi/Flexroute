@@ -379,18 +379,27 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', 'G-ZCRY2Y3LP7', {
-    app_name: 'FlexRoute',
-    send_page_view: true,
-    cookie_domain: 'flexrouteapp.com'
-  });
+  // The developer's own testing must not count as real drivers. A device is marked internal by opening the app
+  // once with ?internal=1 (cleared with ?internal=0), or by tapping the small build line under the scan count.
+  // Every event from such a device carries traffic_type=internal, which GA4's "Internal Traffic" data filter
+  // excludes. Done here, before the config call, so the automatic page_view is tagged as well.
+  var FR_INTERNAL = false;
+  try {
+    var _iq = (location.search.match(/[?&]internal=([01])/) || [])[1];
+    if (_iq === '1') localStorage.setItem('fr_internal', '1');
+    if (_iq === '0') localStorage.removeItem('fr_internal');
+    FR_INTERNAL = localStorage.getItem('fr_internal') === '1';
+  } catch (e) {}
+  var _frCfg = { app_name: 'FlexRoute', send_page_view: true, cookie_domain: 'flexrouteapp.com' };
+  if (FR_INTERNAL) _frCfg.traffic_type = 'internal';
+  gtag('config', 'G-ZCRY2Y3LP7', _frCfg);
 
   // ── FlexRoute custom event helpers ────────────────────────────────────────
   // How the app is being run, attached to every event so GA4 can compare installed users with browser users.
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.28-v49';
+  var FR_BUILD = 'v2026.10.29-v50';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -399,6 +408,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
       var p = params || {};
       if (p.display_mode === undefined) p.display_mode = FR_DISPLAY;
       if (p.platform === undefined) p.platform = FR_PLATFORM;
+      if (FR_INTERNAL && p.traffic_type === undefined) p.traffic_type = 'internal';
       gtag('event', name, p);
     }
   }
@@ -660,7 +670,13 @@ const S = {
   _lastPhase: '',
   userState:  localStorage.getItem('fr_state') || '',
   useImperial: localStorage.getItem('fr_imperial') === '1',
-  lang: localStorage.getItem('fr_lang') || (['fr','de','es'].indexOf((navigator.language||'en').substring(0,2).toLowerCase()) >= 0 ? (navigator.language||'en').substring(0,2).toLowerCase() : 'en'),
+  lang: (function() {
+    try {   // a link such as flexrouteapp.com/?lang=pt chooses the language and remembers it
+      var q = (location.search.match(/[?&]lang=(en|fr|de|es|pt)\b/) || [])[1];
+      if (q) { localStorage.setItem('fr_lang', q); return q; }
+    } catch (e) {}
+    return localStorage.getItem('fr_lang') || (['fr','de','es','pt'].indexOf((navigator.language||'en').substring(0,2).toLowerCase()) >= 0 ? (navigator.language||'en').substring(0,2).toLowerCase() : 'en');
+  })(),
   tweakMode:  false,
   savingsOpen: false,
   // Text zoom level for route view: 0=normal, 1=large, 2=xlarge (persisted)
@@ -1795,7 +1811,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.28-v49\n'
+            + 'build v2026.10.29-v50\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -1947,6 +1963,63 @@ var LANGS = {
     flex_stop_many: 'Flex stops',
     one_package: '1 package',
     shift_complete: 'Shift Complete!',
+    nav_home: 'Navigate to Home',
+    in_word: 'in',
+    autonav_on: '&#9655; AUTO-NAV ON',
+    autonav_off: 'AUTO-NAV OFF',
+    map_preview: 'Route map preview',
+    map_tap_hint: 'TAP A STOP MARKER TO NAVIGATE',
+    shift_blurb: 'One stop at a time &nbsp;&middot;&nbsp; Auto-nav &nbsp;&middot;&nbsp; Progress saved',
+    map_start: 'START',
+    map_home: 'HOME',
+    hero_kicker: 'Amazon Flex Drivers',
+    hero_title: 'Shorter route.<br>Home sooner.',
+    hero_sub: 'Screenshot your stop list. Get the shortest route in seconds.',
+    trial_ended_title: 'Free premium has ended',
+    trial_ended_sub: 'Subscribe to continue optimizing your routes.',
+    trial_left_one: 'free route',
+    trial_left_many: 'free routes',
+    trial_left_tail: 'left this trial',
+    setup_done: '&#10003; Route setup complete',
+    setup_todo: '&#9432; Set depot &amp; home address',
+    ready_lbl: 'ready',
+    start_label: 'Start — warehouse / depot',
+    not_set: 'Not set — enter below &#8595;',
+    use_gps_detect: '&#128204; Use GPS to detect location',
+    saved_short: '&#10003; Saved',
+    home_label: 'Home — end of route',
+    scan_works_at: '&#9888; Scanning works at',
+    open_safari: '&#9888; Open in Safari or Chrome',
+    add_manual_hdr: 'Or add stops manually',
+    last_stop_lbl: 'Last stop:',
+    pkg_short: 'pkg',
+    add_btn: 'Add',
+    opt_my_route: 'Optimize my route',
+    stop_one: 'stop',
+    stop_many: 'stops',
+    lbl_dist_saved: 'distance saved',
+    lbl_time_saved: 'time saved',
+    prev_btn: '&#8249; Prev',
+    next_btn: 'Next &#8250;',
+    done_lbl: 'Done',
+    left_lbl: 'Left',
+    time_lbl: 'Time',
+    sq_route_size: 'How many stops on a typical route?',
+    sq_most_used: 'Which part do you use most?',
+    sq_improve: 'What should we improve first?',
+    sa_under20: 'Under 20',
+    sa_20_40: '20 to 40',
+    sa_over40: 'Over 40',
+    sa_scanning: 'Scanning the list',
+    sa_order: 'The optimised order',
+    sa_shift: 'Shift Mode',
+    sa_addresses: 'Reading addresses',
+    sa_counts: 'Package counts',
+    sa_route: 'The route order',
+    sa_speed: 'Speed',
+    sa_other: 'Something else',
+    pay_pass: 'Just need one month? Pay once, no renewal',
+    pay_pass_note: 'One payment of $9.99 \u00b7 30 days of access \u00b7 nothing renews',
     review_title: 'Nice work \u2014 shift done',
     review_sub: 'If FlexRoute saved you time today, a rating on Google Play helps other drivers find it.',
     review_sub_web: 'Got 15 seconds? Three quick questions would really help us improve it.',
@@ -2155,6 +2228,63 @@ var LANGS = {
     flex_stop_many: 'Arrêts Flex',
     one_package: '1 colis',
     shift_complete: 'Quart terminé !',
+    nav_home: 'Naviguer vers le domicile',
+    in_word: 'en',
+    autonav_on: '&#9655; AUTO-NAV ACTIVÉE',
+    autonav_off: 'AUTO-NAV DÉSACTIVÉE',
+    map_preview: 'Aperçu de la carte',
+    map_tap_hint: 'TOUCHEZ UN MARQUEUR POUR NAVIGUER',
+    shift_blurb: 'Un arrêt à la fois &nbsp;&middot;&nbsp; Navigation auto &nbsp;&middot;&nbsp; Progression enregistrée',
+    map_start: 'DÉPART',
+    map_home: 'DOMICILE',
+    hero_kicker: 'Chauffeurs Amazon Flex',
+    hero_title: 'Trajet plus court.<br>Retour plus tôt.',
+    hero_sub: 'Faites une capture de votre liste d’arrêts. Obtenez l’itinéraire le plus court en quelques secondes.',
+    trial_ended_title: 'L’accès premium gratuit est terminé',
+    trial_ended_sub: 'Abonnez-vous pour continuer à optimiser vos itinéraires.',
+    trial_left_one: 'itinéraire gratuit',
+    trial_left_many: 'itinéraires gratuits',
+    trial_left_tail: 'restants pendant l’essai',
+    setup_done: '&#10003; Configuration de l’itinéraire terminée',
+    setup_todo: '&#9432; Définir le dépôt et le domicile',
+    ready_lbl: 'prêt',
+    start_label: 'Départ — entrepôt / dépôt',
+    not_set: 'Non défini — saisissez ci-dessous &#8595;',
+    use_gps_detect: '&#128204; Utiliser le GPS pour me localiser',
+    saved_short: '&#10003; Enregistré',
+    home_label: 'Domicile — fin du trajet',
+    scan_works_at: '&#9888; Le scan fonctionne sur',
+    open_safari: '&#9888; Ouvrir dans Safari ou Chrome',
+    add_manual_hdr: 'Ou ajoutez des arrêts manuellement',
+    last_stop_lbl: 'Dernier arrêt :',
+    pkg_short: 'colis',
+    add_btn: 'Ajouter',
+    opt_my_route: 'Optimiser mon itinéraire',
+    stop_one: 'arrêt',
+    stop_many: 'arrêts',
+    lbl_dist_saved: 'distance économisée',
+    lbl_time_saved: 'temps économisé',
+    prev_btn: '&#8249; Préc.',
+    next_btn: 'Suiv. &#8250;',
+    done_lbl: 'Fait',
+    left_lbl: 'Restant',
+    time_lbl: 'Temps',
+    sq_route_size: 'Combien d\u2019arr\u00eats sur un itin\u00e9raire type ?',
+    sq_most_used: 'Quelle partie utilisez-vous le plus ?',
+    sq_improve: 'Que devrions-nous am\u00e9liorer en premier ?',
+    sa_under20: 'Moins de 20',
+    sa_20_40: '20 \u00e0 40',
+    sa_over40: 'Plus de 40',
+    sa_scanning: 'Le scan de la liste',
+    sa_order: 'L\u2019ordre optimis\u00e9',
+    sa_shift: 'Le mode Quart',
+    sa_addresses: 'La lecture des adresses',
+    sa_counts: 'Le nombre de colis',
+    sa_route: 'L\u2019ordre de l\u2019itin\u00e9raire',
+    sa_speed: 'La vitesse',
+    sa_other: 'Autre chose',
+    pay_pass: 'Besoin d\u2019un seul mois ? Payez une fois, sans renouvellement',
+    pay_pass_note: 'Un seul paiement de 9,99 $ \u00b7 30 jours d\u2019acc\u00e8s \u00b7 rien ne se renouvelle',
     review_title: 'Beau travail \u2014 quart termin\u00e9',
     review_sub: 'Si FlexRoute vous a fait gagner du temps, une note sur Google Play aide les autres chauffeurs \u00e0 le trouver.',
     review_sub_web: 'Vous avez 15 secondes ? Trois questions rapides nous aideraient beaucoup.',
@@ -2363,6 +2493,63 @@ var LANGS = {
     flex_stop_many: 'Flex-Stopps',
     one_package: '1 Paket',
     shift_complete: 'Schicht abgeschlossen!',
+    nav_home: 'Navigation nach Hause',
+    in_word: 'in',
+    autonav_on: '&#9655; AUTO-NAV AN',
+    autonav_off: 'AUTO-NAV AUS',
+    map_preview: 'Kartenvorschau',
+    map_tap_hint: 'STOPP-MARKIERUNG ANTIPPEN ZUM NAVIGIEREN',
+    shift_blurb: 'Ein Stopp nach dem anderen &nbsp;&middot;&nbsp; Auto-Navigation &nbsp;&middot;&nbsp; Fortschritt gespeichert',
+    map_start: 'START',
+    map_home: 'ZUHAUSE',
+    hero_kicker: 'Amazon-Flex-Fahrer',
+    hero_title: 'Kürzere Route.<br>Früher zu Hause.',
+    hero_sub: 'Screenshot der Stopp-Liste machen. In Sekunden die kürzeste Route erhalten.',
+    trial_ended_title: 'Das kostenlose Premium ist beendet',
+    trial_ended_sub: 'Abonnieren Sie, um weiter Routen zu optimieren.',
+    trial_left_one: 'kostenlose Route',
+    trial_left_many: 'kostenlose Routen',
+    trial_left_tail: 'übrig in der Testphase',
+    setup_done: '&#10003; Routen-Einrichtung abgeschlossen',
+    setup_todo: '&#9432; Depot &amp; Heimatadresse festlegen',
+    ready_lbl: 'bereit',
+    start_label: 'Start — Lager / Depot',
+    not_set: 'Nicht festgelegt — unten eingeben &#8595;',
+    use_gps_detect: '&#128204; GPS zur Standortermittlung nutzen',
+    saved_short: '&#10003; Gespeichert',
+    home_label: 'Zuhause — Ende der Route',
+    scan_works_at: '&#9888; Scannen funktioniert auf',
+    open_safari: '&#9888; In Safari oder Chrome öffnen',
+    add_manual_hdr: 'Oder Stopps manuell hinzufügen',
+    last_stop_lbl: 'Letzter Stopp:',
+    pkg_short: 'Paket',
+    add_btn: 'Hinzufügen',
+    opt_my_route: 'Meine Route optimieren',
+    stop_one: 'Stopp',
+    stop_many: 'Stopps',
+    lbl_dist_saved: 'Strecke gespart',
+    lbl_time_saved: 'Zeit gespart',
+    prev_btn: '&#8249; Zurück',
+    next_btn: 'Weiter &#8250;',
+    done_lbl: 'Erledigt',
+    left_lbl: 'Übrig',
+    time_lbl: 'Zeit',
+    sq_route_size: 'Wie viele Stopps hat eine typische Route?',
+    sq_most_used: 'Welchen Teil nutzen Sie am meisten?',
+    sq_improve: 'Was sollen wir zuerst verbessern?',
+    sa_under20: 'Unter 20',
+    sa_20_40: '20 bis 40',
+    sa_over40: '\u00dcber 40',
+    sa_scanning: 'Das Scannen der Liste',
+    sa_order: 'Die optimierte Reihenfolge',
+    sa_shift: 'Schicht-Modus',
+    sa_addresses: 'Adressen lesen',
+    sa_counts: 'Paketanzahl',
+    sa_route: 'Die Routenreihenfolge',
+    sa_speed: 'Geschwindigkeit',
+    sa_other: 'Etwas anderes',
+    pay_pass: 'Nur einen Monat n\u00f6tig? Einmal zahlen, keine Verl\u00e4ngerung',
+    pay_pass_note: 'Eine Zahlung von 9,99 $ \u00b7 30 Tage Zugang \u00b7 nichts verl\u00e4ngert sich',
     review_title: 'Gut gemacht \u2014 Schicht fertig',
     review_sub: 'Wenn FlexRoute Ihnen heute Zeit gespart hat, hilft eine Bewertung bei Google Play anderen Fahrern.',
     review_sub_web: '15 Sekunden Zeit? Drei kurze Fragen w\u00fcrden uns sehr helfen.',
@@ -2571,6 +2758,63 @@ var LANGS = {
     flex_stop_many: 'Paradas Flex',
     one_package: '1 paquete',
     shift_complete: '¡Turno completado!',
+    nav_home: 'Navegar a casa',
+    in_word: 'en',
+    autonav_on: '&#9655; AUTO-NAV ACTIVA',
+    autonav_off: 'AUTO-NAV INACTIVA',
+    map_preview: 'Vista previa del mapa',
+    map_tap_hint: 'TOCA UN MARCADOR PARA NAVEGAR',
+    shift_blurb: 'Una parada a la vez &nbsp;&middot;&nbsp; Navegación automática &nbsp;&middot;&nbsp; Progreso guardado',
+    map_start: 'INICIO',
+    map_home: 'CASA',
+    hero_kicker: 'Conductores de Amazon Flex',
+    hero_title: 'Ruta más corta.<br>Llegas antes a casa.',
+    hero_sub: 'Haz una captura de tu lista de paradas. Obtén la ruta más corta en segundos.',
+    trial_ended_title: 'El premium gratuito ha terminado',
+    trial_ended_sub: 'Suscríbete para seguir optimizando tus rutas.',
+    trial_left_one: 'ruta gratis',
+    trial_left_many: 'rutas gratis',
+    trial_left_tail: 'restantes en esta prueba',
+    setup_done: '&#10003; Configuración de ruta completa',
+    setup_todo: '&#9432; Define el depósito y tu casa',
+    ready_lbl: 'listo',
+    start_label: 'Inicio — almacén / depósito',
+    not_set: 'Sin definir — escribe abajo &#8595;',
+    use_gps_detect: '&#128204; Usar GPS para detectar la ubicación',
+    saved_short: '&#10003; Guardado',
+    home_label: 'Casa — fin de la ruta',
+    scan_works_at: '&#9888; El escaneo funciona en',
+    open_safari: '&#9888; Abrir en Safari o Chrome',
+    add_manual_hdr: 'O añade paradas manualmente',
+    last_stop_lbl: 'Última parada:',
+    pkg_short: 'paq.',
+    add_btn: 'Añadir',
+    opt_my_route: 'Optimizar mi ruta',
+    stop_one: 'parada',
+    stop_many: 'paradas',
+    lbl_dist_saved: 'distancia ahorrada',
+    lbl_time_saved: 'tiempo ahorrado',
+    prev_btn: '&#8249; Ant.',
+    next_btn: 'Sig. &#8250;',
+    done_lbl: 'Hecho',
+    left_lbl: 'Quedan',
+    time_lbl: 'Tiempo',
+    sq_route_size: '\u00bfCu\u00e1ntas paradas tiene una ruta t\u00edpica?',
+    sq_most_used: '\u00bfQu\u00e9 parte usas m\u00e1s?',
+    sq_improve: '\u00bfQu\u00e9 deber\u00edamos mejorar primero?',
+    sa_under20: 'Menos de 20',
+    sa_20_40: 'De 20 a 40',
+    sa_over40: 'M\u00e1s de 40',
+    sa_scanning: 'Escanear la lista',
+    sa_order: 'El orden optimizado',
+    sa_shift: 'Modo Turno',
+    sa_addresses: 'Leer direcciones',
+    sa_counts: 'Cantidad de paquetes',
+    sa_route: 'El orden de la ruta',
+    sa_speed: 'La velocidad',
+    sa_other: 'Otra cosa',
+    pay_pass: '\u00bfSolo necesitas un mes? Paga una vez, sin renovaci\u00f3n',
+    pay_pass_note: 'Un pago de 9,99 $ \u00b7 30 d\u00edas de acceso \u00b7 nada se renueva',
     review_title: 'Buen trabajo \u2014 turno completado',
     review_sub: 'Si FlexRoute te ahorr\u00f3 tiempo hoy, una valoraci\u00f3n en Google Play ayuda a otros conductores.',
     review_sub_web: '\u00bfTienes 15 segundos? Tres preguntas r\u00e1pidas nos ayudar\u00edan mucho.',
@@ -2715,6 +2959,266 @@ var LANGS = {
     result_stopcap_title: '{n} paradas bloqueadas',
     result_stopcap_sub: 'Tu prueba muestra las primeras 15 paradas. Desbloquea las {n} para terminar de planear esta ruta.',
     result_stopcap_cta: 'Desbloquear todas las paradas',
+  },
+  pt: {
+    scan_title: 'Escanear capturas de tela do Flex',
+    scan_tap: '📷 Enviar capturas de tela',
+    scan_sub: 'Toque para selecionar — escolha várias imagens de uma vez',
+    scan_tip: '▶ Dica: uma captura da lista completa funciona melhor — várias capturas também funcionam',
+    legacy_welcome_title: 'Obrigado, testador pioneiro!',
+    legacy_welcome_body: 'Você usava o FlexRoute antes de começarmos a cobrar. Como agradecimento, seu acesso premium continua gratuito — sem cartão, sem cadastro — até a data abaixo.',
+    legacy_welcome_until: '✨ Grátis até {date}',
+    legacy_welcome_ok: 'Entendi — obrigado!',
+    scanning: 'Escaneando imagem',
+    of: 'de',
+    images_scanned: 'imagens escaneadas',
+    where_delivering: 'Onde você faz entregas?',
+    set_once: 'Defina uma vez — salvo para todos os turnos futuros',
+    select_state: 'Selecione seu estado / província...',
+    starting_loc: 'Local de partida',
+    depot_label: 'Armazém ou base',
+    use_gps: '📌 Usar GPS (detectar minha localização)',
+    or_type_below: '— ou digite o endereço abaixo —',
+    saved_tap_clear: 'Salvo — toque em ✕ para limpar',
+    saved_auto: 'Salvo automaticamente para os próximos turnos',
+    home_addr: 'Endereço de casa',
+    home_sub: 'A rota termina perto de casa',
+    stops_title: 'Paradas',
+    add_stop_ph: 'Digite um endereço e toque em +',
+    manual_stop: 'Adicionada manualmente',
+    stops_scanned: 'escaneadas',
+    stops_manual: 'manuais',
+    no_stops: 'Nenhuma parada ainda — envie uma captura de tela ou adicione manualmente acima',
+    optimize_btn: '⚡ Otimizar rota',
+    optimize_stops: '⚡ Otimizar rota — {n} parada{s}',
+    resolve_first: 'Corrija {n} endereço(s) não reconhecido(s) acima antes de otimizar',
+    opt_resolve_btn: '⚡ Otimizar rota — resolva os endereços primeiro',
+    pkg_num_label: 'Nº do pacote (opcional):',
+    pkg_num_tip: 'SSD: informe o nº da sua parada Flex para carregar os pacotes em ordem',
+    change: 'Alterar',
+    region: 'Região',
+    gps_locked: 'GPS localizado',
+    drive_order: 'Ordem do percurso',
+    pkg_in_car: 'Nº do pacote no carro',
+    stops_shortest: '{n} paradas — ordem mais curta',
+    tweak: '↕ Ajustar',
+    copy: 'Copiar',
+    share: '⬆ Compartilhar',
+    keep_order: '✓ Manter esta ordem',
+    reoptimize: '⚡ Otimizar de novo',
+    start_shift: '▶ Iniciar Modo Turno',
+    back_to_route: '✓ Concluído — Voltar à rota',
+    shift_mode: 'MODO TURNO',
+    stop_of: 'Parada {i} de {n}',
+    last_stop: '— ÚLTIMA PARADA',
+    delivered_next: '✓ Entregue — Próxima parada',
+    finish_shift: '✓ Finalizar turno',
+    all_stops: '☰ Todas as paradas',
+    packages_at_stop: '{n} pacotes nesta parada',
+    packages_with_nums: '{n} pacotes — #{list}',
+    pkg_num_unknown: 'Número não lido — confira no app Flex',
+    list_and: 'e',
+    pkg_in_car_num: 'Pacote #{n} no carro',
+    flex_stop_one: 'Parada Flex',
+    flex_stop_many: 'Paradas Flex',
+    one_package: '1 pacote',
+    shift_complete: 'Turno concluído!',
+    nav_home: 'Navegar para casa',
+    in_word: 'em',
+    autonav_on: '&#9655; AUTO-NAV LIGADA',
+    autonav_off: 'AUTO-NAV DESLIGADA',
+    map_preview: 'Prévia do mapa',
+    map_tap_hint: 'TOQUE EM UM MARCADOR PARA NAVEGAR',
+    shift_blurb: 'Uma parada por vez &nbsp;&middot;&nbsp; Navegação automática &nbsp;&middot;&nbsp; Progresso salvo',
+    map_start: 'INÍCIO',
+    map_home: 'CASA',
+    hero_kicker: 'Motoristas Amazon Flex',
+    hero_title: 'Rota mais curta.<br>Mais cedo em casa.',
+    hero_sub: 'Tire uma captura de tela da sua lista de paradas. Receba a rota mais curta em segundos.',
+    trial_ended_title: 'O premium gratuito terminou',
+    trial_ended_sub: 'Assine para continuar otimizando suas rotas.',
+    trial_left_one: 'rota grátis',
+    trial_left_many: 'rotas grátis',
+    trial_left_tail: 'restantes neste teste',
+    setup_done: '&#10003; Configuração da rota concluída',
+    setup_todo: '&#9432; Defina o armazém e o endereço de casa',
+    ready_lbl: 'pronto',
+    start_label: 'Partida — armazém / base',
+    not_set: 'Não definido — digite abaixo &#8595;',
+    use_gps_detect: '&#128204; Usar GPS para detectar a localização',
+    saved_short: '&#10003; Salvo',
+    home_label: 'Casa — fim da rota',
+    scan_works_at: '&#9888; O escaneamento funciona em',
+    open_safari: '&#9888; Abra no Safari ou no Chrome',
+    add_manual_hdr: 'Ou adicione paradas manualmente',
+    last_stop_lbl: 'Última parada:',
+    pkg_short: 'pacote',
+    add_btn: 'Adicionar',
+    opt_my_route: 'Otimizar minha rota',
+    stop_one: 'parada',
+    stop_many: 'paradas',
+    lbl_dist_saved: 'distância economizada',
+    lbl_time_saved: 'tempo economizado',
+    prev_btn: '&#8249; Anterior',
+    next_btn: 'Próxima &#8250;',
+    done_lbl: 'Feito',
+    left_lbl: 'Restam',
+    time_lbl: 'Tempo',
+    sq_route_size: 'Quantas paradas tem uma rota t\u00edpica?',
+    sq_most_used: 'Qual parte voc\u00ea mais usa?',
+    sq_improve: 'O que devemos melhorar primeiro?',
+    sa_under20: 'Menos de 20',
+    sa_20_40: 'De 20 a 40',
+    sa_over40: 'Mais de 40',
+    sa_scanning: 'Escanear a lista',
+    sa_order: 'A ordem otimizada',
+    sa_shift: 'Modo Turno',
+    sa_addresses: 'Leitura de endere\u00e7os',
+    sa_counts: 'Contagem de pacotes',
+    sa_route: 'A ordem da rota',
+    sa_speed: 'A velocidade',
+    sa_other: 'Outra coisa',
+    pay_pass: 'Precisa só de um mês? Pague uma vez, sem renovação',
+    pay_pass_note: 'Um pagamento de US$ 9,99 · 30 dias de acesso · nada é renovado',
+    review_title: 'Bom trabalho — turno concluído',
+    review_sub: 'Se o FlexRoute economizou seu tempo hoje, uma avaliação no Google Play ajuda outros motoristas a encontrá-lo.',
+    review_sub_web: 'Tem 15 segundos? Três perguntas rápidas nos ajudariam muito a melhorar o app.',
+    review_play: '★ Avaliar no Google Play',
+    review_survey: 'Responder 3 perguntas rápidas',
+    survey_note: 'Mais alguma coisa? (opcional)',
+    survey_send: 'Enviar',
+    survey_thanks: 'Obrigado — isso ajuda muito.',
+    reviewing_stop: 'Revisando a parada {n}',
+    already_delivered: 'já entregue',
+    back_to_current: 'Voltar à parada {n}',
+    stops_delivered: '{n} paradas',
+    done_back: '✓ Concluído — Voltar à rota',
+    you_save: 'Você economiza {km} {unit} e ~{min} min',
+    dist_saved: 'Distância economizada',
+    time_saved: 'Tempo economizado',
+    more_efficient: 'Mais eficiente',
+    amazon_order: 'ORDEM DA AMAZON',
+    your_route: 'SUA ROTA',
+    gps_tag: 'GPS REAL',
+    est_tag: 'ESTIMADO',
+    already_optimal: 'A Amazon já definiu a rota mais curta para este bloco.',
+    optimal_sub: 'Suas paradas já estão bem próximas — nenhuma melhoria encontrada.',
+    verify: '📍 verificar',
+    address_warn: 'Pode ter sido localizado no lugar errado — toque em verificar acima',
+    failed_badge: '⚠ ENDEREÇO NÃO ENCONTRADO',
+    failed_top: '⚠ {n} endereço(s) não encontrado(s) — corrija antes de otimizar',
+    retry: '⚡ Tentar este endereço',
+    geocoding: 'Localizando...',
+    found_btn: '✓ Encontrado!',
+    still_not_found: 'Ainda não encontrado. Tente adicionar o nome da cidade.',
+    remove: 'Remover',
+    skip_stop: 'Remover parada',
+    last_tag: 'ÚLTIMA',
+    google_maps: 'GOOGLE MAPS',
+    maps_split: 'Dividido em {n} partes (~5 paradas cada) para evitar travamentos em celulares com pouca memória.',
+    part_stops: 'Parte {i}: paradas {a}-{b}',
+    settings_title: 'Configurações',
+    dist_units: 'UNIDADES DE DISTÂNCIA',
+    tap_switch: 'Toque para alternar',
+    gmaps_key_title: 'Chave da API do Google Maps',
+    gmaps_key_sub: 'Opcional — ajuda a encontrar endereços difíceis ou rurais',
+    gmaps_key_note: 'O FlexRoute já encontra a maioria dos endereços de graça usando o OpenStreetMap. Adicione uma chave só se as paradas falharem sempre na localização.',
+    gmaps_saved: 'Ativa — usada como alternativa quando um endereço não é encontrado',
+    save_key: 'Salvar chave',
+    key_saved: '✓ Chave salva',
+    about_sub: 'Otimizador de rotas para motoristas de entrega',
+    tos: 'Termos de Serviço →',
+    not_affiliated: 'Sem vínculo com a Amazon.com, Inc.',
+    clear_data: 'Limpar dados do app',
+    clear_data_sub: 'Remove todas as paradas, endereços e configurações salvos neste aparelho. Não pode ser desfeito.',
+    clear_btn: '🗑 Limpar todos os dados',
+    add_to_home: 'ADICIONAR À TELA INICIAL',
+    ios_tip: 'Toque em <strong>Compartilhar ⬇</strong> e depois em <strong>"Adicionar à Tela de Início"</strong>',
+    android_tip: 'Toque em <strong>⋮ Menu</strong> e depois em <strong>"Adicionar à tela inicial"</strong>',
+    route_outdated: '⚠ A rota está desatualizada',
+    route_outdated_sub: 'Você editou paradas desde a última otimização',
+    re_optimize_short: '⚡ Otimizar de novo',
+    optimized_route_label: 'ROTA OTIMIZADA',
+    edit_btn: 'Editar',
+    zoom_title: 'Aumentar o tamanho do texto',
+    optimizing_dots: 'Otimizando...',
+    collapse: '⌃ recolher',
+    details: 'detalhes ⌄',
+    share_btn: '⇧ Compartilhar',
+    try_again: '⚡ Tentar de novo',
+    start_shift_btn: '▶ Iniciar Modo Turno',
+    resume_shift: '▶ Retomar turno — parada {n} de {total}',
+    autonav_hint_waze: 'A navegação automática abrirá o Waze para a próxima parada',
+    autonav_hint_maps: 'A navegação automática abrirá o Google Maps para a próxima parada',
+    autonav_hint_choose: 'Toque em Waze ou Maps uma vez — a navegação automática manterá sua escolha',
+    open_google_maps: 'Abrir no Google Maps',
+    waze_stop_by_stop: '◀ Waze — parada por parada',
+    one_stop_low_mem: 'Uma parada por vez — usa menos memória.',
+    new_shift_clear: '✕ Novo turno — limpar todas as paradas',
+    delivered_next_short: '✓ Entregue — Próxima parada',
+    all_stops_short: '☰ Todas as paradas',
+    waze_short: '◀ Waze',
+    safari_chrome_warn: '⚠ Abra no Safari ou no Chrome para escanear — navegadores dentro de apps bloqueiam o scanner',
+    select_region_ph: 'Selecione sua região...',
+    api_key_title: 'Chave da API do Google Maps',
+    api_key_sub: 'Opcional — ajuda a encontrar endereços difíceis ou rurais',
+    api_key_how: 'Como obter uma chave grátis (2 minutos)',
+    api_key_active: '✓ Ativa — usada como alternativa quando um endereço não é encontrado',
+    auth_verify_email: 'Confirme seu e-mail',
+    auth_check_inbox: 'Verifique sua caixa de entrada.',
+    auth_code_sent_to: 'Enviamos um código de 6 dígitos para {email}',
+    auth_enter_code_label: 'Digite o código de 6 dígitos',
+    auth_verify_continue: 'Confirmar e continuar',
+    auth_resend_code: 'Reenviar código',
+    auth_code_resent: 'Código reenviado ✓',
+    auth_one_time_setup: 'Configuração única',
+    auth_enter_email: 'Digite seu e-mail.',
+    auth_no_password: 'Sem senha — enviaremos um código único para confirmar que é você.',
+    auth_email_label: 'Seu endereço de e-mail',
+    auth_send_code: 'Enviar código',
+    auth_sending: 'Enviando…',
+    auth_verifying: 'Confirmando…',
+    auth_billing_only: 'Usado apenas para cobrança',
+    auth_no_spam: 'Sem spam',
+    auth_back: 'Voltar',
+    auth_err_invalid_email: 'Digite um e-mail válido.',
+    auth_err_send_failed: 'Não foi possível enviar o código — verifique sua conexão e tente de novo.',
+    auth_err_invalid_code: 'Digite o código de 6 dígitos.',
+    auth_err_verify_failed: 'Código inválido ou expirado. Tente de novo ou reenvie.',
+    pay_eyebrow: 'FlexRoute Premium',
+    pay_headline: 'Você já sabe que funciona.',
+    pay_sub: 'Você já fez {n} rotas otimizadas de verdade — não é uma demonstração. Continue por menos que um tanque de gasolina.',
+    pay_drivers_stat: '300+ motoristas',
+    pay_drivers_sub: 'já usam o FlexRoute',
+    pay_cancel_stat: 'Cancele quando quiser',
+    pay_cancel_sub: 'o acesso vai até o fim do período',
+    pay_monthly: 'Mensal',
+    pay_per_month: 'por mês',
+    pay_save_badge: 'ECONOMIZE {pct}%',
+    pay_yearly: 'Anual',
+    pay_per_month_short: '/ mês',
+    pay_feat1_title: 'Nunca toca na sua conta da Amazon',
+    pay_feat1_sub: 'Só captura de tela — sem login, sem risco de banimento',
+    pay_feat2_title: 'Otimização de rotas ilimitada',
+    pay_feat2_sub: 'Todo turno, todo dia',
+    pay_feat3_title: 'Modo Turno — parada por parada',
+    pay_feat3_sub: 'Navegação automática, progresso salvo',
+    pay_feat4_title: 'Sempre termina perto de casa',
+    pay_feat4_sub: 'Distâncias reais de estrada com GPS',
+    pay_continue: 'Continuar para o pagamento',
+    pay_redirecting: 'Redirecionando…',
+    pay_back_to_app: 'Voltar ao app',
+    pay_billing_question: 'Dúvida sobre cobrança?',
+    pay_checkout_failed: 'Não foi possível iniciar o pagamento — tente de novo em instantes',
+    acct_sign_in: 'Entrar',
+    auth_postpay_headline: 'Tudo certo — só mais uma coisa.',
+    auth_postpay_sub: 'Salve este e-mail para entrar de novo em qualquer aparelho — você já pagou, isso só mantém seu acesso seguro.',
+    auth_skip_for_now: 'Pular por enquanto',
+    pay_headline_stopcap: 'Esta rota está pronta.',
+    pay_sub_stopcap: 'Sua rota tem {n} paradas — contas de teste otimizam as primeiras 15 paradas por rota. Libere paradas ilimitadas por menos que um tanque de gasolina.',
+    result_stopcap_title: '{n} paradas bloqueadas',
+    result_stopcap_sub: 'Seu teste mostra as primeiras 15 paradas. Libere todas as {n} para terminar de planejar esta rota.',
+    result_stopcap_cta: 'Liberar todas as paradas',
   }
 };
 
@@ -2727,8 +3231,9 @@ function t(key) {
 
 function langPill() {
   var lang = S.lang || 'en';
-  var langs = ['en','fr','de','es'];
-  var labels = {en:'EN', fr:'FR', de:'DE', es:'ES'};
+  var ptUser = lang === 'pt' || /^pt/i.test(navigator.language || '');
+  var langs = ptUser ? ['en','pt'] : ['en','fr','de','es'];
+  var labels = {en:'EN', fr:'FR', de:'DE', es:'ES', pt:'PT'};
   return '<div class="lang-pill" id="langPill">' +
     langs.map(function(l){
       return '<span class="' + (lang===l?'up-on':'up-off') + '" data-lang="'+l+'">' + labels[l] + '</span>';
@@ -3206,6 +3711,10 @@ function vPaywall() {
   </div>
 
   <button id="checkoutBtn" class="btn bp" style="height:54px;margin-bottom:10px">${t('pay_continue')}</button>
+  ${PASS_ENABLED ? `<div style="text-align:center;margin:0 0 12px">
+    <button id="passBtn" style="background:transparent;border:1.5px solid var(--brd2);color:var(--t2);border-radius:10px;padding:11px 14px;font-size:13.5px;font-weight:700;cursor:pointer;width:100%;-webkit-tap-highlight-color:transparent">${t('pay_pass')}</button>
+    <div style="font-size:11.5px;color:var(--t3);margin-top:6px">${t('pay_pass_note')}</div>
+  </div>` : ''}
   <div style="text-align:center;margin-bottom:16px">
     <button id="paywallBackBtn" style="background:transparent;border:none;color:var(--t3);font-size:13px;cursor:pointer;text-decoration:underline;padding:8px">${t('pay_back_to_app')}</button>
   </div>
@@ -3214,6 +3723,9 @@ function vPaywall() {
 
 </div>`;}
 
+
+// Set to false to hide the "pay once, no renewal" option without touching anything else.
+var PASS_ENABLED = true;
 
 function bindPaywall() {
   var selected = 'monthly';
@@ -3236,19 +3748,22 @@ function bindPaywall() {
   var backBtn = document.getElementById('paywallBackBtn');
   if (backBtn) backBtn.addEventListener('click', function() { S.phase = 'input'; render(); });
 
-  async function doCheckout() {
+  async function doCheckout(planOverride) {
     var checkoutBtn = document.getElementById('checkoutBtn');
-    if (checkoutBtn) { checkoutBtn.disabled = true; checkoutBtn.textContent = t('pay_redirecting'); }
+    var passBtn = document.getElementById('passBtn');
+    if (checkoutBtn) { checkoutBtn.disabled = true; if (!planOverride) checkoutBtn.textContent = t('pay_redirecting'); }
+    if (passBtn) { passBtn.disabled = true; if (planOverride) passBtn.textContent = t('pay_redirecting'); }
     try {
       var r = await fetch('/.netlify/functions/create-checkout-session', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: S.userEmail, plan: selected })
+        body: JSON.stringify({ email: S.userEmail, plan: planOverride || selected })
       });
       var d = await r.json();
       if (!r.ok || !d.url) throw new Error(d.error || 'checkout failed');
       window.location.href = d.url;
     } catch (e) {
       if (checkoutBtn) { checkoutBtn.disabled = false; checkoutBtn.textContent = t('pay_continue'); }
+      if (passBtn) { passBtn.disabled = false; passBtn.textContent = t('pay_pass'); }
       toast(t('pay_checkout_failed'));
     }
   }
@@ -3270,6 +3785,16 @@ function bindPaywall() {
     // prefilled (see doCheckout's body), just never REQUIRED before this
     // point.
     await doCheckout();
+  });
+  var passBtnEl = document.getElementById('passBtn');
+  if (passBtnEl) passBtnEl.addEventListener('click', async function() {
+    // Same funnel event as the main button (so checkout_link_clicked still counts every tap toward Stripe),
+    // plus its own event so GA4 can compare the pass with the monthly plan.
+    if (typeof trackEvent === 'function') {
+      trackEvent('checkout_link_clicked', { plan: 'month_pass', had_email: !!S.userEmail });
+      trackEvent('paywall_pass_clicked', { had_email: !!S.userEmail });
+    }
+    await doCheckout('month_pass');
   });
 }
 
@@ -3407,8 +3932,8 @@ function vInput() {
     } else if (_daysLeft <= 0) {
       h += '<div style="background:rgba(255,68,85,0.12);border:1px solid rgba(255,68,85,0.4);border-radius:12px;padding:12px 16px;margin-top:8px;display:flex;align-items:center;gap:12px">';
       h += '<div style="font-size:24px;line-height:1">🔒</div>';
-      h += '<div><div style="font-family:var(--sans);font-size:14px;font-weight:700;color:var(--err)">Free premium has ended</div>';
-      h += '<div style="font-size:12px;color:var(--t2);margin-top:2px">Subscribe to continue optimizing your routes.</div></div>';
+      h += '<div><div style="font-family:var(--sans);font-size:14px;font-weight:700;color:var(--err)">' + t('trial_ended_title') + '</div>';
+      h += '<div style="font-size:12px;color:var(--t2);margin-top:2px">' + t('trial_ended_sub') + '</div></div>';
       h += '</div>';
     }
   }
@@ -3422,7 +3947,7 @@ function vInput() {
       S.trialRoutesUsed > 0 && S.trialRoutesUsed < FREE_TRIAL_ROUTE_LIMIT) {
     var _left = FREE_TRIAL_ROUTE_LIMIT - S.trialRoutesUsed;
     h += '<div style="background:var(--surf);border:1px solid var(--brd);border-radius:12px;padding:10px 16px;margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:12px">';
-    h += '<div style="font-size:13px;color:var(--t2)"><strong style="color:var(--acc)">' + _left + ' free route' + (_left === 1 ? '' : 's') + '</strong> left this trial</div>';
+    h += '<div style="font-size:13px;color:var(--t2)"><strong style="color:var(--acc)">' + _left + ' ' + (_left === 1 ? t('trial_left_one') : t('trial_left_many')) + '</strong> ' + t('trial_left_tail') + '</div>';
     h += '<div style="font-size:11px;color:var(--t3)">' + S.trialRoutesUsed + ' / ' + FREE_TRIAL_ROUTE_LIMIT + ' used</div>';
     h += '</div>';
   }
@@ -3451,10 +3976,10 @@ function vInput() {
   h += '<div style="padding:0 2px;margin-bottom:16px">';
   h += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">';
   h += '<span style="width:7px;height:7px;background:#FF9900;border-radius:50%;display:inline-block;flex-shrink:0"></span>';
-  h += '<span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:#FF9900;text-transform:uppercase">Amazon Flex Drivers</span>';
+  h += '<span style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2.5px;color:#FF9900;text-transform:uppercase">' + t('hero_kicker') + '</span>';
   h += '</div>';
-  h += '<div style="font-family:var(--sans);font-size:30px;font-weight:800;color:#FFFFFF;line-height:1.0;margin-bottom:6px;letter-spacing:-.3px">Shorter route.<br>Home sooner.</div>';
-  h += '<div style="font-size:13px;color:#C8C8E8;line-height:1.5">Screenshot your stop list. Get the shortest route in seconds.</div>';
+  h += '<div style="font-family:var(--sans);font-size:30px;font-weight:800;color:#FFFFFF;line-height:1.0;margin-bottom:6px;letter-spacing:-.3px">' + t('hero_title') + '</div>';
+  h += '<div style="font-size:13px;color:#C8C8E8;line-height:1.5">' + t('hero_sub') + '</div>';
   h += '</div>';
 
   // ── SETUP CARD ──
@@ -3462,9 +3987,9 @@ function vInput() {
   h += '<div style="background:#13131E;border-radius:16px;overflow:hidden;margin-bottom:14px;border:1.5px solid ' + borderCol + '">';
   h += '<div style="padding:11px 16px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;justify-content:space-between">';
   h += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:' + borderCol + ';text-transform:uppercase">';
-  h += setupDone ? '&#10003; Route setup complete' : '&#9432; Set depot &amp; home address';
+  h += setupDone ? t('setup_done') : t('setup_todo');
   h += '</div>';
-  if (setupDone) h += '<span style="font-size:11px;color:#7878A0">' + escH(S.userState||'') + ' &middot; ready</span>';
+  if (setupDone) h += '<span style="font-size:11px;color:#7878A0">' + escH(S.userState||'') + ' &middot; ' + t('ready_lbl') + '</span>';
   h += '</div>';
   h += '<div style="background:#1A1A28">';
 
@@ -3472,7 +3997,7 @@ function vInput() {
   h += '<div style="padding:10px 14px;border-bottom:1px solid #2A2A40;display:flex;align-items:center;gap:10px">';
   h += '<span style="font-size:16px;flex-shrink:0">&#127758;</span>';
   h += '<div style="flex:1;min-width:0">';
-  h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Region</div>';
+  h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">' + t('region') + '</div>';
   if (S.userState) {
     h += '<div style="font-family:var(--sans);font-size:14px;font-weight:700;color:#FFFFFF">' + escH(S.userState) + '</div>';
   } else {
@@ -3484,7 +4009,7 @@ function vInput() {
     h += '</select>';
   }
   h += '</div>';
-  if (S.userState) h += '<button id="changeStateBtn" style="background:transparent;border:1px solid #2A2A40;border-radius:6px;color:#7878A0;font-size:11px;cursor:pointer;padding:4px 10px;font-family:var(--sans);white-space:nowrap;flex-shrink:0">Change</button>';
+  if (S.userState) h += '<button id="changeStateBtn" style="background:transparent;border:1px solid #2A2A40;border-radius:6px;color:#7878A0;font-size:11px;cursor:pointer;padding:4px 10px;font-family:var(--sans);white-space:nowrap;flex-shrink:0">' + t('change') + '</button>';
   h += '</div>';
 
   // Start / depot row
@@ -3492,25 +4017,25 @@ function vInput() {
   h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (S.gpsCoords || S.startAddr ? '0' : '8px') + '">';
   h += '<span style="font-size:16px;flex-shrink:0">&#128204;</span>';
   h += '<div style="flex:1;min-width:0">';
-  h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Start \u2014 warehouse / depot</div>';
+  h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">' + t('start_label') + '</div>';
   if (S.gpsCoords) {
     h += '<div style="font-size:13px;font-weight:500;color:#22D98A">&#10003; GPS: ' + escH(S.gpsAddr) + '</div>';
   } else if (S.startAddr) {
     h += '<div style="font-size:13px;font-weight:500;color:#FFFFFF">' + escH(S.startAddr) + '</div>';
   } else {
-    h += '<div style="font-size:12px;color:#FF9900;font-weight:600">Not set \u2014 enter below &#8595;</div>';
+    h += '<div style="font-size:12px;color:#FF9900;font-weight:600">' + t('not_set') + '</div>';
   }
   h += '</div>';
   if (S.gpsCoords) {
-    h += '<button class="btn" id="gpsBtn" style="border:1px solid #22D98A;color:#22D98A;padding:4px 10px;font-size:11px;background:transparent;white-space:nowrap;flex-shrink:0;border-radius:6px">Change</button>';
+    h += '<button class="btn" id="gpsBtn" style="border:1px solid #22D98A;color:#22D98A;padding:4px 10px;font-size:11px;background:transparent;white-space:nowrap;flex-shrink:0;border-radius:6px">' + t('change') + '</button>';
   } else if (S.startAddr) {
     h += '<button id="clearStartBtn" style="background:transparent;border:none;color:#7878A0;font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>';
   }
   h += '</div>';
   if (!S.gpsCoords) {
-    if (!S.startAddr) h += '<button class="gps-btn-big" id="gpsBtn" style="margin-bottom:6px;padding:10px;font-size:13px">&#128204; Use GPS to detect location</button>';
+    if (!S.startAddr) h += '<button class="gps-btn-big" id="gpsBtn" style="margin-bottom:6px;padding:10px;font-size:13px">' + t('use_gps_detect') + '</button>';
     h += '<input type="text" id="startInput" placeholder="or type depot/warehouse address" value="' + escH(S.startAddr || '') + '" class="setup-input" style="font-size:13px;padding:9px 12px;width:100%;box-sizing:border-box"/>';
-    if (S.startAddr) h += '<div style="font-size:11px;color:#22D98A;margin-top:4px">&#10003; Saved</div>';
+    if (S.startAddr) h += '<div style="font-size:11px;color:#22D98A;margin-top:4px">' + t('saved_short') + '</div>';
   }
   h += '</div>';
 
@@ -3519,11 +4044,11 @@ function vInput() {
   h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:' + (S.home ? '0' : '8px') + '">';
   h += '<span style="font-size:16px;flex-shrink:0">&#127968;</span>';
   h += '<div style="flex:1;min-width:0">';
-  h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">Home \u2014 end of route</div>';
+  h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:2px">' + t('home_label') + '</div>';
   if (S.home) {
     h += '<div style="font-size:13px;font-weight:500;color:#FFFFFF">' + escH(S.home) + '</div>';
   } else {
-    h += '<div style="font-size:12px;color:#FF9900;font-weight:600">Not set \u2014 enter below &#8595;</div>';
+    h += '<div style="font-size:12px;color:#FF9900;font-weight:600">' + t('not_set') + '</div>';
   }
   h += '</div>';
   if (S.home) h += '<button id="clearHomeBtn" style="background:transparent;border:none;color:#7878A0;font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>';
@@ -3536,7 +4061,7 @@ function vInput() {
 
   // ── SCAN ──
   if (typeof Tesseract === 'undefined') {
-    h += '<div style="background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#C8C8E8;line-height:1.5;text-align:center">&#9888; Scanning works at <a href="https://flexrouteapp.com" target="_blank" style="color:#FF9900;font-weight:600">flexrouteapp.com</a></div>';
+    h += '<div style="background:rgba(255,153,0,.07);border:1px solid rgba(255,153,0,.25);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#C8C8E8;line-height:1.5;text-align:center">' + t('scan_works_at') + ' <a href="https://flexrouteapp.com" target="_blank" style="color:#FF9900;font-weight:600">flexrouteapp.com</a></div>';
   }
   h += '<label class="dz' + (sc ? ' scanning' : '') + '" id="dz" style="margin-bottom:14px' + (!setupDone ? ';opacity:.6' : '') + '">';
   h += '<input type="file" id="fi" accept="image/*,application/pdf" multiple style="position:absolute;width:0;height:0;opacity:0;pointer-events:none">';
@@ -3552,7 +4077,7 @@ function vInput() {
     h += '<div style="font-family:var(--sans);font-size:17px;font-weight:700;color:#FFFFFF;letter-spacing:.2px">' + t('scan_tap') + '</div>';
     h += '<div style="font-size:13px;color:#7878A0;margin-top:4px">' + t('scan_sub') + '</div>';
     if (/Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent)) {
-      h += '<div style="font-size:11px;color:#FF9900;margin-top:8px;font-weight:600">&#9888; Open in Safari or Chrome</div>';
+      h += '<div style="font-size:11px;color:#FF9900;margin-top:8px;font-weight:600">' + t('open_safari') + '</div>';
     } else {
       h += '<div style="font-size:11px;color:#FF9900;margin-top:8px;font-weight:600">' + t('scan_tip') + '</div>';
     }
@@ -3563,7 +4088,7 @@ function vInput() {
   if (cnt) {
     h += '<div style="margin-bottom:14px">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">';
-    h += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:#FF9900;text-transform:uppercase;display:flex;align-items:center;gap:8px">Stops <span style="background:#FF9900;color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px">' + cnt + '</span></div>';
+    h += '<div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:#FF9900;text-transform:uppercase;display:flex;align-items:center;gap:8px">' + t('stops_title') + ' <span style="background:#FF9900;color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px">' + cnt + '</span></div>';
     var _scn = S.stops.filter(function(s){return s.flexNum!=null||s.scanned;}), _flexSet = {};
     _scn.forEach(function(s){ (s.packageNums && s.packageNums.length ? s.packageNums : (s.flexNum != null ? [s.flexNum] : [])).forEach(function(n){ _flexSet[n] = 1; }); });
     var _flexN = Object.keys(_flexSet).length, _combined = _flexN > _scn.length ? _flexN - _scn.length : 0;
@@ -3577,11 +4102,11 @@ function vInput() {
     var failed = S.stops.filter(function(s){return s.geoFailed;});
     var normal = S.stops.filter(function(s){return !s.geoFailed;});
     h += '<div class="sscr"><div class="slist">' + failed.concat(normal).map(function(s,i){return sRow(s,i);}).join('') + '</div></div>';
-    if (lastS) h += '<div class="al ai" style="margin-top:8px;font-size:12px">Last stop: <strong style="font-family:var(--mono)">' + escH(lastS.address) + '</strong>' + (lastS.flexNum != null ? ' &mdash; pkg <strong>#' + lastS.flexNum + '</strong>' : '') + '</div>';
+    if (lastS) h += '<div class="al ai" style="margin-top:8px;font-size:12px">' + t('last_stop_lbl') + ' <strong style="font-family:var(--mono)">' + escH(lastS.address) + '</strong>' + (lastS.flexNum != null ? ' &mdash; ' + t('pkg_short') + ' <strong>#' + lastS.flexNum + '</strong>' : '') + '</div>';
     h += '</div></div>';
   } else {
     h += '<div style="background:#13131E;border-radius:16px;padding:12px 14px;margin-bottom:14px">';
-    h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">Or add stops manually</div>';
+    h += '<div style="font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">' + t('add_manual_hdr') + '</div>';
     h += '<div class="ir"><div class="si-wrap" style="flex:1;position:relative"><input type="text" id="si" placeholder="Type an address" value="' + escH(S.manVal) + '" style="font-size:14px"/></div>';
     h += '<button class="badd" id="addBtn" style="height:42px;font-size:20px;padding:0 14px">+</button></div>';
     if (S._lastOCR) h += '<div id="dbgPanel" style="display:none;background:#1A1A28;border:1px solid #2A2A40;border-radius:var(--rs);padding:10px;margin-top:8px;font-size:10px;font-family:var(--mono);color:#7878A0;white-space:pre-wrap;max-height:220px;overflow-y:auto;word-break:break-all"></div>';
@@ -3609,7 +4134,7 @@ function vInput() {
           + '<div style="display:flex;gap:6px">'
           + '<input id="ocrfix-' + idx + '" value="' + prefill + '" placeholder="Type or correct the address"'
           + ' style="flex:1;min-width:0;font-size:13px;padding:7px 9px;border-radius:8px;border:1px solid var(--brd);background:var(--surf2);color:var(--t1)">'
-          + '<button data-ocrfix="' + idx + '" style="flex-shrink:0;font-size:12px;font-weight:700;padding:7px 12px;border-radius:8px;border:1px solid var(--acc);background:transparent;color:var(--acc);cursor:pointer">Add</button>'
+          + '<button data-ocrfix="' + idx + '" style="flex-shrink:0;font-size:12px;font-weight:700;padding:7px 12px;border-radius:8px;border:1px solid var(--acc);background:transparent;color:var(--acc);cursor:pointer">' + t('add_btn') + '</button>'
           + '</div></div>';
       }).join('');
     }
@@ -3641,9 +4166,9 @@ function vInput() {
   h += '<div style="margin-bottom:20px">';
   if (S.geoFailed && S.geoFailed.length > 0) {
     h += '<div style="background:rgba(255,68,85,.12);border:1px solid #FF4455;border-radius:var(--rs);padding:9px 13px;font-family:var(--sans);font-size:13px;color:#FF4455;text-align:center;margin-bottom:10px;font-weight:700;letter-spacing:.5px">&#9888; ' + t('resolve_first').replace('{n}', S.geoFailed.length).replace('{es}', S.geoFailed.length > 1 ? 'es' : '') + '</div>';
-    h += '<button class="btn bp" disabled style="height:54px">&#9889; Optimize my route</button>';
+    h += '<button class="btn bp" disabled style="height:54px">&#9889; ' + t('opt_my_route') + '</button>';
   } else {
-    h += '<button class="btn bp" id="optBtn"' + (!cnt ? ' disabled' : '') + ' style="height:54px">&#9889; ' + (cnt ? t('optimize_btn') + ' &mdash; ' + cnt + ' stop' + (cnt > 1 ? 's' : '') : 'Optimize my route') + '</button>';
+    h += '<button class="btn bp" id="optBtn"' + (!cnt ? ' disabled' : '') + ' style="height:54px">&#9889; ' + (cnt ? t('optimize_btn') + ' &mdash; ' + cnt + ' ' + (cnt > 1 ? t('stop_many') : t('stop_one')) : t('opt_my_route')) + '</button>';
   }
   h += '<div style="text-align:center;font-size:12px;color:#7878A0;margin-top:10px;letter-spacing:.3px">' + (PREMIUM_LIVE ? FREE_TRIAL_ROUTE_LIMIT + ' free routes' : 'Free') + ' &nbsp;&middot;&nbsp; No Amazon login &nbsp;&middot;&nbsp; Works now</div>';
   h += '</div>';
@@ -3661,8 +4186,8 @@ function vInput() {
     var _nNum  = 'font-family:var(--sans);font-size:30px;font-weight:900;color:#FF9900;line-height:1';
     var _nLbl  = 'font-family:var(--sans);font-size:10px;color:#7878A0;letter-spacing:1px;text-transform:uppercase;margin-top:5px';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;background:#13131E;border-radius:16px;overflow:hidden;margin-bottom:6px">';
-    h += '<div style="' + _nCell + ';border-right:1px solid #2A2A40"><div style="' + _nNum + '">' + kmToDisplay(_tot.km) + ' ' + distUnit() + '</div><div style="' + _nLbl + '">distance saved</div></div>';
-    h += '<div style="' + _nCell + '"><div style="' + _nNum + '">' + _tv + '</div><div style="' + _nLbl + '">time saved</div></div>';
+    h += '<div style="' + _nCell + ';border-right:1px solid #2A2A40"><div style="' + _nNum + '">' + kmToDisplay(_tot.km) + ' ' + distUnit() + '</div><div style="' + _nLbl + '">' + t('lbl_dist_saved') + '</div></div>';
+    h += '<div style="' + _nCell + '"><div style="' + _nNum + '">' + _tv + '</div><div style="' + _nLbl + '">' + t('lbl_time_saved') + '</div></div>';
     h += '</div>';
     h += '<div style="text-align:center;font-size:11px;color:#7878A0;margin-bottom:16px">across ' + _tot.routes + ' optimized route' + (_tot.routes > 1 ? 's' : '') + '</div>';
   }
@@ -3815,7 +4340,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.28-v49</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.29-v50</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -3846,7 +4371,7 @@ function vResult() {
     : `<div id="savingsBanner" onclick="S.savingsOpen=true;render()" style="display:grid;grid-template-columns:1fr 1fr;background:var(--surf);border-radius:16px;overflow:hidden;margin-bottom:14px;cursor:pointer">
         <div style="padding:16px;text-align:center;border-right:1px solid var(--brd)">
           <div style="font-family:var(--sans);font-size:30px;font-weight:900;color:var(--acc);line-height:1">${sv.savedKm} ${distUnit()}</div>
-          <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:5px">distance saved</div>
+          <div style="font-family:var(--sans);font-size:10px;color:var(--t3);letter-spacing:1px;text-transform:uppercase;margin-top:5px">${t('lbl_dist_saved')}</div>
         </div>
         <div style="padding:16px;text-align:center">
           <div style="font-family:var(--sans);font-size:30px;font-weight:900;color:var(--acc);line-height:1">${sv.savedMin} min</div>
@@ -3866,14 +4391,14 @@ function vResult() {
   <button class="map-toggle-btn${(!S._mapOpen && !localStorage.getItem('fr_map_seen')) ? ' map-attn' : ''}" id="mapToggleBtn" onclick="toggleRouteMap()">
     <div style="display:flex;align-items:center;gap:10px">
       <span style="font-size:18px">&#128506;</span>
-      <span>Route map preview</span>
+      <span>${t('map_preview')}</span>
       ${(!S._mapOpen && !localStorage.getItem('fr_map_seen')) ? '<span class="map-attn-badge">&#10024;</span>' : ''}
     </div>
     <span id="mapToggleIcon" style="font-size:18px;color:var(--acc);font-weight:700">${S._mapOpen ? '&#8963;' : '+'}</span>
   </button>
   <div id="mapWrap" style="margin-bottom:10px;display:${S._mapOpen ? 'block' : 'none'}">
     <div id="routeMap"></div>
-    <div id="routeMapHint" style="font-size:11px;color:var(--t3);text-align:center;margin-top:6px;font-family:var(--sans);letter-spacing:.5px">TAP A STOP MARKER TO NAVIGATE</div>
+    <div id="routeMapHint" style="font-size:11px;color:var(--t3);text-align:center;margin-top:6px;font-family:var(--sans);letter-spacing:.5px">${t('map_tap_hint')}</div>
   </div>
 
   <button class="btn bp" id="startShiftBtn" style="height:54px;margin-bottom:8px">
@@ -3883,13 +4408,13 @@ function vResult() {
       return escH(t('resume_shift').replace('{n}', S.cIdx + 1).replace('{total}', _tot));
     })()}
   </button>
-  <div style="text-align:center;font-size:12px;color:var(--t3);margin-bottom:14px;letter-spacing:.3px">One stop at a time &nbsp;&middot;&nbsp; Auto-nav &nbsp;&middot;&nbsp; Progress saved</div>
+  <div style="text-align:center;font-size:12px;color:var(--t3);margin-bottom:14px;letter-spacing:.3px">${t('shift_blurb')}</div>
 
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:0 2px">
     <div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--acc);text-transform:uppercase">${S.optimized.length} stops &mdash; shortest order</div>
     <div style="display:flex;gap:6px">
-      <button class="rcp" id="cpBtn">Copy</button>
-      <button class="rcp" id="shareBtn" style="color:var(--inf);border-color:rgba(74,158,255,.3)">&#8679; Share</button>
+      <button class="rcp" id="cpBtn">${t('copy')}</button>
+      <button class="rcp" id="shareBtn" style="color:var(--inf);border-color:rgba(74,158,255,.3)">${t('share_btn')}</button>
     </div>
   </div>
   <div style="font-size:11px;color:var(--t3);margin:-4px 0 12px 2px">
@@ -3911,7 +4436,7 @@ function vResult() {
       ${S.startAddr ? `<div class="ri" style="border-color:var(--inf);border-width:1.5px;background:var(--inf-d)">
         <div class="ri-l">
           <div class="rn" style="background:var(--inf);font-size:14px">&#9654;</div>
-          <div style="font-size:10px;color:var(--inf);font-weight:800;letter-spacing:1.2px;font-family:var(--sans)">START</div>
+          <div style="font-size:10px;color:var(--inf);font-weight:800;letter-spacing:1.2px;font-family:var(--sans)">${t('map_start')}</div>
         </div>
         <div class="ri-addr">${escH(S.startAddr)}</div>
       </div>` : ''}
@@ -3919,7 +4444,7 @@ function vResult() {
       ${S.home ? `<div class="ri rh">
         <div class="ri-l">
           <div class="rn" style="background:var(--ok);font-size:14px">&#8962;</div>
-          <div style="font-size:10px;color:var(--ok);font-weight:800;letter-spacing:1.2px;font-family:var(--sans)">HOME</div>
+          <div style="font-size:10px;color:var(--ok);font-weight:800;letter-spacing:1.2px;font-family:var(--sans)">${t('map_home')}</div>
         </div>
         <div class="ri-addr">${escH(S.home)}</div>
       </div>` : ''}
@@ -4041,15 +4566,15 @@ function vCompanion() {
       var _hq = encodeURIComponent(S.home.trim());
       _homeBtn = '<a href="https://www.google.com/maps/dir/?api=1&destination=' + _hq + '" target="_blank" ' +
         'class="btn" style="font-size:18px;padding:16px 32px;margin-bottom:12px;text-decoration:none;display:block;text-align:center">' +
-        '🏠 Navigate to Home</a>';
+        '🏠 ' + t('nav_home') + '</a>';
     }
     return '<div class="comp-wrap"><div class="comp-body" style="height:100vh">' +
       '<div style="font-size:56px;margin-bottom:16px">🎉</div>' +
-      '<div style="font-family:var(--sans);font-size:40px;font-weight:900;color:var(--ok);margin-bottom:10px">Shift Complete!</div>' +
-      '<div style="font-size:17px;color:var(--t2);margin-bottom:28px">' + done + ' stops' + (elapsed ? ' in ' + elapsed : '') + '</div>' +
+      '<div style="font-family:var(--sans);font-size:40px;font-weight:900;color:var(--ok);margin-bottom:10px">' + t('shift_complete') + '</div>' +
+      '<div style="font-size:17px;color:var(--t2);margin-bottom:28px">' + t('stops_delivered').replace('{n}', done) + (elapsed ? ' ' + t('in_word') + ' ' + elapsed : '') + '</div>' +
       reviewCardHtml() +
       _homeBtn +
-      '<button id="compFinishBtn" class="btn bp" style="font-size:18px;padding:16px 32px">&#10003; Done &mdash; Back to route</button>' +
+      '<button id="compFinishBtn" class="btn bp" style="font-size:18px;padding:16px 32px">' + t('done_back') + '</button>' +
       '</div></div>';
   }
   var wazeURL = buildNavURL('waze', stop.address);
@@ -4057,17 +4582,17 @@ function vCompanion() {
   return '<div class="comp-wrap">' +
     '<div class="comp-hdr">' +
       '<button id="compBkBtn" style="background:transparent;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:4px 10px">&#8592;</button>' +
-      '<div style="font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--t2)">SHIFT MODE</div>' +
+      '<div style="font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:1.5px;color:var(--t2)">' + t('shift_mode') + '</div>' +
       '<button id="compAutoNavBtn" title="Auto-open nav for next stop after Delivered" ' +
         'style="background:transparent;border:1px solid var(--brd2);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer;color:' +
         (S.cAutoNav ? 'var(--acc);border-color:var(--acc)' : 'var(--t3)') + '">' +
-        (S.cAutoNav ? '&#9655; AUTO-NAV ON' : 'AUTO-NAV OFF') +
+        (S.cAutoNav ? t('autonav_on') : t('autonav_off')) +
       '</button>' +
       '<div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--acc)">' + done + '/' + total + '</div>' +
     '</div>' +
     '<div class="comp-prog"><div class="comp-prog-fill" style="width:' + pct + '%"></div></div>' +
     '<div class="comp-body">' +
-      '<div class="comp-stopnum">Stop ' + (idx+1) + ' of ' + total + (isLast ? ' \u2014 LAST STOP' : '') + '</div>' +
+      '<div class="comp-stopnum">' + t('stop_of').replace('{i}', idx+1).replace('{n}', total) + (isLast ? ' ' + t('last_stop') : '') + '</div>' +
       '<div class="comp-addr">' + escH(stop.address) + '</div>' +
       (function(){
         var _k = stop.pkgCount || 1;
@@ -4097,9 +4622,9 @@ function vCompanion() {
       })() +
       // Prev / Next: look back and ahead along the route without changing what has been delivered.
       '<div class="comp-browse">' +
-        '<button class="comp-bbtn" id="compPrevBtn"' + (idx <= 0 ? ' disabled' : '') + ' aria-label="Previous stop">&#8249; Prev</button>' +
+        '<button class="comp-bbtn" id="compPrevBtn"' + (idx <= 0 ? ' disabled' : '') + ' aria-label="Previous stop">' + t('prev_btn') + '</button>' +
         '<div class="comp-bpos">' + (idx + 1) + ' / ' + total + '</div>' +
-        '<button class="comp-bbtn" id="compNextBtn"' + (idx >= total - 1 ? ' disabled' : '') + ' aria-label="Next stop">Next &#8250;</button>' +
+        '<button class="comp-bbtn" id="compNextBtn"' + (idx >= total - 1 ? ' disabled' : '') + ' aria-label="Next stop">' + t('next_btn') + '</button>' +
       '</div>' +
       (reviewing ? '<div class="comp-review">' +
         '<span>' + escH(t('reviewing_stop').replace('{n}', idx + 1)) + (viewDone ? ' \u00b7 ' + escH(t('already_delivered')) : '') + '</span>' +
@@ -4116,15 +4641,15 @@ function vCompanion() {
         // While reviewing another stop, the big button must not mark anything delivered: it returns
         // the driver to the stop they are actually on.
         ? '<button class="comp-done comp-done-back" id="compBackCurBtn2">&#8617; ' + escH(t('back_to_current').replace('{n}', curIdx + 1)) + '</button>'
-        : '<button class="comp-done" id="compDoneBtn">' + (isLast ? t('finish_shift') : '&#10003; Delivered \u2014 Next Stop') + '</button>') +
+        : '<button class="comp-done" id="compDoneBtn">' + (isLast ? t('finish_shift') : t('delivered_next')) + '</button>') +
     '</div>' +
     '<div class="comp-footer">' +
       '<div class="comp-stats">' +
-        '<div><div class="comp-sn">' + done + '</div><div class="comp-sl">Done</div></div>' +
-        '<div><div class="comp-sn">' + (total-done) + '</div><div class="comp-sl">Left</div></div>' +
-        '<div><div class="comp-sn">' + (elapsed||'--') + '</div><div class="comp-sl">Time</div></div>' +
+        '<div><div class="comp-sn">' + done + '</div><div class="comp-sl">' + t('done_lbl') + '</div></div>' +
+        '<div><div class="comp-sn">' + (total-done) + '</div><div class="comp-sl">' + t('left_lbl') + '</div></div>' +
+        '<div><div class="comp-sn">' + (elapsed||'--') + '</div><div class="comp-sl">' + t('time_lbl') + '</div></div>' +
       '</div>' +
-      '<button onclick="toggleCompList()" style="background:var(--surf);border:1.5px solid var(--brd);border-radius:8px;padding:8px 14px;color:var(--t2);font-size:13px;cursor:pointer;font-family:var(--sans)">&#9776; All stops</button>' +
+      '<button onclick="toggleCompList()" style="background:var(--surf);border:1.5px solid var(--brd);border-radius:8px;padding:8px 14px;color:var(--t2);font-size:13px;cursor:pointer;font-family:var(--sans)">' + t('all_stops') + '</button>' +
     '</div>' +
   '</div>';
 }
@@ -4276,10 +4801,12 @@ function dismissReview() {
 function openSurvey() { S._surveyOpen = true; S._surveyAnswers = {}; trackEvent('survey_opened', {}); render(); }
 
 // The questions. Deliberately factual: none of them is a satisfaction score, so none can act as a filter.
+// Labels are translated (qk / ak are string-table keys); the value sent to the server stays the English text,
+// which is what feedback.js accepts and what the answers are counted by.
 var SURVEY_Q = [
-  { id: 'route_size', q: 'How many stops on a typical route?', a: ['Under 20', '20 to 40', 'Over 40'] },
-  { id: 'most_used',  q: 'Which part do you use most?',        a: ['Scanning the list', 'The optimised order', 'Shift Mode'] },
-  { id: 'improve',    q: 'What should we improve first?',      a: ['Reading addresses', 'Package counts', 'The route order', 'Speed', 'Something else'] }
+  { id: 'route_size', q: 'How many stops on a typical route?', qk: 'sq_route_size', a: ['Under 20', '20 to 40', 'Over 40'], ak: ['sa_under20', 'sa_20_40', 'sa_over40'] },
+  { id: 'most_used',  q: 'Which part do you use most?',        qk: 'sq_most_used',  a: ['Scanning the list', 'The optimised order', 'Shift Mode'], ak: ['sa_scanning', 'sa_order', 'sa_shift'] },
+  { id: 'improve',    q: 'What should we improve first?',      qk: 'sq_improve',    a: ['Reading addresses', 'Package counts', 'The route order', 'Speed', 'Something else'], ak: ['sa_addresses', 'sa_counts', 'sa_route', 'sa_speed', 'sa_other'] }
 ];
 function answerSurvey(qid, val) {
   S._surveyAnswers = S._surveyAnswers || {}; S._surveyAnswers[qid] = val;
@@ -4310,10 +4837,10 @@ function reviewCardHtml() {
   if (S._surveyOpen) {
     var h = '<div class="rev-card"><button class="rev-x" id="revXBtn" aria-label="Close">&#10005;</button>';
     SURVEY_Q.forEach(function(q) {
-      h += '<div class="rev-q">' + escH(q.q) + '</div><div class="rev-opts">';
-      q.a.forEach(function(opt) {
+      h += '<div class="rev-q">' + escH(t(q.qk)) + '</div><div class="rev-opts">';
+      q.a.forEach(function(opt, oi) {
         var on = (S._surveyAnswers || {})[q.id] === opt;
-        h += '<button class="rev-opt' + (on ? ' on' : '') + '" data-sq="' + escH(q.id) + '" data-sv="' + escH(opt) + '">' + escH(opt) + '</button>';
+        h += '<button class="rev-opt' + (on ? ' on' : '') + '" data-sq="' + escH(q.id) + '" data-sv="' + escH(opt) + '">' + escH(t(q.ak[oi])) + '</button>';
       });
       h += '</div>';
     });
@@ -9064,8 +9591,19 @@ function _buildTagHtml() {
           : (m.geoUsed ? 'positions used' : 'positions received but not used' + (m.geoWhy ? ' (' + m.geoWhy + ')' : ''));
   return '<div id="buildTag" style="font-size:9.5px;color:#585878;margin:2px 0 8px 2px;line-height:1.4">build ' + escH(FR_BUILD) +
          ' \u00b7 counts from: ' + escH(modes[m.pkgMode] || m.pkgMode || '?') + ' \u00b7 Amazon total: ' + (m.totalPackages == null ? 'not seen' : m.totalPackages) +
-         ' \u00b7 ' + escH(pos) + '</div>';
+         ' \u00b7 ' + escH(pos) + (FR_INTERNAL ? ' \u00b7 INTERNAL device (excluded from analytics)' : '') + '</div>';
 }
+
+function toggleInternalFlag() {
+  FR_INTERNAL = !FR_INTERNAL;
+  try { if (FR_INTERNAL) localStorage.setItem('fr_internal', '1'); else localStorage.removeItem('fr_internal'); } catch (e) {}
+  toast(FR_INTERNAL ? 'Internal traffic ON: this device is now excluded from analytics' : 'Internal traffic OFF: this device counts as a real user');
+  render();
+}
+document.addEventListener('click', function(e) {
+  var b = e.target && e.target.closest && e.target.closest('#buildTag');
+  if (b) toggleInternalFlag();
+});
 
 function haversineKm(lat1, lon1, lat2, lon2) {
   const R = 6371;
