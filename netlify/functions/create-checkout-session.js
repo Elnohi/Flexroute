@@ -18,7 +18,9 @@
 //
 // Contract:
 //   POST /.netlify/functions/create-checkout-session
-//   Body: { email?: "<verified email>", plan: "monthly" | "yearly" }
+//   Body: { email?: "<verified email>", plan: "monthly" | "yearly" | "month_pass" }
+//   "month_pass" = the same $9.99 monthly price, paid once: the webhook switches renewal off right after
+//   checkout, so access runs for the one paid period and then simply ends (see stripe-webhook.js).
 //   Response (200): { url: "<stripe checkout url>" }
 //   Response (4xx/5xx): { error, code }
 
@@ -57,11 +59,13 @@ async function handleCreateCheckout(body, stripe, originHost, internalTestSecret
     }
   }
   const plan = body.plan;
-  if (plan !== 'monthly' && plan !== 'yearly') {
+  if (plan !== 'monthly' && plan !== 'yearly' && plan !== 'month_pass') {
     return { statusCode: 400, body: { error: 'Invalid plan', code: 'BAD_PLAN' } };
   }
 
-  const priceId = PRICE_IDS[plan];
+  // A 30-day pass is the monthly price with renewal switched off afterwards; it needs no Price of its own, and
+  // check-entitlement.js already treats an active subscription on this price as paid until it ends.
+  const priceId = PRICE_IDS[plan === 'month_pass' ? 'monthly' : plan];
   // success_url/cancel_url point back at the app itself. {CHECKOUT_SESSION_ID}
   // is a literal Stripe template token, substituted by Stripe at redirect
   // time — flexroute.html reads it via get-checkout-email.js when the
@@ -93,6 +97,11 @@ async function handleCreateCheckout(body, stripe, originHost, internalTestSecret
     cancel_url: baseUrl + '/flexroute.html?checkout=cancelled',
     metadata: { flexroute_plan: plan },
   };
+  if (plan === 'month_pass') {
+    // Put the plan on the SUBSCRIPTION itself too (not only the session), so later subscription events can tell a
+    // pass from an ordinary monthly plan and skip the "you cancelled" email.
+    sessionParams.subscription_data = { metadata: { flexroute_plan: 'month_pass' } };
+  }
   if (email) {
     // Prefills Stripe's email field for a driver whose device already knows
     // it (e.g. previously signed in) — Stripe still lets them change it.

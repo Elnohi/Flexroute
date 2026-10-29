@@ -92,7 +92,14 @@ async function notifyAdmin(subject, text) {
 // SCHEDULED (customer.subscription.updated) and again, harmlessly, when it takes effect
 // (customer.subscription.deleted) -- the second call is deduped per subscription, and it
 // also covers immediate cancellations that never had a scheduling event. Never throws.
+// A 30-day pass is an ordinary monthly subscription with renewal switched off right after checkout. Its end is
+// planned, so it must not get the "sorry to see you go" feedback email or a "set to cancel" alert.
+function isMonthPass(sub) {
+  return !!(sub && sub.metadata && sub.metadata.flexroute_plan === 'month_pass');
+}
+
 async function onCancelSignal(sub, ended) {
+  if (isMonthPass(sub)) return { email: null, status: 'skipped (30-day pass)', endsAt: null, pass: true };
   try {
     const customer = await stripe.customers.retrieve(sub.customer);
     const email = (customer && !customer.deleted && customer.email) || null;
@@ -158,10 +165,29 @@ exports.handler = async (event) => {
         const plan = (session.metadata && session.metadata.flexroute_plan) || 'unknown plan';
         const amount = formatAmount(session.amount_total, session.currency);
         const isTestCoupon = Array.isArray(session.discounts) && session.discounts.length > 0 && amount === '$0.00';
+        const isPass = plan === 'month_pass';
+        // 30-day pass: switch renewal off so the one paid period is all they get. Idempotent (Stripe may redeliver
+        // this event) and it must never turn into a non-200 for Stripe, so every failure is caught and reported.
+        let passNote = '';
+        if (isPass) {
+          if (session.subscription) {
+            try {
+              await stripe.subscriptions.update(session.subscription, { cancel_at_period_end: true });
+              passNote = '\n(30-day pass: renewal switched off, access ends after this period.)';
+            } catch (e) {
+              console.error('[FlexRoute] stripe-webhook: could not switch pass renewal off:', e && e.message);
+              passNote = '\n\u26a0 30-day pass: COULD NOT switch renewal off (' + ((e && e.message) || 'error') +
+                '). Set "Cancel subscription at end of period" on sub ' + session.subscription + ' manually, or they will be charged again.';
+            }
+          } else {
+            passNote = '\n\u26a0 30-day pass: the session had no subscription id, so renewal was not switched off. Check Stripe.';
+          }
+        }
         await notifyAdmin(
-          (isTestCoupon ? '[TEST] ' : '') + '🎉 New FlexRoute subscriber: ' + email,
+          (isTestCoupon ? '[TEST] ' : '') + (isPass ? '30-day pass bought: ' : '🎉 New FlexRoute subscriber: ') + email,
           'Email: ' + email + '\nPlan: ' + plan + '\nAmount charged: ' + amount +
             (isTestCoupon ? '\n(Discount applied — likely an internal test checkout, not a real paying driver.)' : '') +
+            passNote +
             '\nSession: ' + session.id
         );
       }
@@ -226,6 +252,7 @@ exports.handler = async (event) => {
       const scheduledNow = sub.status !== 'canceled' &&
         ((sub.cancel_at_period_end === true && prev.cancel_at_period_end === false) ||
          (!!sub.cancel_at && prev.cancel_at === null));
+      if (scheduledNow && isMonthPass(sub)) break;       // a pass is meant to end: nothing to email or alert about
       if (scheduledNow) {
         const r = await onCancelSignal(sub, false);
         await notifyAdmin(
