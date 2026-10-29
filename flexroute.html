@@ -287,6 +287,20 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
 .ios-toast-title{font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:1.5px;color:var(--acc);margin-bottom:3px}
 .ios-toast-sub{font-size:12px;color:var(--t2);line-height:1.5}
 .ios-toast-close{font-size:18px;color:var(--t3);flex-shrink:0;padding:4px}
+.rev-card{position:relative;background:var(--surf2);border:1.5px solid var(--brd2);border-radius:16px;padding:16px 16px 14px;margin:0 0 20px;text-align:left;max-width:460px;width:100%}
+.rev-title{font-family:var(--sans);font-size:15px;font-weight:800;color:var(--t1);margin-bottom:6px;padding-right:20px}
+.rev-sub{font-size:13px;color:var(--t2);line-height:1.5;margin-bottom:13px}
+.rev-btns{display:flex;flex-direction:column;gap:9px}
+.rev-play{background:var(--acc);color:#1A1A28;border:none;border-radius:10px;padding:13px 16px;font-family:var(--sans);font-size:14px;font-weight:800;cursor:pointer;width:100%;-webkit-tap-highlight-color:transparent}
+.rev-survey{background:transparent;color:var(--t2);border:1.5px solid var(--brd2);border-radius:10px;padding:12px 16px;font-family:var(--sans);font-size:13.5px;font-weight:700;cursor:pointer;width:100%;-webkit-tap-highlight-color:transparent}
+.rev-x{position:absolute;top:8px;right:9px;background:transparent;border:none;color:var(--t3);font-size:15px;cursor:pointer;padding:4px 7px;line-height:1;-webkit-tap-highlight-color:transparent}
+.rev-q{font-size:13px;font-weight:700;color:var(--t1);margin:12px 0 7px;font-family:var(--sans)}
+.rev-q:first-of-type{margin-top:2px}
+.rev-opts{display:flex;flex-wrap:wrap;gap:7px}
+.rev-opt{background:transparent;color:var(--t2);border:1.5px solid var(--brd2);border-radius:999px;padding:8px 13px;font-size:12.5px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.rev-opt.on{background:rgba(255,153,0,.16);border-color:var(--acc);color:var(--acc);font-weight:700}
+.rev-note{width:100%;margin-top:13px;background:var(--surf);border:1.5px solid var(--brd2);border-radius:10px;padding:10px 12px;color:var(--t1);font-size:13px;font-family:inherit;resize:vertical;box-sizing:border-box}
+.rev-send{margin-top:11px;background:var(--acc);color:#1A1A28;border:none;border-radius:10px;padding:12px 16px;font-family:var(--sans);font-size:14px;font-weight:800;cursor:pointer;width:100%;-webkit-tap-highlight-color:transparent}
 .a2hs-card{position:relative;background:linear-gradient(135deg,rgba(255,153,0,.13),rgba(255,153,0,.04));border:1.5px solid rgba(255,153,0,.42);border-radius:16px;padding:15px 16px 13px;margin-bottom:14px}
 .a2hs-head{display:flex;gap:12px;align-items:flex-start}
 .a2hs-emoji{font-size:26px;line-height:1;flex-shrink:0;margin-top:1px}
@@ -376,7 +390,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.27-v48';
+  var FR_BUILD = 'v2026.10.28-v49';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1781,7 +1795,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.27-v48\n'
+            + 'build v2026.10.28-v49\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -1933,6 +1947,14 @@ var LANGS = {
     flex_stop_many: 'Flex stops',
     one_package: '1 package',
     shift_complete: 'Shift Complete!',
+    review_title: 'Nice work \u2014 shift done',
+    review_sub: 'If FlexRoute saved you time today, a rating on Google Play helps other drivers find it.',
+    review_sub_web: 'Got 15 seconds? Three quick questions would really help us improve it.',
+    review_play: '\u2605 Rate on Google Play',
+    review_survey: 'Answer 3 quick questions',
+    survey_note: 'Anything else? (optional)',
+    survey_send: 'Send',
+    survey_thanks: 'Thanks \u2014 that really helps.',
     reviewing_stop: 'Reviewing stop {n}',
     already_delivered: 'already delivered',
     back_to_current: 'Back to stop {n}',
@@ -2133,6 +2155,14 @@ var LANGS = {
     flex_stop_many: 'Arrêts Flex',
     one_package: '1 colis',
     shift_complete: 'Quart terminé !',
+    review_title: 'Beau travail \u2014 quart termin\u00e9',
+    review_sub: 'Si FlexRoute vous a fait gagner du temps, une note sur Google Play aide les autres chauffeurs \u00e0 le trouver.',
+    review_sub_web: 'Vous avez 15 secondes ? Trois questions rapides nous aideraient beaucoup.',
+    review_play: '\u2605 Noter sur Google Play',
+    review_survey: 'R\u00e9pondre \u00e0 3 questions',
+    survey_note: 'Autre chose ? (facultatif)',
+    survey_send: 'Envoyer',
+    survey_thanks: 'Merci, c\u2019est tr\u00e8s utile.',
     reviewing_stop: 'Consultation de l’arrêt {n}',
     already_delivered: 'déjà livré',
     back_to_current: 'Retour à l’arrêt {n}',
@@ -2333,6 +2363,14 @@ var LANGS = {
     flex_stop_many: 'Flex-Stopps',
     one_package: '1 Paket',
     shift_complete: 'Schicht abgeschlossen!',
+    review_title: 'Gut gemacht \u2014 Schicht fertig',
+    review_sub: 'Wenn FlexRoute Ihnen heute Zeit gespart hat, hilft eine Bewertung bei Google Play anderen Fahrern.',
+    review_sub_web: '15 Sekunden Zeit? Drei kurze Fragen w\u00fcrden uns sehr helfen.',
+    review_play: '\u2605 Bei Google Play bewerten',
+    review_survey: '3 kurze Fragen beantworten',
+    survey_note: 'Noch etwas? (optional)',
+    survey_send: 'Senden',
+    survey_thanks: 'Danke, das hilft uns sehr.',
     reviewing_stop: 'Stopp {n} ansehen',
     already_delivered: 'bereits zugestellt',
     back_to_current: 'Zur\u00fcck zu Stopp {n}',
@@ -2533,6 +2571,14 @@ var LANGS = {
     flex_stop_many: 'Paradas Flex',
     one_package: '1 paquete',
     shift_complete: '¡Turno completado!',
+    review_title: 'Buen trabajo \u2014 turno completado',
+    review_sub: 'Si FlexRoute te ahorr\u00f3 tiempo hoy, una valoraci\u00f3n en Google Play ayuda a otros conductores.',
+    review_sub_web: '\u00bfTienes 15 segundos? Tres preguntas r\u00e1pidas nos ayudar\u00edan mucho.',
+    review_play: '\u2605 Valorar en Google Play',
+    review_survey: 'Responder 3 preguntas',
+    survey_note: '\u00bfAlgo m\u00e1s? (opcional)',
+    survey_send: 'Enviar',
+    survey_thanks: 'Gracias, nos ayuda mucho.',
     reviewing_stop: 'Viendo la parada {n}',
     already_delivered: 'ya entregada',
     back_to_current: 'Volver a la parada {n}',
@@ -3769,7 +3815,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.27-v48</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.28-v49</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -4001,6 +4047,7 @@ function vCompanion() {
       '<div style="font-size:56px;margin-bottom:16px">🎉</div>' +
       '<div style="font-family:var(--sans);font-size:40px;font-weight:900;color:var(--ok);margin-bottom:10px">Shift Complete!</div>' +
       '<div style="font-size:17px;color:var(--t2);margin-bottom:28px">' + done + ' stops' + (elapsed ? ' in ' + elapsed : '') + '</div>' +
+      reviewCardHtml() +
       _homeBtn +
       '<button id="compFinishBtn" class="btn bp" style="font-size:18px;padding:16px 32px">&#10003; Done &mdash; Back to route</button>' +
       '</div></div>';
@@ -4161,6 +4208,7 @@ function markDelivered() {
   else {
     S.cIdx = stops.length;
     trackEvent('companion_completed', { stop_count: stops.length, elapsed_mins: Math.round((Date.now() - S.cShiftStart) / 60000) });
+    reviewNoteShift();   // a completed shift is what earns the right to ask for a rating
   }
   saveSession(); render();
 
@@ -4186,6 +4234,104 @@ function markDelivered() {
 var _leafletLoaded = false;
 var _mapInstance   = null;  // the current Leaflet map instance
 var _mapPopupEl    = null;  // the custom nav popup DOM element
+
+// ─── Rating invitation and mini survey ────────────────────────────────────────────────────────────
+// Shown after a COMPLETED shift, the one moment a driver has actually finished a route with the app.
+//
+// Google Play forbids "review gating": asking how someone feels and then showing the store link only to
+// the happy ones. So there is NO satisfaction question anywhere in this flow. Both buttons are offered to
+// everyone, side by side, every time the card appears, and the survey never decides who sees the Play link.
+// The survey questions are factual (route size, which feature, what to improve) rather than "how do you
+// like it", for the same reason.
+var REVIEW_MIN_DAYS = 60;      // never ask the same driver more often than this
+var REVIEW_MAX_ASKS = 3;       // and never more than this many times in total
+var PLAY_ID = 'com.flexrouteapp.twa';
+
+function _revState() { try { return JSON.parse(localStorage.getItem('fr_review') || '{}'); } catch (e) { return {}; } }
+function _revSave(st) { try { localStorage.setItem('fr_review', JSON.stringify(st)); } catch (e) {} }
+// Only Android app users have a Play listing to rate; everyone else just gets the survey.
+function _canRatePlay() { return FR_PLATFORM === 'android'; }
+function canShowReview() {
+  var st = _revState();
+  if (st.dismissed || st.rated) return false;
+  if ((st.asks || 0) >= REVIEW_MAX_ASKS) return false;
+  if (st.last && Date.now() - st.last < REVIEW_MIN_DAYS * 86400000) return false;
+  // The shift that just finished is already counted, so 2 means "this is at least their second".
+  return (st.shifts || 0) >= 2;                       // never on a driver's very first completed shift
+}
+function reviewNoteShift() { var st = _revState(); st.shifts = (st.shifts || 0) + 1; _revSave(st); }
+// One place for leaving the app. A TWA runs in a Chrome Custom Tab, which silently swallows
+// window.open(_, '_blank'), so every such link has to navigate directly instead.
+function goToExternal(url) { window.location.href = url; }
+function playListingUrl() { return 'https://play.google.com/store/apps/details?id=' + PLAY_ID + '&showAllReviews=true'; }
+function openPlayReview() {
+  var st = _revState(); st.rated = true; _revSave(st);
+  trackEvent('review_play_clicked', { platform: FR_PLATFORM });
+  goToExternal(playListingUrl());
+}
+function dismissReview() {
+  var st = _revState(); st.dismissed = true; _revSave(st);
+  trackEvent('review_prompt_dismissed', {}); S._surveyOpen = false; render();
+}
+function openSurvey() { S._surveyOpen = true; S._surveyAnswers = {}; trackEvent('survey_opened', {}); render(); }
+
+// The questions. Deliberately factual: none of them is a satisfaction score, so none can act as a filter.
+var SURVEY_Q = [
+  { id: 'route_size', q: 'How many stops on a typical route?', a: ['Under 20', '20 to 40', 'Over 40'] },
+  { id: 'most_used',  q: 'Which part do you use most?',        a: ['Scanning the list', 'The optimised order', 'Shift Mode'] },
+  { id: 'improve',    q: 'What should we improve first?',      a: ['Reading addresses', 'Package counts', 'The route order', 'Speed', 'Something else'] }
+];
+function answerSurvey(qid, val) {
+  S._surveyAnswers = S._surveyAnswers || {}; S._surveyAnswers[qid] = val;
+  trackEvent('survey_answered', { question: qid, answer: val });
+  render();
+}
+async function submitSurvey() {
+  var ans = S._surveyAnswers || {};
+  var note = (document.getElementById('surveyNote') || {}).value || '';
+  var st = _revState(); st.surveyed = true; _revSave(st);
+  trackEvent('survey_completed', { answered: Object.keys(ans).length, has_note: note ? 1 : 0 });
+  S._surveyDone = true; S._surveyOpen = false; render();
+  try {
+    await fetch('/.netlify/functions/feedback', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers: ans, note: note.slice(0, 1000), stops: (S.optimized || []).length,
+        platform: FR_PLATFORM, display: FR_DISPLAY, lang: S.lang || 'en', region: S.userState || '' })
+    });
+  } catch (e) { /* the driver already saw "thanks"; a failed send is not their problem */ }
+}
+function reviewCardHtml() {
+  if (!canShowReview() && !S._surveyOpen && !S._surveyDone) return '';
+  if (S._surveyDone) {
+    return '<div class="rev-card"><div class="rev-title">' + escH(t('survey_thanks')) + '</div>' +
+      (_canRatePlay() ? '<div class="rev-sub">' + escH(t('review_sub')) + '</div>' +
+        '<button class="rev-play" id="revPlayBtn">' + escH(t('review_play')) + '</button>' : '') + '</div>';
+  }
+  if (S._surveyOpen) {
+    var h = '<div class="rev-card"><button class="rev-x" id="revXBtn" aria-label="Close">&#10005;</button>';
+    SURVEY_Q.forEach(function(q) {
+      h += '<div class="rev-q">' + escH(q.q) + '</div><div class="rev-opts">';
+      q.a.forEach(function(opt) {
+        var on = (S._surveyAnswers || {})[q.id] === opt;
+        h += '<button class="rev-opt' + (on ? ' on' : '') + '" data-sq="' + escH(q.id) + '" data-sv="' + escH(opt) + '">' + escH(opt) + '</button>';
+      });
+      h += '</div>';
+    });
+    h += '<textarea id="surveyNote" class="rev-note" rows="2" placeholder="' + escH(t('survey_note')) + '"></textarea>';
+    h += '<button class="rev-send" id="revSendBtn">' + escH(t('survey_send')) + '</button></div>';
+    return h;
+  }
+  // The invitation. Both buttons for everyone, no question in front of them.
+  var st2 = _revState();
+  if (!S._revLogged) { S._revLogged = true; st2.asks = (st2.asks || 0) + 1; st2.last = Date.now(); _revSave(st2);
+    trackEvent('review_prompt_shown', { asks: st2.asks, platform: FR_PLATFORM }); }
+  var h2 = '<div class="rev-card"><button class="rev-x" id="revXBtn" aria-label="Close">&#10005;</button>';
+  h2 += '<div class="rev-title">' + escH(t('review_title')) + '</div>';
+  h2 += '<div class="rev-sub">' + escH(_canRatePlay() ? t('review_sub') : t('review_sub_web')) + '</div><div class="rev-btns">';
+  if (_canRatePlay()) h2 += '<button class="rev-play" id="revPlayBtn">' + escH(t('review_play')) + '</button>';
+  h2 += '<button class="rev-survey" id="revSurveyBtn">' + escH(t('review_survey')) + '</button></div></div>';
+  return h2;
+}
 
 function toggleRouteMap() {
   S._mapOpen = !S._mapOpen;
@@ -4440,6 +4586,15 @@ function bindMap() {
 function bindCompanion() {
   var btn = document.getElementById('compDoneBtn');
   if (btn) btn.addEventListener('click', markDelivered);
+  on('revPlayBtn',   'click', openPlayReview);
+  on('revSurveyBtn', 'click', openSurvey);
+  on('revXBtn',      'click', dismissReview);
+  on('revSendBtn',   'click', submitSurvey);
+  var _revWrap = document.querySelector('.rev-card');
+  if (_revWrap) _revWrap.addEventListener('click', function(e) {
+    var b = e.target.closest && e.target.closest('[data-sq]');
+    if (b) answerSurvey(b.getAttribute('data-sq'), b.getAttribute('data-sv'));
+  });
   on('compPrevBtn', 'click', function(){ compBrowse(-1); });
   on('compNextBtn', 'click', function(){ compBrowse(1); });
   on('compBackCurBtn',  'click', compBackToCurrent);

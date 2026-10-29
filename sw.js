@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v48';   // v48: Asia + Australia address formats (unit/level/shop/office/floor prefixes keep the street, No./Lot/Villa/Blk forms kept whole, Japanese and Korean numbering, jalan/lorong/daero streets) and a city line with a postcode is never taken for the address
+const CACHE = 'flexroute-v49';   // v49: after a completed shift, an invitation to rate on Google Play plus an optional 3-question survey - both offered to everyone, no satisfaction question anywhere (Play forbids review gating) + new feedback function
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
