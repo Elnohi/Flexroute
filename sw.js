@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v53';   // v53: street check (a stop that sits on a different street than its address says is moved onto the right one when the road network confirms it, otherwise flagged with an amber check), label-aware geocoder choice, road table fetched once and reused
+const CACHE = 'flexroute-v54';   // v54: street check tolerates a one-letter typo in the street name (and corrects the address), runs three stops at a time, the distance shown is for the order shown even if the route re-measure fails, route report lists flagged stops and can copy the raw road data
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

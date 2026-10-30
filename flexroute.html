@@ -399,7 +399,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.30-v53';
+  var FR_BUILD = 'v2026.10.30-v54';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1824,7 +1824,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.30-v53\n'
+            + 'build v2026.10.30-v54\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4403,7 +4403,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v53</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v54</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -6957,10 +6957,10 @@ async function optimize() {
       // OSRM's own order and figures, kept so every later step can be undone if it would lengthen the drive.
       const _osrmOrder = optimizedOrder.slice(), _osrmDist = tripDist, _osrmDur = tripDur;
       // 1) Refine OSRM's order with real road times (it is a heuristic: swaps/moves can still save time).
-      let _orderChanged = false, _groupedTogether = false, _refSavedS = 0, _refApprox = false;
+      let _orderChanged = false, _groupedTogether = false, _refSavedS = 0, _refApprox = false, _refTot = null, _remeasure = 'not needed';
       try {
         const _ref = await _refineWithRoadTimes(optimizedOrder, startPt, S.homeCoords, S.lastId, [orderedForTrip]);
-        if (_ref.changed) { optimizedOrder = _ref.order; _orderChanged = true; _refSavedS = _ref.savedSec; _refApprox = !!_ref.approx; }
+        if (_ref.changed) { optimizedOrder = _ref.order; _orderChanged = true; _refSavedS = _ref.savedSec; _refApprox = !!_ref.approx; _refTot = { m: _ref.totM, s: _ref.totS }; }
       } catch (_e) { /* keep OSRM's order */ }
       // 2) Stops that are physically together are visited together (never at a cost of >1.5 km straight-line).
       const _grp = _groupColocated(optimizedOrder, s => s.coords, s => s.id === S.lastId);
@@ -6980,10 +6980,16 @@ async function optimize() {
             // Safeguard: these changes would make the drive longer than OSRM's own order. Don't ship them.
             optimizedOrder = _osrmOrder; tripDist = _osrmDist; tripDur = _osrmDur;
             _orderChanged = false; _groupedTogether = false;
+            _remeasure = 'reverted';
             S._routeNotes.push("Kept the router's own order (the fine-tuning would have added driving distance).");
             trackEvent('route_changes_reverted', { extra_m: Math.round(_nr.distance - _osrmDist), region: S.userState || 'unknown' });
-          } else if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; }
-        } catch (_e) { /* keep the OSRM trip figures */ }
+          } else if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; _remeasure = 'ok'; }
+          else if (_refTot && _refTot.m != null) {
+            // The route lookup did not answer. The order IS the new one, so show the road table's total for it rather than
+            // the first draft's figures, which would be for a different order.
+            tripDist = _refTot.m; tripDur = _refTot.s; _remeasure = 'failed: showing the road table total';
+          } else _remeasure = 'failed';
+        } catch (_e) { _remeasure = 'failed'; /* keep the OSRM trip figures */ }
       }
       // Last safeguard: never present an order that is longer AND slower than Amazon's own on the same roads.
       // Amazon's order is one of the drafts the search started from, so this should not happen; if it does, say so
@@ -6996,7 +7002,7 @@ async function optimize() {
       }
       S._diag = S._diag || {};
       S._diag.route = { amazonM: origDist, amazonS: origDur, draftM: _osrmDist, draftS: _osrmDur, finalM: tripDist, finalS: tripDur,
-                        n: geocodedStops.length, at: Date.now() };
+                        n: geocodedStops.length, at: Date.now(), remeasure: _remeasure };
       // Say what changed, measured against the order the router gave and the route actually re-measured,
       // so the note can never describe a step that a later step undid.
       // Nothing is reported unless the order the driver actually gets differs from the router's own:
@@ -9772,13 +9778,14 @@ function buildRouteReport() {
          '  | home ' + (S.homeCoords ? S.homeCoords.lat.toFixed(5) + ',' + S.homeCoords.lon.toFixed(5) : 'none'));
   L.push('Amazon order : ' + f1(d.amazonM) + ', ' + fm(d.amazonS) + '   (as routed on the roads)');
   L.push('Router draft : ' + f1(d.draftM) + ', ' + fm(d.draftS));
-  L.push('Shown to you : ' + f1(d.finalM) + ', ' + fm(d.finalS));
+  L.push('Shown to you : ' + f1(d.finalM) + ', ' + fm(d.finalS) + (d.remeasure && d.remeasure !== 'not needed' ? '   (re-measure: ' + d.remeasure + ')' : ''));
   if (r) L.push('Search       : ' + (r.approx ? 'STRAIGHT-LINE estimates (road table unavailable)' : 'road times') + ' | ' + r.starts + ' starting orders, best was #' + (r.from + 1) +
                 ' | ' + r.iters + ' shake rounds, ' + r.ms + ' ms | draft ' + f1(r.baseM) + ' -> ' + f1(r.bestM) + ' | ' + (r.kept ? 'KEPT' : 'not used'));
   else L.push('Search       : did not run (fewer than 4 stops, or the router was unavailable)');
   var st = (S._diag && S._diag.street) || null;
   L.push('Street check : ' + (st ? (st.ran ? st.checked + ' checked, ' + st.flagged + ' off their street, ' + st.moved + ' moved, ' + st.suspect + ' could not be confirmed (' + st.ms + ' ms)'
                                              : 'did not run (the road table was unavailable)') : 'not run in this session'));
+  if (st && st.detail && st.detail.length) st.detail.forEach(function(x) { L.push('   flagged     : ' + x.addr + '  (snapped to ' + x.snappedTo + ')  ->  ' + x.outcome); });
   var sv = _streetVisits(list);
   L.push('Streets      : ' + sv.total + ' separate street visits on ' + sv.streets + ' streets' + (sv.multi.length ? ' | returns to: ' + sv.multi.join(', ') : ' | no street is visited twice'));
   var amz = (S.stops || []).filter(function(s) { return !s.geoFailed; }).slice().sort(function(a, b) { return (a.flexNum == null ? 1e9 : a.flexNum) - (b.flexNum == null ? 1e9 : b.flexNum); });
@@ -9798,12 +9805,26 @@ function buildRouteReport() {
     prevId = cur;
     L.push(String(i + 1).padEnd(4) + (s.flexNum != null ? ('#' + s.flexNum) : '-').padEnd(6) + leg + (s.coords ? s.coords.lat.toFixed(5) + ',' + s.coords.lon.toFixed(5) : 'no coords').padEnd(24) + s.address +
            ((s.pkgCount || 1) > 1 ? '  [' + s.pkgCount + ' pkgs]' : '') +
-           (s.geoFixed ? '   <-- MOVED ' + s.geoFixed + ' m onto its own street' : '') + (s.geoSuspect ? '   <-- SUSPECT: ' + (s.geoNote || '') : ''));
+           (s.geoFixed ? '   <-- MOVED ' + s.geoFixed + ' m onto its own street' : '') + (s.addrWas ? ' (address corrected from "' + s.addrWas.split(',')[0] + '")' : '') + (s.geoSuspect ? '   <-- SUSPECT: ' + (s.geoNote || '') : ''));
   });
   if (T && prevId != null && idx['__home__'] != null && idx[prevId] != null) {
     L.push('home'.padEnd(10) + String((T.dist[idx[prevId]][idx['__home__']] / 1000).toFixed(1)).padStart(6) + String(Math.round(T.dur[idx[prevId]][idx['__home__']] / 60)).padStart(8));
   }
   return L.join('\n');
+}
+// The raw road times between every stop, so the order can be checked offline against the SAME numbers the app used.
+function buildRoadData() {
+  var T = S._lastTable; if (!T) return null;
+  var byId = {}; (S.optimized || []).forEach(function(s) { byId[s.id] = s; });
+  var pts = T.ids.map(function(id) {
+    if (id === '__start__') return { n: 'START', lat: S._startPt.lat, lon: S._startPt.lon };
+    if (id === '__home__') return { n: 'HOME', lat: S.homeCoords.lat, lon: S.homeCoords.lon };
+    var s = byId[id]; return { n: s ? '#' + (s.flexNum != null ? s.flexNum : '?') : id, lat: s && s.coords ? +s.coords.lat.toFixed(5) : null, lon: s && s.coords ? +s.coords.lon.toFixed(5) : null };
+  });
+  var idx = {}; T.ids.forEach(function(id, k) { idx[id] = k; });
+  var shown = [].concat(idx['__start__'] != null ? [idx['__start__']] : [], (S.optimized || []).filter(function(s) { return !s.geoFailed; }).map(function(s) { return idx[s.id]; }), idx['__home__'] != null ? [idx['__home__']] : []);
+  return JSON.stringify({ build: FR_BUILD, approx: !!T.approx, shown: shown, pts: pts,
+    dur: T.dur.map(function(r) { return r.map(function(x) { return Math.round(x); }); }), dist: T.dist.map(function(r) { return r.map(function(x) { return Math.round(x); }); }) });
 }
 function showRouteReport() {
   var txt = buildRouteReport();
@@ -9813,10 +9834,15 @@ function showRouteReport() {
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;padding:14px;overflow:auto';
   var b = document.createElement('button'); b.id = 'routeReportClose'; b.className = 'btn bp'; b.style.cssText = 'width:100%;height:44px;margin-bottom:12px'; b.textContent = 'Close';
   b.addEventListener('click', function() { ov.remove(); });
+  var rd = document.createElement('button'); rd.id = 'routeReportData'; rd.className = 'btn bg'; rd.style.cssText = 'width:100%;height:40px;margin-bottom:12px'; rd.textContent = 'Copy road data (for checking the order)';
+  rd.addEventListener('click', function() {
+    var j = buildRoadData(); if (!j) { toast('No road data in this session'); return; }
+    try { navigator.clipboard.writeText(j).then(function() { toast('Road data copied (' + Math.round(j.length / 1024) + ' KB)'); }, function() { toast('Copy failed'); }); } catch (e) { toast('Copy failed'); }
+  });
   var pre = document.createElement('pre'); pre.id = 'routeReportText';
   pre.style.cssText = 'white-space:pre;overflow-x:auto;font-size:10.5px;line-height:1.45;color:#d8d8f0;font-family:ui-monospace,Menlo,Consolas,monospace;margin:0';
   pre.textContent = txt;
-  ov.appendChild(b); ov.appendChild(pre); document.body.appendChild(ov);
+  ov.appendChild(b); ov.appendChild(rd); ov.appendChild(pre); document.body.appendChild(ov);
 }
 
 
@@ -9848,11 +9874,26 @@ function _houseNumOf(addr) {
   var m = a.match(/^[A-Za-z]{0,3}\d+[A-Za-z]?\s*[\-\/]\s*(\d+)/) || a.match(/^(\d+)/);
   return m ? parseInt(m[1], 10) : null;
 }
+// True when two words differ by at most one inserted, missing or changed letter ("coxwel" / "coxwell").
+function _editLE1(a, b) {
+  if (a === b) return true;
+  var la = a.length, lb = b.length; if (Math.abs(la - lb) > 1) return false;
+  var i = 0, j = 0, edits = 0;
+  while (i < la && j < lb) {
+    if (a.charAt(i) === b.charAt(j)) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (la > lb) i++; else if (lb > la) j++; else { i++; j++; }
+  }
+  return edits + (la - i) + (lb - j) <= 1;
+}
+// Short words must match exactly (Lynn is not Lyon); longer ones may be one letter off, because the screenshot reader
+// does drop a letter now and then (a real route had "Coxwel Ave" for Coxwell Ave).
+function _tokenClose(a, b) { return a === b || (a.length >= 6 && b.length >= 6 && _editLE1(a, b)); }
 function _coreMatches(a, b) {
   if (!a || !b) return false;
   if (a === b) return true;
   var A = a.split(' '), B = b.split(' '), small = A.length <= B.length ? A : B, big = A.length <= B.length ? B : A;
-  return small.every(function(w) { return big.indexOf(w) >= 0; });                  // "gerrard" matches "lower gerrard"
+  return small.every(function(w) { return big.some(function(x) { return _tokenClose(w, x); }); });   // "gerrard" matches "lower gerrard"
 }
 // Only street names that are plain words can be compared safely (numbered roads and highways are named inconsistently).
 function _checkableCore(core) {
@@ -9886,7 +9927,7 @@ async function _geoCandidatesFor(address, biasLat, biasLon) {
         label: f.properties ? [f.properties.housenumber, f.properties.street || f.properties.name].filter(Boolean).join(' ') : '' }; });
     } catch (e) { return []; }
   }
-  var a = await photon(true), b = await photon(false);
+  var both = await Promise.all([photon(true), photon(false)]), a = both[0], b = both[1];
   a.concat(b).forEach(function(c) { if (!out.some(function(o) { return haversineKm(o.lat, o.lon, c.lat, c.lon) < 0.015; })) out.push(c); });
   var core = _streetCoreOf(address);
   if (!out.some(function(c) { return _coreMatches(_streetCoreOf(c.label), core); })) {
@@ -9940,29 +9981,39 @@ async function _verifyStopStreets(stops, startPt) {
     res.flagged = flagged.length;
     var med = (function() { var la = stops.map(function(s) { return s.coords.lat; }).sort(function(a, b) { return a - b; }), lo = stops.map(function(s) { return s.coords.lon; }).sort(function(a, b) { return a - b; });
       return { lat: la[la.length >> 1], lon: lo[lo.length >> 1] }; })();
-    var changed = false;
-    for (var i = 0; i < flagged.length && i < STREET_CHECK_MAX; i++) {
-      if (Date.now() > deadline) break;
-      var f = flagged[i];
-      var near = await _nearbyRoadMatches(f.s.coords, f.core); await _pause(120);
-      if (near !== false) continue;                      // true: just a corner lot. null: the lookup failed, so do not guess.
-      var cands = await _geoCandidatesFor(f.s.address, med.lat, med.lon), num = _houseNumOf(f.s.address), fixed = null;
+    var changed = false; res.detail = [];
+    async function handle(f) {
+      var d = { addr: f.s.address.split(',')[0], snappedTo: f.name, outcome: '' }; res.detail.push(d);
+      var near = await _nearbyRoadMatches(f.s.coords, f.core);
+      if (near === true) { d.outcome = 'fine: its own street is right beside it (a corner lot)'; return; }
+      if (near === null) { d.outcome = 'not checked: the road lookup failed'; return; }
+      var both = await Promise.all([_geoCandidatesFor(f.s.address, med.lat, med.lon)]), cands = both[0], num = _houseNumOf(f.s.address), fixed = null;
       cands = cands.filter(function(c) {
         var lbl = _streetCoreOf(c.label); if (!_coreMatches(lbl, f.core)) return false;
         var cn = _houseNumOf(c.label); if (num != null && cn !== num) return false;       // the very house number, on the right street
         if (haversineKm(c.lat, c.lon, med.lat, med.lon) > 8) return false;
         return haversineKm(c.lat, c.lon, f.s.coords.lat, f.s.coords.lon) > 0.04;           // not the same wrong place again
       }).sort(function(a, b) { return haversineKm(a.lat, a.lon, med.lat, med.lon) - haversineKm(b.lat, b.lon, med.lat, med.lon); });
-      for (var j = 0; j < cands.length && j < 3 && !fixed && Date.now() < deadline; j++) {
-        var ok = await _nearbyRoadMatches({ lat: cands[j].lat, lon: cands[j].lon }, f.core); await _pause(120);
+      for (var j = 0; j < cands.length && j < 2 && !fixed && Date.now() < deadline; j++) {
+        var ok = await _nearbyRoadMatches({ lat: cands[j].lat, lon: cands[j].lon }, f.core);
         if (ok === true) fixed = cands[j];
       }
       if (fixed) {
         var moved = Math.round(haversineKm(f.s.coords.lat, f.s.coords.lon, fixed.lat, fixed.lon) * 1000);
         f.s.coords = { lat: fixed.lat, lon: fixed.lon }; f.s.geoNote = 'moved ' + moved + ' m: it had been placed on ' + f.name;
-        f.s.geoFixed = moved; res.moved++; changed = true;
-      } else { f.s.geoSuspect = true; f.s.geoNote = 'placed on ' + f.name; res.suspect++; }
+        f.s.geoFixed = moved; res.moved++; changed = true; d.outcome = 'moved ' + moved + ' m onto its own street';
+        // A misspelt street (one letter off) is corrected in the address too, so navigation by address finds it as well.
+        var fc = _streetCoreOf(fixed.label), nm = String(f.s.address).match(/^([A-Za-z]{0,3}\d+[A-Za-z]?\s*(?:[\-\/]\s*\d+[A-Za-z]?\s*)?(?:1\/2\s+)?)([^,]+?)(\s*(?:,.*)?)$/);
+        var right = String(fixed.label || '').replace(/^\S*\d\S*\s+/, '').trim();
+        if (fc && fc !== f.core && nm && right && !/\b(unit|suite|ste|apt|front porch|buzz)\b/i.test(nm[2])) {
+          f.s.addrWas = f.s.address; f.s.address = nm[1] + right + nm[3]; d.outcome += '; address corrected from "' + f.s.addrWas.split(',')[0] + '"';
+        }
+      } else { f.s.geoSuspect = true; f.s.geoNote = 'placed on ' + f.name; res.suspect++; d.outcome = 'could not be confirmed: no candidate on its street was verified'; }
     }
+    var queue = flagged.slice(0, STREET_CHECK_MAX);
+    async function worker() { while (queue.length && Date.now() < deadline) { await handle(queue.shift()); await _pause(60); } }
+    await Promise.all([worker(), worker(), worker()]);                  // three stops at a time, not one after another
+    queue.forEach(function(f) { res.detail.push({ addr: f.s.address.split(',')[0], snappedTo: f.name, outcome: 'not checked: out of time' }); });
     if (changed) {                                       // positions changed, so the road matrix has to be fetched again
       m = mk(); var D2 = await _osrmTable(m.pts);
       S._tableCache = D2 ? { ids: m.ids, pts: m.pts, dur: D2.dur, dist: D2.dist, names: D2.names } : null;
@@ -10046,7 +10097,7 @@ async function _refineWithRoadTimes(order, startPt, homePt, lockedId, altOrders)
   if (out.length !== order.length) return { order: order, changed: false };
   var moved = 0; out.forEach(function(s, k) { if (s !== order[k]) moved++; });
   if (!moved) return { order: order, changed: false };
-  return { order: out, changed: true, swaps: moved, savedM: Math.round(savedM), savedSec: Math.round(savedT), approx: approx };
+  return { order: out, changed: true, swaps: moved, savedM: Math.round(savedM), savedSec: Math.round(savedT), approx: approx, totM: Math.round(dBest), totS: Math.round(tBest) };
 }
 
 // Resolve with `fallback` if `p` has not settled within `ms`. A browser fetch has NO timeout of its own, so one
