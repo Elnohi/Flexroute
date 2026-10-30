@@ -399,7 +399,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.29-v50';
+  var FR_BUILD = 'v2026.10.29-v51';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -409,6 +409,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
       if (p.display_mode === undefined) p.display_mode = FR_DISPLAY;
       if (p.platform === undefined) p.platform = FR_PLATFORM;
       if (FR_INTERNAL && p.traffic_type === undefined) p.traffic_type = 'internal';
+      try { if (typeof S !== 'undefined' && S && S._sample && p.sample === undefined) p.sample = 1; } catch (e) {}
       gtag('event', name, p);
     }
   }
@@ -915,8 +916,10 @@ function a2hsCard() {
 }
 
 function saveSession() {
+  if (S._sample) return;            // a sample route is never written to the driver's saved session
   try {
     localStorage.setItem('fr_session', JSON.stringify({
+      savedAt: Date.now(),
       stops: S.stops, optimized: S.optimized, savings: S.savings,
       lastId: S.lastId, startAddr: S.startAddr, uid: S.uid,
       geoFailed: S.geoFailed,
@@ -1324,6 +1327,13 @@ window.addEventListener('load', () => {
           // next stop. So the snapshot is only a fallback when no preference
           // was ever stored.
           if (!S.cNavApp && p.cNavApp) S.cNavApp = p.cNavApp;
+          // Coming back to a shift in progress after a pause (a quick hop to Waze and back is not counted).
+          try {
+            var _gap = p.savedAt ? Math.round((Date.now() - p.savedAt) / 60000) : -1;
+            if ((S.cDone.length > 0 || S.cIdx > 0) && (_gap < 0 || _gap >= 5)) {
+              trackEvent('companion_resumed', { done: S.cDone.length, total: S.optimized.filter(function(x) { return !x.geoFailed; }).length, gap_min: _gap });
+            }
+          } catch (e) {}
         }
         S.phase = (p.optimized && p.optimized.length > 0) ? 'result' : 'input';
         render();
@@ -1738,7 +1748,10 @@ function bind() {
           S.tweakMode = false; saveSession(); reoptimizeRemaining(); break;
         }
         optimize(); break;
-      case 'bkBtn':        S.phase='input'; S.errMsg=''; S.geoFailed=[]; render(); break;
+      case 'bkBtn':        if (S._sample) { exitSample('back'); break; } S.phase='input'; S.errMsg=''; S.geoFailed=[]; render(); break;
+      case 'sampleBtn':    startSample(); break;
+      case 'sampleScanBtn': trackEvent('sample_cta_clicked', { action: 'scan_own' }); exitSample('scan_own', true); break;
+      case 'sampleCloseBtn': exitSample('close'); break;
       case 'stopCapUnlockBtn':
         S._paywallReason = 'stop_count_exceeded';
         S._paywallStopCount = S._trialStopCapTotal;
@@ -1811,7 +1824,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.29-v50\n'
+            + 'build v2026.10.29-v51\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -1963,6 +1976,13 @@ var LANGS = {
     flex_stop_many: 'Flex stops',
     one_package: '1 package',
     shift_complete: 'Shift Complete!',
+    sample_link: 'No itinerary handy? Try a sample route',
+    sample_banner_title: 'Sample route',
+    sample_banner_text: 'Made-up addresses and estimated savings, so you can see how it works. Nothing here is saved or counted as one of your routes.',
+    sample_cta: 'Scan my own route',
+    sample_close: 'Close sample',
+    sample_depot: 'Sample warehouse',
+    sample_home: 'Sample home',
     nav_home: 'Navigate to Home',
     in_word: 'in',
     autonav_on: '&#9655; AUTO-NAV ON',
@@ -2228,6 +2248,13 @@ var LANGS = {
     flex_stop_many: 'Arrêts Flex',
     one_package: '1 colis',
     shift_complete: 'Quart terminé !',
+    sample_link: 'Pas de liste sous la main ? Essayez un itinéraire exemple',
+    sample_banner_title: 'Itinéraire exemple',
+    sample_banner_text: 'Adresses fictives et économies estimées, pour voir comment ça marche. Rien n’est enregistré ni compté comme l’un de vos itinéraires.',
+    sample_cta: 'Scanner mon itinéraire',
+    sample_close: 'Fermer l’exemple',
+    sample_depot: 'Entrepôt exemple',
+    sample_home: 'Domicile exemple',
     nav_home: 'Naviguer vers le domicile',
     in_word: 'en',
     autonav_on: '&#9655; AUTO-NAV ACTIVÉE',
@@ -2493,6 +2520,13 @@ var LANGS = {
     flex_stop_many: 'Flex-Stopps',
     one_package: '1 Paket',
     shift_complete: 'Schicht abgeschlossen!',
+    sample_link: 'Keine Liste zur Hand? Beispielroute ausprobieren',
+    sample_banner_title: 'Beispielroute',
+    sample_banner_text: 'Erfundene Adressen und geschätzte Ersparnis, damit Sie sehen, wie es funktioniert. Nichts davon wird gespeichert oder als Ihre Route gezählt.',
+    sample_cta: 'Meine eigene Route scannen',
+    sample_close: 'Beispiel schließen',
+    sample_depot: 'Beispiel-Lager',
+    sample_home: 'Beispiel-Zuhause',
     nav_home: 'Navigation nach Hause',
     in_word: 'in',
     autonav_on: '&#9655; AUTO-NAV AN',
@@ -2758,6 +2792,13 @@ var LANGS = {
     flex_stop_many: 'Paradas Flex',
     one_package: '1 paquete',
     shift_complete: '¡Turno completado!',
+    sample_link: '¿No tienes tu lista a mano? Prueba una ruta de ejemplo',
+    sample_banner_title: 'Ruta de ejemplo',
+    sample_banner_text: 'Direcciones inventadas y ahorro estimado, para que veas cómo funciona. Nada se guarda ni cuenta como una de tus rutas.',
+    sample_cta: 'Escanear mi propia ruta',
+    sample_close: 'Cerrar ejemplo',
+    sample_depot: 'Almacén de ejemplo',
+    sample_home: 'Casa de ejemplo',
     nav_home: 'Navegar a casa',
     in_word: 'en',
     autonav_on: '&#9655; AUTO-NAV ACTIVA',
@@ -3023,6 +3064,13 @@ var LANGS = {
     flex_stop_many: 'Paradas Flex',
     one_package: '1 pacote',
     shift_complete: 'Turno concluído!',
+    sample_link: 'Sem a lista à mão? Experimente uma rota de exemplo',
+    sample_banner_title: 'Rota de exemplo',
+    sample_banner_text: 'Endereços inventados e economia estimada, para você ver como funciona. Nada aqui é salvo nem conta como uma das suas rotas.',
+    sample_cta: 'Escanear minha própria rota',
+    sample_close: 'Fechar exemplo',
+    sample_depot: 'Armazém de exemplo',
+    sample_home: 'Casa de exemplo',
     nav_home: 'Navegar para casa',
     in_word: 'em',
     autonav_on: '&#9655; AUTO-NAV LIGADA',
@@ -4083,6 +4131,7 @@ function vInput() {
     }
   }
   h += '</label>';
+  if (canOfferSample()) h += '<div style="text-align:center;margin:-2px 0 14px"><button id="sampleBtn" style="background:transparent;border:none;color:var(--acc);font-size:13px;font-weight:700;cursor:pointer;text-decoration:underline;padding:8px 10px;font-family:var(--sans);-webkit-tap-highlight-color:transparent">' + escH(t('sample_link')) + '</button></div>';
 
   // ── STOPS LIST ──
   if (cnt) {
@@ -4340,7 +4389,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.29-v50</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.29-v51</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -4354,6 +4403,7 @@ function vResult() {
 
 <div class="scr" style="padding-top:8px">
 
+  ${S._sample ? sampleBannerHtml() : ''}
   ${S.tweakMode ? `
   <div style="background:var(--acc);border-radius:var(--r);padding:12px 15px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px">
     <div style="flex:1">
@@ -4380,7 +4430,7 @@ function vResult() {
       </div>`)
   : ''}
 
-  ${a2hsCard()}
+  ${S._sample ? '' : a2hsCard()}
 
   ${S.geoFailed.length ? `
   <div class="geo-warn" style="margin-bottom:10px">
@@ -4412,10 +4462,10 @@ function vResult() {
 
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:0 2px">
     <div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--acc);text-transform:uppercase">${S.optimized.length} stops &mdash; shortest order</div>
-    <div style="display:flex;gap:6px">
+    ${S._sample ? '' : `<div style="display:flex;gap:6px">
       <button class="rcp" id="cpBtn">${t('copy')}</button>
       <button class="rcp" id="shareBtn" style="color:var(--inf);border-color:rgba(74,158,255,.3)">${t('share_btn')}</button>
-    </div>
+    </div>`}
   </div>
   <div style="font-size:11px;color:var(--t3);margin:-4px 0 12px 2px">
     ${(function(){ var _sh = _pkgShown(S.optimized.reduce(function(sum,s){return sum+(s.pkgCount||1);},0), S.stops.length); return _sh.n + (_sh.flex ? ' (Amazon\'s total; per-stop counts unconfirmed)' : '') + ' packages scanned'; })()} &mdash; check this against your Flex app before you drive off
@@ -4507,8 +4557,8 @@ function vResult() {
       </div>
     </div>
 
-    <hr class="dv">
-    <button class="btn bg" id="newShiftBtn" style="font-size:14px;padding:12px 16px;color:var(--err);border-color:rgba(255,68,85,.25);border-radius:10px">${t("new_shift_clear")}</button>
+    ${S._sample ? '' : `<hr class="dv">
+    <button class="btn bg" id="newShiftBtn" style="font-size:14px;padding:12px 16px;color:var(--err);border-color:rgba(255,68,85,.25);border-radius:10px">${t("new_shift_clear")}</button>`}
   </div>
 
 </div>`;}
@@ -4688,7 +4738,16 @@ function toggleCompList() {
   });
 }
 
-function exitCompanion() { S.companion = false; S.cView = null; S.phase = 'result'; saveSession(); render(); }
+// how: 'back' (the arrow) or 'finish' (the Done button on the completion screen). The event records how far the
+// driver got, so "started but never finished" can be told apart from "finished and tapped Done".
+function exitCompanion(how) {
+  if (S.companion) {
+    var _tot = S.optimized.filter(function(x) { return !x.geoFailed; }).length;
+    trackEvent('companion_exit', { how: (typeof how === 'string') ? how : 'back', done: S.cDone.length, total: _tot,
+      completed: S.cIdx >= _tot ? 1 : 0, elapsed_mins: S.cShiftStart ? Math.round((Date.now() - S.cShiftStart) / 60000) : 0 });
+  }
+  S.companion = false; S.cView = null; S.phase = 'result'; saveSession(); render();
+}
 
 function startCompanion() {
   S.companion = true;
@@ -4700,6 +4759,7 @@ function startCompanion() {
   } else if (!S.cShiftStart) {
     S.cShiftStart = Date.now();   // progress exists but the start time was lost: KEEP the progress
   }
+  if (S._sample) S._sampleShift = true;
   trackEvent('companion_started', { stop_count: S.optimized.filter(function(s){ return !s.geoFailed; }).length });
   saveSession();
   render();
@@ -4729,11 +4789,14 @@ function markDelivered() {
   if (S.cIdx >= stops.length) return;
   if (S.cDone.indexOf(S.cIdx) < 0) S.cDone.push(S.cIdx);
   var wasLast = S.cIdx >= stops.length - 1;
+  // One event per stop delivered: GA4 can then show how far each shift got, not just whether it ended.
+  trackEvent('companion_progress', { done: S.cDone.length, total: stops.length, pct: Math.round(S.cDone.length / stops.length * 100),
+    elapsed_mins: S.cShiftStart ? Math.round((Date.now() - S.cShiftStart) / 60000) : 0 });
   if (!wasLast) { S.cIdx++; }
   else {
     S.cIdx = stops.length;
     trackEvent('companion_completed', { stop_count: stops.length, elapsed_mins: Math.round((Date.now() - S.cShiftStart) / 60000) });
-    reviewNoteShift();   // a completed shift is what earns the right to ask for a rating
+    if (!S._sample) reviewNoteShift();   // a completed shift earns the right to ask for a rating (a sample shift does not)
   }
   saveSession(); render();
 
@@ -4828,6 +4891,7 @@ async function submitSurvey() {
   } catch (e) { /* the driver already saw "thanks"; a failed send is not their problem */ }
 }
 function reviewCardHtml() {
+  if (S._sample) return '';                                  // never ask for a rating after a demo
   if (!canShowReview() && !S._surveyOpen && !S._surveyDone) return '';
   if (S._surveyDone) {
     return '<div class="rev-card"><div class="rev-title">' + escH(t('survey_thanks')) + '</div>' +
@@ -5128,10 +5192,10 @@ function bindCompanion() {
   on('compBackCurBtn2', 'click', compBackToCurrent);
   // Back/exit button — needed because onclick="exitCompanion()" requires global scope
   var bkC = document.getElementById('compBkBtn');
-  if (bkC) bkC.addEventListener('click', exitCompanion);
+  if (bkC) bkC.addEventListener('click', function() { exitCompanion('back'); });
   // Completion Done button
   var doneC = document.getElementById('compFinishBtn');
-  if (doneC) doneC.addEventListener('click', exitCompanion);
+  if (doneC) doneC.addEventListener('click', function() { exitCompanion('finish'); });
   var autoNavBtn = document.getElementById('compAutoNavBtn');
   if (autoNavBtn) autoNavBtn.addEventListener('click', function(){
     S.cAutoNav = !S.cAutoNav;
@@ -5469,11 +5533,11 @@ function rRow(s, i) {
   ${s._moved ? `<div class="ri-manual">&#128204; MOVED BY YOU${s._pinned ? ' \u00b7 STAYS HERE' : ''}</div>` : ''}
   ${isL ? `<div class="ri-tag">LAST</div>` : ''}
   </div>
-  <div class="ri-mv">
+  ${S._sample ? '' : `<div class="ri-mv">
     <button class="rbtn" data-rup="${i}" ${i === 0 ? 'disabled' : ''} title="Move up" aria-label="Move stop up">&#9650;</button>
     <button class="rbtn" data-rdn="${i}" ${i === S.optimized.length - 1 ? 'disabled' : ''} title="Move down" aria-label="Move stop down">&#9660;</button>
     <button class="rbtn rbtn-del" data-rdel="${i}" title="Remove stop" aria-label="Remove stop">&#10005;</button>
-  </div>
+  </div>`}
 </div>`;
 }
 
@@ -6145,6 +6209,7 @@ function _consumeTrialIfApplicable() {
 }
 
 async function optimize() {
+  if (S._sample) { exitSample('optimize_guard', true); return; }   // never run the real pipeline on sample data
   // ── Email gate (before trial gate) ─────────────────────────────────────
   // Require an email before the FIRST optimization so the server can track
   // trial usage per email. Without this, clearing localStorage resets the
@@ -9592,6 +9657,76 @@ function _buildTagHtml() {
   return '<div id="buildTag" style="font-size:9.5px;color:#585878;margin:2px 0 8px 2px;line-height:1.4">build ' + escH(FR_BUILD) +
          ' \u00b7 counts from: ' + escH(modes[m.pkgMode] || m.pkgMode || '?') + ' \u00b7 Amazon total: ' + (m.totalPackages == null ? 'not seen' : m.totalPackages) +
          ' \u00b7 ' + escH(pos) + (FR_INTERNAL ? ' \u00b7 INTERNAL device (excluded from analytics)' : '') + '</div>';
+}
+
+// ─── Sample route ─────────────────────────────────────────────────────────────────────────────────────────────
+// For a visitor who has no Flex itinerary to hand. It shows the real result and Shift Mode screens on made-up
+// addresses. It is deliberately isolated: it never calls optimize() (so it cannot use up a free route, touch the
+// geocoders or write the depot/home to storage), is never saved (saveSession returns early while S._sample),
+// is never counted in the savings totals, and every analytics event sent during it carries sample=1.
+// The savings are honest estimates, not a promise: 16 stops, Amazon-style order about 13% longer than the best one found.
+var SAMPLE_ENABLED = true;
+var SAMPLE_DATA = {
+  // [house number, street, packages, lat, lon], in Amazon's order: Flex stop number = position + 2
+  stops: [[2310, "Pearl St", 1, 39.75383, -104.9781], [2105, "Logan St", 1, 39.7504, -104.9819], [1760, "Grant St", 1, 39.74464, -104.9838], [1930, "Washington St", 2, 39.74748, -104.9762], [1870, "Ogden St", 2, 39.74648, -104.9724], [1225, "Lincoln St", 1, 39.73571, -104.9857], [1480, "Pennsylvania St", 1, 39.73997, -104.98], [1615, "Clarkson St", 1, 39.74222, -104.9743], [1350, "Ogden St", 3, 39.73779, -104.9724], [1105, "Pennsylvania St", 1, 39.7337, -104.98], [1090, "Pearl St", 1, 39.73345, -104.9781], [960, "Logan St", 2, 39.73128, -104.9819], [720, "Grant St", 1, 39.72727, -104.9838], [515, "Pennsylvania St", 1, 39.72385, -104.98], [610, "Clarkson St", 1, 39.72544, -104.9743], [845, "Washington St", 1, 39.72936, -104.9762]],
+  optFlex: [2, 3, 4, 5, 6, 9, 10, 8, 7, 11, 12, 13, 14, 15, 16, 17],
+  depot: {"lat": 39.7587, "lon": -104.9832}, home: {"lat": 39.73195, "lon": -104.9743},
+  savings: { origKm: 13.2, optKm: 11.5, origMin: 27, optMin: 24, savedKm: 1.7, savedMin: 3 }
+};
+var SAMPLE_FIELDS = ['stops','optimized','savings','startAddr','home','_startPt','homeCoords','phase','companion','cIdx','cDone','cShiftStart','cView',
+  'geoFailed','_routeNotes','tweakMode','lastId','savingsOpen','_scanSummary','errMsg','_trialStopCapped','_mapOpen'];
+// Offered only to someone who has not run a real route yet, and never over a list they are working on.
+function canOfferSample() {
+  return SAMPLE_ENABLED && !S._sample && !(S.stops && S.stops.length) && !(S.trialRoutesUsed > 0) && S.entitlement !== 'paid';
+}
+function startSample() {
+  if (S._sample) return;
+  S._sampleBackup = {}; SAMPLE_FIELDS.forEach(function(k) { S._sampleBackup[k] = S[k]; });
+  S._sampleT0 = Date.now(); S._sampleShift = false;
+  var D = SAMPLE_DATA, byFlex = {};
+  var stops = D.stops.map(function(r, i) {
+    var o = { id: 'smp' + i, address: r[0] + ' ' + r[1] + ', Denver, CO', coords: { lat: r[3], lon: r[4] },
+              flexNum: i + 2, packageNums: [i + 2], pkgCount: r[2], scanned: true };
+    byFlex[o.flexNum] = o; return o;
+  });
+  S._sample = true;
+  S.stops = stops;
+  S.optimized = D.optFlex.map(function(f) { return byFlex[f]; });
+  S.savings = { origKm: D.savings.origKm, optKm: D.savings.optKm, origMin: D.savings.origMin, optMin: D.savings.optMin,
+                savedKm: D.savings.savedKm, savedMin: D.savings.savedMin, realGPS: false };
+  S.startAddr = t('sample_depot') + ' \u2014 Brighton Blvd, Denver';
+  S.home = t('sample_home') + ' \u2014 1000 Clarkson St, Denver';
+  S._startPt = D.depot; S.homeCoords = D.home;
+  S.geoFailed = []; S._routeNotes = []; S.tweakMode = false; S.lastId = null; S._scanSummary = null; S.errMsg = ''; S._trialStopCapped = false;
+  S.savingsOpen = true;     // show the full card, which carries the ESTIMATED tag, instead of the bare numbers
+  S.companion = false; S.cIdx = 0; S.cDone = []; S.cShiftStart = null; S.cView = null;
+  S.phase = 'result';
+  trackEvent('sample_started', { stop_count: stops.length });
+  try { window.scrollTo(0, 0); } catch (e) {}
+  render();
+}
+// how: 'scan_own' (the main button), 'close', 'back' (the header arrow) or 'optimize_guard' (should never happen).
+function exitSample(how, toScan) {
+  if (!S._sample) return;
+  trackEvent('sample_exited', { how: how, seconds: Math.round((Date.now() - (S._sampleT0 || Date.now())) / 1000), used_shift: S._sampleShift ? 1 : 0 });
+  var b = S._sampleBackup || {};
+  SAMPLE_FIELDS.forEach(function(k) { S[k] = b[k]; });
+  S._sample = false; S._sampleBackup = null; S._sampleShift = false;
+  S.companion = false; S.phase = 'input'; S.errMsg = '';
+  try { window.scrollTo(0, 0); } catch (e) {}
+  render();
+  if (toScan) {            // the tap that brought us here is still a user gesture, so the file picker may open
+    try { var fi = document.querySelector('input[type=file]'); if (fi) fi.click(); } catch (e) {}
+  }
+}
+function sampleBannerHtml() {
+  return '<div id="sampleBanner" style="background:rgba(255,153,0,.10);border:1.5px solid var(--acc);border-radius:14px;padding:12px 14px;margin-bottom:10px">' +
+    '<div style="font-family:var(--sans);font-size:12px;font-weight:800;letter-spacing:1.5px;color:var(--acc);text-transform:uppercase">&#9432; ' + escH(t('sample_banner_title')) + '</div>' +
+    '<div style="font-size:12.5px;color:var(--t2);line-height:1.5;margin:5px 0 11px">' + escH(t('sample_banner_text')) + '</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button id="sampleScanBtn" class="btn bp" style="flex:1;min-width:150px;height:44px;font-size:14px">' + escH(t('sample_cta')) + '</button>' +
+      '<button id="sampleCloseBtn" class="btn bg" style="height:44px;font-size:13px;padding:0 14px">' + escH(t('sample_close')) + '</button>' +
+    '</div></div>';
 }
 
 function toggleInternalFlag() {
