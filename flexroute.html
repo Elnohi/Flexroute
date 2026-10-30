@@ -399,7 +399,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.30-v54';
+  var FR_BUILD = 'v2026.10.30-v55';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1824,7 +1824,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.30-v54\n'
+            + 'build v2026.10.30-v55\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4403,7 +4403,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v54</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v55</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -6957,7 +6957,7 @@ async function optimize() {
       // OSRM's own order and figures, kept so every later step can be undone if it would lengthen the drive.
       const _osrmOrder = optimizedOrder.slice(), _osrmDist = tripDist, _osrmDur = tripDur;
       // 1) Refine OSRM's order with real road times (it is a heuristic: swaps/moves can still save time).
-      let _orderChanged = false, _groupedTogether = false, _refSavedS = 0, _refApprox = false, _refTot = null, _remeasure = 'not needed';
+      let _orderChanged = false, _groupedTogether = false, _refSavedS = 0, _refApprox = false, _refTot = null, _remeasure = 'not needed', _rej = null;
       try {
         const _ref = await _refineWithRoadTimes(optimizedOrder, startPt, S.homeCoords, S.lastId, [orderedForTrip]);
         if (_ref.changed) { optimizedOrder = _ref.order; _orderChanged = true; _refSavedS = _ref.savedSec; _refApprox = !!_ref.approx; _refTot = { m: _ref.totM, s: _ref.totS }; }
@@ -6978,6 +6978,9 @@ async function optimize() {
           // real roads; anything else is undone. One found on real road times only has to be no meaningfully longer.
           if ((_nr && _nr.distance > _osrmDist + 200) || (_refApprox && (!_nr || _nr.distance > _osrmDist - 30))) {
             // Safeguard: these changes would make the drive longer than OSRM's own order. Don't ship them.
+            // (What was turned down, and how each measure rated it, goes in the route report.)
+            _rej = { flex: optimizedOrder.map(function(s) { return s.flexNum != null ? '#' + s.flexNum : '?'; }), routeM: _nr ? Math.round(_nr.distance) : null, routeS: _nr ? Math.round(_nr.duration) : null,
+                     tableM: _refTot ? _refTot.m : null, tableS: _refTot ? _refTot.s : null };
             optimizedOrder = _osrmOrder; tripDist = _osrmDist; tripDur = _osrmDur;
             _orderChanged = false; _groupedTogether = false;
             _remeasure = 'reverted';
@@ -7002,7 +7005,7 @@ async function optimize() {
       }
       S._diag = S._diag || {};
       S._diag.route = { amazonM: origDist, amazonS: origDur, draftM: _osrmDist, draftS: _osrmDur, finalM: tripDist, finalS: tripDur,
-                        n: geocodedStops.length, at: Date.now(), remeasure: _remeasure };
+                        n: geocodedStops.length, at: Date.now(), remeasure: _remeasure, rejected: _rej };
       // Say what changed, measured against the order the router gave and the route actually re-measured,
       // so the note can never describe a step that a later step undid.
       // Nothing is reported unless the order the driver actually gets differs from the router's own:
@@ -9780,11 +9783,17 @@ function buildRouteReport() {
   L.push('Router draft : ' + f1(d.draftM) + ', ' + fm(d.draftS));
   L.push('Shown to you : ' + f1(d.finalM) + ', ' + fm(d.finalS) + (d.remeasure && d.remeasure !== 'not needed' ? '   (re-measure: ' + d.remeasure + ')' : ''));
   if (r) L.push('Search       : ' + (r.approx ? 'STRAIGHT-LINE estimates (road table unavailable)' : 'road times') + ' | ' + r.starts + ' starting orders, best was #' + (r.from + 1) +
-                ' | ' + r.iters + ' shake rounds, ' + r.ms + ' ms | draft ' + f1(r.baseM) + ' -> ' + f1(r.bestM) + ' | ' + (r.kept ? 'KEPT' : 'not used'));
+                ' | ' + r.iters + ' shake rounds, ' + r.ms + ' ms | road table: draft ' + f1(r.baseM) + ' -> best ' + f1(r.bestM) + ' | ' + (r.kept ? 'the table says better' : 'no gain on the table'));
   else L.push('Search       : did not run (fewer than 4 stops, or the router was unavailable)');
   var st = (S._diag && S._diag.street) || null;
   L.push('Street check : ' + (st ? (st.ran ? st.checked + ' checked, ' + st.flagged + ' off their street, ' + st.moved + ' moved, ' + st.suspect + ' could not be confirmed (' + st.ms + ' ms)'
                                              : 'did not run (the road table was unavailable)') : 'not run in this session'));
+  if (d.rejected) {
+    var rj = d.rejected;
+    L.push('Rejected     : the search\'s order was rated ' + f1(rj.routeM) + ', ' + fm(rj.routeS) + ' by the route lookup, against the draft\'s ' + f1(d.draftM) + ', ' + fm(d.draftS) +
+           (r ? ' (the road table had it at ' + f1(rj.tableM) + ' against ' + f1(r.baseM) + ')' : '') + ', so the draft was kept');
+    L.push('   proposed  : ' + rj.flex.join(' '));
+  }
   if (st && st.detail && st.detail.length) st.detail.forEach(function(x) { L.push('   flagged     : ' + x.addr + '  (snapped to ' + x.snappedTo + ')  ->  ' + x.outcome); });
   var sv = _streetVisits(list);
   L.push('Streets      : ' + sv.total + ' separate street visits on ' + sv.streets + ' streets' + (sv.multi.length ? ' | returns to: ' + sv.multi.join(', ') : ' | no street is visited twice'));
