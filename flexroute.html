@@ -399,7 +399,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.29-v51';
+  var FR_BUILD = 'v2026.10.30-v52';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1824,7 +1824,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.29-v51\n'
+            + 'build v2026.10.30-v52\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -1849,6 +1849,15 @@ function bind() {
     scanLbl.addEventListener('pointerup', function() { clearTimeout(_dbgTimer); });
     scanLbl.addEventListener('pointerleave', function() { clearTimeout(_dbgTimer); });
     scanLbl.addEventListener('pointercancel', function() { clearTimeout(_dbgTimer); });
+  }
+  var routeLbl = document.getElementById('routeHdrLbl');
+  if (routeLbl) {
+    var _rrTaps = [];
+    routeLbl.addEventListener('click', function() {
+      var now = Date.now();
+      _rrTaps = _rrTaps.filter(function(t) { return now - t < 2500; }); _rrTaps.push(now);
+      if (_rrTaps.length >= 5) { _rrTaps = []; showRouteReport(); }
+    });
   }
   // Element bindings — re-added every render() since DOM is recreated
   on('saveKey',      'click', function(){ saveKey(); });
@@ -4389,7 +4398,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.29-v51</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v52</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -4461,7 +4470,7 @@ function vResult() {
   <div style="text-align:center;font-size:12px;color:var(--t3);margin-bottom:14px;letter-spacing:.3px">${t('shift_blurb')}</div>
 
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;padding:0 2px">
-    <div style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--acc);text-transform:uppercase">${S.optimized.length} stops &mdash; shortest order</div>
+    <div id="routeHdrLbl" style="font-family:var(--sans);font-size:11px;font-weight:700;letter-spacing:2px;color:var(--acc);text-transform:uppercase;user-select:none;-webkit-user-select:none;touch-action:manipulation">${S.optimized.length} stops &mdash; shortest order</div>
     ${S._sample ? '' : `<div style="display:flex;gap:6px">
       <button class="rcp" id="cpBtn">${t('copy')}</button>
       <button class="rcp" id="shareBtn" style="color:var(--inf);border-color:rgba(74,158,255,.3)">${t('share_btn')}</button>
@@ -5241,7 +5250,7 @@ function vSavings(sv) {
       <div>
         <div style="font-size:17px;font-weight:700;color:var(--ok);font-family:var(--sans);letter-spacing:.3px">Amazon already has the best route</div>
         <div style="font-size:13px;color:var(--t2);margin-top:5px;line-height:1.55">
-          We checked every possible order — Amazon's sequence is already optimal for today's stops.
+          We searched for a shorter order and couldn't beat Amazon's sequence for today's stops.
           No changes needed. ${gpsTag}
         </div>
         <div style="font-size:12px;color:var(--t3);margin-top:8px;line-height:1.5;background:var(--surf2);border-radius:var(--rs);padding:9px 11px;border:1px solid var(--brd)">
@@ -6937,10 +6946,10 @@ async function optimize() {
       // OSRM's own order and figures, kept so every later step can be undone if it would lengthen the drive.
       const _osrmOrder = optimizedOrder.slice(), _osrmDist = tripDist, _osrmDur = tripDur;
       // 1) Refine OSRM's order with real road times (it is a heuristic: swaps/moves can still save time).
-      let _orderChanged = false, _groupedTogether = false, _refSavedS = 0;
+      let _orderChanged = false, _groupedTogether = false, _refSavedS = 0, _refApprox = false;
       try {
-        const _ref = await _refineWithRoadTimes(optimizedOrder, startPt, S.homeCoords, S.lastId);
-        if (_ref.changed) { optimizedOrder = _ref.order; _orderChanged = true; _refSavedS = _ref.savedSec; }
+        const _ref = await _refineWithRoadTimes(optimizedOrder, startPt, S.homeCoords, S.lastId, [orderedForTrip]);
+        if (_ref.changed) { optimizedOrder = _ref.order; _orderChanged = true; _refSavedS = _ref.savedSec; _refApprox = !!_ref.approx; }
       } catch (_e) { /* keep OSRM's order */ }
       // 2) Stops that are physically together are visited together (never at a cost of >1.5 km straight-line).
       const _grp = _groupColocated(optimizedOrder, s => s.coords, s => s.id === S.lastId);
@@ -6954,7 +6963,9 @@ async function optimize() {
           const _nr = await osrmRoute([
             ...(startPt ? [startPt] : []), ...optimizedOrder.map(s => s.coords), ...(S.homeCoords ? [S.homeCoords] : [])
           ]);
-          if (_nr && _nr.distance > _osrmDist + 200) {
+          // An order found with straight-line estimates (the road table was unavailable) has to be PROVEN shorter on
+          // real roads; anything else is undone. One found on real road times only has to be no meaningfully longer.
+          if ((_nr && _nr.distance > _osrmDist + 200) || (_refApprox && (!_nr || _nr.distance > _osrmDist - 30))) {
             // Safeguard: these changes would make the drive longer than OSRM's own order. Don't ship them.
             optimizedOrder = _osrmOrder; tripDist = _osrmDist; tripDur = _osrmDur;
             _orderChanged = false; _groupedTogether = false;
@@ -6963,6 +6974,18 @@ async function optimize() {
           } else if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; }
         } catch (_e) { /* keep the OSRM trip figures */ }
       }
+      // Last safeguard: never present an order that is longer AND slower than Amazon's own on the same roads.
+      // Amazon's order is one of the drafts the search started from, so this should not happen; if it does, say so
+      // and keep Amazon's order rather than show a worse one. (Skipped when a last stop is locked, which changes it.)
+      if (!lastStop && origDist != null && origDur != null && tripDist != null && tripDur != null &&
+          tripDist > origDist + 100 && tripDur > origDur) {
+        optimizedOrder = orderedForTrip.slice(); tripDist = origDist; tripDur = origDur; _orderChanged = false;
+        S._routeNotes.push("Kept Amazon's order: our best alternative was not shorter on the road.");
+        trackEvent('route_kept_amazon_order', { stop_count: optimizedOrder.length, region: S.userState || 'unknown' });
+      }
+      S._diag = S._diag || {};
+      S._diag.route = { amazonM: origDist, amazonS: origDur, draftM: _osrmDist, draftS: _osrmDur, finalM: tripDist, finalS: tripDur,
+                        n: geocodedStops.length, at: Date.now() };
       // Say what changed, measured against the order the router gave and the route actually re-measured,
       // so the note can never describe a step that a later step undid.
       // Nothing is reported unless the order the driver actually gets differs from the router's own:
@@ -6971,8 +6994,13 @@ async function optimize() {
         const _lbl = _netOrderLabels(_osrmOrder, optimizedOrder);
         if (_lbl.length) {
           const _savedM = Math.max(0, Math.round(_osrmDist - tripDist));
-          S._routeNotes.push('Fine-tuned with road distances: moved stops ' + _lbl.join(', ') +
-            (_savedM >= 50 ? ' (saves ' + (_savedM / 1000).toFixed(1) + ' km)' : '') + '.');
+          if (_lbl.length > 6) {
+            S._routeNotes.push('Re-ordered ' + _lbl.length + ' stops using road times, so the route stops doubling back' +
+              (_savedM >= 50 ? ' (saves ' + (_savedM / 1000).toFixed(1) + ' km against the first draft)' : '') + '.');
+          } else {
+            S._routeNotes.push('Fine-tuned with road distances: moved stops ' + _lbl.join(', ') +
+              (_savedM >= 50 ? ' (saves ' + (_savedM / 1000).toFixed(1) + ' km)' : '') + '.');
+          }
           if (_groupedTogether) S._routeNotes.push('Kept stops in the same building together.');
           trackEvent('route_refined_road_times', { stop_count: optimizedOrder.length, swaps: _lbl.length,
             saved_m: _savedM, saved_s: _refSavedS, grouped: _groupedTogether ? 1 : 0, region: S.userState || 'unknown' });
@@ -9580,6 +9608,184 @@ function _improveOrderLocal(seq, D, Dd, lockLast) {
   }
   return { seq: out, moves: moves, savedM: savedM, savedT: savedT };
 }
+
+// ── Full search on the road-time matrix ─────────────────────────────────────────────────────────────────────────
+// OSRM's /trip returns a greedy first draft, and the local fine-tuning above can only nudge a stop a few places.
+// On a real 31-stop route that left the driver crossing the same four parallel streets again and again. This
+// searches the WHOLE neighbourhood instead, on the same road times:
+//   - 2-opt: reverse any stretch of the route,
+//   - or-opt: lift 1-3 stops out and put them back ANYWHERE (forwards or reversed),
+//   - then shake the best result a little (a "double bridge") and search again, a few dozen times.
+// It starts from several drafts at once (OSRM's order, Amazon's own order, and the old fine-tuned order), so the
+// answer can never be worse than any of them. One-way streets are respected exactly: costs are read in the
+// direction of travel and a reversed stretch is priced in reverse. The first and last points never move
+// (start, home, a locked last stop). A fixed seed makes it repeatable: the same route gives the same order.
+// Cost = road time + 0.06 s per metre, so one kilometre counts as one extra minute and time alone cannot hide a detour.
+var GLOBAL_LAMBDA = 0.06;
+var GLOBAL_BUDGET_MS = 300;       // stop shaking after this long (the first search always completes)
+var GLOBAL_MAX_N = 160;           // beyond this many points, use the older local fine-tuning only
+var GLOBAL_ILS_MAX = 120;
+function _mulberry32(a) {
+  return function() {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    var t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function _improveOrderGlobal(starts, Dt, Dd, lockLast, budgetMs) {
+  var n = starts[0].length, lo = 1, hi = n - 2 - (lockLast ? 1 : 0);
+  var now = (typeof performance !== 'undefined' && performance.now) ? function() { return performance.now(); } : function() { return Date.now(); };
+  var t0 = now();
+  if (hi <= lo) return { seq: starts[0].slice(), cost: 0, from: 0, iters: 0, ms: 0 };
+  var C = [];
+  for (var i = 0; i < n; i++) { C[i] = new Float64Array(n); for (var j = 0; j < n; j++) C[i][j] = Dt[i][j] + GLOBAL_LAMBDA * Dd[i][j]; }
+  function cost(a) { var x = 0; for (var k = 0; k < a.length - 1; k++) x += C[a[k]][a[k + 1]]; return x; }
+  var EPS = 1e-3;
+  function localSearch(a0) {
+    var a = a0.slice(), guard = 0;
+    while (guard++ < 400) {
+      var F = new Float64Array(n), B = new Float64Array(n);
+      for (var k = 1; k < n; k++) { F[k] = F[k - 1] + C[a[k - 1]][a[k]]; B[k] = B[k - 1] + C[a[k]][a[k - 1]]; }
+      var bestD = -EPS, mv = null, i, j, L, p;
+      // 2-opt: reverse a[i..j]
+      for (i = lo; i < hi; i++) for (j = i + 1; j <= hi; j++) {
+        var d2 = C[a[i - 1]][a[j]] + (B[j] - B[i]) + C[a[i]][a[j + 1]] - C[a[i - 1]][a[i]] - (F[j] - F[i]) - C[a[j]][a[j + 1]];
+        if (d2 < bestD) { bestD = d2; mv = { t: 0, i: i, j: j }; }
+      }
+      // or-opt: move the stretch a[i..i+L-1] to just before a[p], forwards or reversed
+      for (L = 1; L <= 3; L++) for (i = lo; i + L - 1 <= hi; i++) {
+        var e = i + L - 1, s0 = a[i], s1 = a[e], prev = a[i - 1], next = a[e + 1];
+        var rem = C[prev][next] - C[prev][s0] - C[s1][next];
+        var inF = F[e] - F[i], inB = B[e] - B[i];
+        for (p = lo; p <= hi + 1; p++) {
+          if (p >= i && p <= e + 1) continue;
+          var u = a[p - 1], v = a[p], base = rem - C[u][v];
+          var dF = base + C[u][s0] + inF + C[s1][v];
+          if (dF < bestD) { bestD = dF; mv = { t: 1, i: i, L: L, p: p, rev: false }; }
+          if (L > 1) { var dR = base + C[u][s1] + inB + C[s0][v]; if (dR < bestD) { bestD = dR; mv = { t: 1, i: i, L: L, p: p, rev: true }; } }
+        }
+      }
+      if (!mv) break;
+      if (mv.t === 0) {
+        a = a.slice(0, mv.i).concat(a.slice(mv.i, mv.j + 1).reverse(), a.slice(mv.j + 1));
+      } else {
+        var seg = a.slice(mv.i, mv.i + mv.L); if (mv.rev) seg.reverse();
+        var rest = a.slice(0, mv.i).concat(a.slice(mv.i + mv.L));
+        var at = mv.p > mv.i ? mv.p - mv.L : mv.p;
+        a = rest.slice(0, at).concat(seg, rest.slice(at));
+      }
+    }
+    return a;
+  }
+  var best = null;
+  starts.forEach(function(st, idx) {
+    var a = localSearch(st), c = cost(a);
+    if (!best || c < best.c - 1e-9) best = { a: a, c: c, from: idx };
+  });
+  var cur = best.a, curC = best.c, iters = 0, m = hi - lo + 1;
+  var rnd = _mulberry32(1234567 + n * 7919 + Math.round(best.c));
+  while (m >= 8 && iters < GLOBAL_ILS_MAX && now() - t0 < budgetMs) {
+    iters++;
+    // double bridge on the movable part: A B C D -> A C B D
+    var c1 = lo + 1 + Math.floor(rnd() * (m - 3)), c2 = c1 + 1 + Math.floor(rnd() * (hi + 1 - c1 - 1)), c3 = c2 + 1 + Math.floor(rnd() * (hi + 2 - c2 - 1));
+    if (!(lo < c1 && c1 < c2 && c2 < c3 && c3 <= hi + 1)) continue;
+    var cand = cur.slice(0, c1).concat(cur.slice(c2, c3), cur.slice(c1, c2), cur.slice(c3));
+    cand = localSearch(cand);
+    var cc = cost(cand);
+    if (cc < curC - 1e-6) { cur = cand; curC = cc; }
+  }
+  return { seq: cur, cost: curC, from: best.from, iters: iters, ms: Math.round(now() - t0) };
+}
+// Straight-line stand-in for the road matrix, used only when OSRM's table is unavailable (x1.3 for roads, 30 km/h).
+function _haversineMatrix(pts) {
+  var n = pts.length, T = [], Dm = [];
+  for (var i = 0; i < n; i++) {
+    T[i] = new Array(n); Dm[i] = new Array(n);
+    for (var j = 0; j < n; j++) {
+      var m = i === j ? 0 : haversineKm(pts[i].lat, pts[i].lon, pts[j].lat, pts[j].lon) * 1000 * 1.3;
+      Dm[i][j] = m; T[i][j] = m / 8.33;
+    }
+  }
+  return { dur: T, dist: Dm, approx: true };
+}
+
+// ─── Route report ─────────────────────────────────────────────────────────────────────────────────────────────
+// For "why did the app send me round in circles?": 5 quick taps on the stop-count heading of the result screen copy
+// a plain-text report (and show it). It lists every stop in driving order with the coordinates the app placed it at
+// and the road leg to it, the three route measurements (Amazon's order, the router's draft, what is shown), what the
+// search did, and how many separate times the route returns to the same street. Nothing is sent anywhere.
+function _streetOf(addr) {
+  var a = String(addr || '').split(',')[0];
+  a = a.replace(/\b(unit|suite|ste|apt|front porch|buzz|bsmt|basement)\b.*$/i, '');
+  a = a.replace(/^[A-Za-z]{0,3}\d+[\-\/]?\d*[A-Za-z]?\s*(?:1\/2\s+)?/, '');
+  a = a.replace(/\b(avenue|ave|road|rd|street|st|court|ct|crescent|cres|drive|dr|boulevard|blvd|lane|ln|place|pl|east|west|north|south)\b\.?/gi, '');
+  return a.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+function _streetVisits(list) {
+  var visits = {}, prev = null, total = 0;
+  list.forEach(function(s) {
+    var st = _streetOf(s.address); if (!st) { prev = null; return; }
+    if (st !== prev) { visits[st] = (visits[st] || 0) + 1; total++; }
+    prev = st;
+  });
+  var multi = Object.keys(visits).filter(function(k) { return visits[k] > 1; }).sort(function(a, b) { return visits[b] - visits[a]; });
+  return { total: total, streets: Object.keys(visits).length, multi: multi.map(function(k) { return k + ' x' + visits[k]; }) };
+}
+function buildRouteReport() {
+  var L = [], list = (S.optimized || []).filter(function(s) { return !s.geoFailed; });
+  var f1 = function(m) { return m == null ? '?' : (m / 1000).toFixed(1) + ' km'; };
+  var fm = function(sec) { return sec == null ? '?' : Math.round(sec / 60) + ' min'; };
+  var d = (S._diag && S._diag.route) || {}, r = (S._diag && S._diag.refine) || null;
+  L.push('--- FlexRoute route report ---');
+  L.push('build ' + FR_BUILD + (S._sample ? '  (SAMPLE ROUTE)' : ''));
+  L.push('stops ' + list.length + '  | start ' + (S._startPt ? S._startPt.lat.toFixed(5) + ',' + S._startPt.lon.toFixed(5) : 'none') +
+         '  | home ' + (S.homeCoords ? S.homeCoords.lat.toFixed(5) + ',' + S.homeCoords.lon.toFixed(5) : 'none'));
+  L.push('Amazon order : ' + f1(d.amazonM) + ', ' + fm(d.amazonS) + '   (as routed on the roads)');
+  L.push('Router draft : ' + f1(d.draftM) + ', ' + fm(d.draftS));
+  L.push('Shown to you : ' + f1(d.finalM) + ', ' + fm(d.finalS));
+  if (r) L.push('Search       : ' + (r.approx ? 'STRAIGHT-LINE estimates (road table unavailable)' : 'road times') + ' | ' + r.starts + ' starting orders, best was #' + (r.from + 1) +
+                ' | ' + r.iters + ' shake rounds, ' + r.ms + ' ms | draft ' + f1(r.baseM) + ' -> ' + f1(r.bestM) + ' | ' + (r.kept ? 'KEPT' : 'not used'));
+  else L.push('Search       : did not run (fewer than 4 stops, or the router was unavailable)');
+  var sv = _streetVisits(list);
+  L.push('Streets      : ' + sv.total + ' separate street visits on ' + sv.streets + ' streets' + (sv.multi.length ? ' | returns to: ' + sv.multi.join(', ') : ' | no street is visited twice'));
+  var amz = (S.stops || []).filter(function(s) { return !s.geoFailed; }).slice().sort(function(a, b) { return (a.flexNum == null ? 1e9 : a.flexNum) - (b.flexNum == null ? 1e9 : b.flexNum); });
+  var sa = _streetVisits(amz);
+  L.push("Amazon's own : " + sa.total + ' separate street visits' + (sa.multi.length ? ' | returns to: ' + sa.multi.join(', ') : ''));
+  L.push('');
+  var T = S._lastTable, idx = {};
+  if (T) T.ids.forEach(function(id, k) { idx[id] = k; });
+  var prevId = T && idx['__start__'] != null ? '__start__' : null;
+  L.push('#   Flex  leg km  leg min  lat,lon                 address');
+  list.forEach(function(s, i) {
+    var leg = '   ?      ?   ', cur = s.id;
+    if (T && prevId != null && idx[prevId] != null && idx[cur] != null) {
+      var dm = T.dist[idx[prevId]][idx[cur]], ds = T.dur[idx[prevId]][idx[cur]];
+      leg = String((dm / 1000).toFixed(1)).padStart(6) + String(Math.round(ds / 60)).padStart(8) + '  ';
+    }
+    prevId = cur;
+    L.push(String(i + 1).padEnd(4) + (s.flexNum != null ? ('#' + s.flexNum) : '-').padEnd(6) + leg + (s.coords ? s.coords.lat.toFixed(5) + ',' + s.coords.lon.toFixed(5) : 'no coords').padEnd(24) + s.address +
+           ((s.pkgCount || 1) > 1 ? '  [' + s.pkgCount + ' pkgs]' : ''));
+  });
+  if (T && prevId != null && idx['__home__'] != null && idx[prevId] != null) {
+    L.push('home'.padEnd(10) + String((T.dist[idx[prevId]][idx['__home__']] / 1000).toFixed(1)).padStart(6) + String(Math.round(T.dur[idx[prevId]][idx['__home__']] / 60)).padStart(8));
+  }
+  return L.join('\n');
+}
+function showRouteReport() {
+  var txt = buildRouteReport();
+  try { if (navigator.clipboard) navigator.clipboard.writeText(txt).then(function() { toast('Route report copied'); }, function() {}); } catch (e) {}
+  var old = document.getElementById('routeReportOv'); if (old) old.remove();
+  var ov = document.createElement('div'); ov.id = 'routeReportOv';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:9999;padding:14px;overflow:auto';
+  var b = document.createElement('button'); b.id = 'routeReportClose'; b.className = 'btn bp'; b.style.cssText = 'width:100%;height:44px;margin-bottom:12px'; b.textContent = 'Close';
+  b.addEventListener('click', function() { ov.remove(); });
+  var pre = document.createElement('pre'); pre.id = 'routeReportText';
+  pre.style.cssText = 'white-space:pre;overflow-x:auto;font-size:10.5px;line-height:1.45;color:#d8d8f0;font-family:ui-monospace,Menlo,Consolas,monospace;margin:0';
+  pre.textContent = txt;
+  ov.appendChild(b); ov.appendChild(pre); document.body.appendChild(ov);
+}
+
 // Describe, in stop-list positions (1-based), how the FINAL order differs from the router's order.
 // Always computed from before/after so the note can never disagree with the route the driver sees.
 // Two stops that simply traded places read as "3\u21944"; anything else reads as "7\u21924".
@@ -9609,20 +9815,51 @@ function _netOrderLabels(before, after) {
   return out.map(function(x) { return x.s; });
 }
 
-async function _refineWithRoadTimes(order, startPt, homePt, lockedId) {
+async function _refineWithRoadTimes(order, startPt, homePt, lockedId, altOrders) {
   if (order.length < 4) return { order: order, changed: false };
   var off = startPt ? 1 : 0;
   var pts = [].concat(startPt ? [startPt] : [], order.map(function(s) { return s.coords; }), homePt ? [homePt] : []);
-  var D = await _osrmTable(pts);
-  if (!D) return { order: order, changed: false };
-  var seq = pts.map(function(_, k) { return k; });
+  var n = pts.length;
+  var D = await _osrmTable(pts), approx = false;
+  // If the road table is unavailable (the public OSRM server is often busy), search on straight-line distances
+  // instead of doing nothing; the caller re-measures on real roads and undoes the result if it is not shorter.
+  if (!D) { D = _haversineMatrix(pts); approx = true; }
+  var seq0 = pts.map(function(_, k) { return k; });
   var lockLast = !!(lockedId && homePt && order[order.length - 1].id === lockedId);
-  var r = _improveOrderLocal(seq, D.dur, D.dist, lockLast);
-  if (!r.moves.length) return { order: order, changed: false };
+  // Several drafts to start from: the router's order, any alternative orders (Amazon's own), and the old local result.
+  var starts = [seq0], idxOf = {};
+  order.forEach(function(s, k) { idxOf[s.id] = k + off; });
+  (altOrders || []).forEach(function(alt) {
+    if (!alt || alt.length !== order.length) return;
+    var q = [], ok = true;
+    alt.forEach(function(s) { var k = idxOf[s.id]; if (k == null) ok = false; else q.push(k); });
+    if (!ok) return;
+    var full = [].concat(startPt ? [0] : [], q, homePt ? [n - 1] : []);
+    if (full.length !== n || full[0] !== seq0[0] || full[n - 1] !== seq0[n - 1] || (lockLast && full[n - 2] !== seq0[n - 2])) return;
+    starts.push(full);
+  });
+  var loc = _improveOrderLocal(seq0.slice(), D.dur, D.dist, lockLast);
+  if (loc.moves.length) starts.push(loc.seq);
+  var g = (n <= GLOBAL_MAX_N) ? _improveOrderGlobal(starts, D.dur, D.dist, lockLast, GLOBAL_BUDGET_MS) : null;
+  var best = g ? g.seq : (loc.moves.length ? loc.seq : seq0);
+  var tot = function(M, a) { var x = 0; for (var k = 0; k < a.length - 1; k++) x += M[a[k]][a[k + 1]]; return x; };
+  var tBase = tot(D.dur, seq0), tBest = tot(D.dur, best), dBase = tot(D.dist, seq0), dBest = tot(D.dist, best);
+  var savedM = dBase - dBest, savedT = tBase - tBest;
+  // Keep it only if it is not slower, not meaningfully longer, and worth having. Straight-line estimates are held
+  // to a higher bar, because they cannot see one-way streets.
+  var good = approx ? (tBest <= tBase * 0.97 && savedM >= 0.03 * dBase)
+                    : (tBest <= tBase && dBest <= dBase + 50 && (savedM >= 30 || savedT >= 10));
+  S._diag = S._diag || {};
+  S._diag.refine = { approx: approx, n: n, starts: starts.length, from: g ? g.from : -1, iters: g ? g.iters : 0, ms: g ? g.ms : 0,
+                     baseM: Math.round(dBase), bestM: Math.round(dBest), baseS: Math.round(tBase), bestS: Math.round(tBest), kept: !!good };
+  S._lastTable = { ids: [].concat(startPt ? ['__start__'] : [], order.map(function(s) { return s.id; }), homePt ? ['__home__'] : []), dur: D.dur, dist: D.dist, approx: approx };
+  if (!good) return { order: order, changed: false };
   var out = [];
-  r.seq.forEach(function(k) { var idx = k - off; if (idx >= 0 && idx < order.length) out.push(order[idx]); });
+  best.forEach(function(k) { var idx = k - off; if (idx >= 0 && idx < order.length) out.push(order[idx]); });
   if (out.length !== order.length) return { order: order, changed: false };
-  return { order: out, changed: true, swaps: r.moves.length, savedM: Math.round(r.savedM), savedSec: Math.round(r.savedT) };
+  var moved = 0; out.forEach(function(s, k) { if (s !== order[k]) moved++; });
+  if (!moved) return { order: order, changed: false };
+  return { order: out, changed: true, swaps: moved, savedM: Math.round(savedM), savedSec: Math.round(savedT), approx: approx };
 }
 
 // Resolve with `fallback` if `p` has not settled within `ms`. A browser fetch has NO timeout of its own, so one

@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v51';   // v51: a sample route for visitors with no itinerary at hand (isolated: never saved, never uses a free route, tagged sample=1) + Shift Mode progress, exit and resume events
+const CACHE = 'flexroute-v52';   // v52: route search on the whole road-time matrix (2-opt, or-opt, restarts) starting from OSRM's draft AND Amazon's own order, a fallback when the road table is unavailable, a never-worse-than-Amazon guard, and a copyable route report (5 taps on the stop-count heading)
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
