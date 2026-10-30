@@ -399,7 +399,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.30-v52';
+  var FR_BUILD = 'v2026.10.30-v53';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1824,7 +1824,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.30-v52\n'
+            + 'build v2026.10.30-v53\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -1985,6 +1985,7 @@ var LANGS = {
     flex_stop_many: 'Flex stops',
     one_package: '1 package',
     shift_complete: 'Shift Complete!',
+    verify_warn: '⚠ check',
     sample_link: 'No itinerary handy? Try a sample route',
     sample_banner_title: 'Sample route',
     sample_banner_text: 'Made-up addresses and estimated savings, so you can see how it works. Nothing here is saved or counted as one of your routes.',
@@ -2257,6 +2258,7 @@ var LANGS = {
     flex_stop_many: 'Arrêts Flex',
     one_package: '1 colis',
     shift_complete: 'Quart terminé !',
+    verify_warn: '⚠ vérifier',
     sample_link: 'Pas de liste sous la main ? Essayez un itinéraire exemple',
     sample_banner_title: 'Itinéraire exemple',
     sample_banner_text: 'Adresses fictives et économies estimées, pour voir comment ça marche. Rien n’est enregistré ni compté comme l’un de vos itinéraires.',
@@ -2529,6 +2531,7 @@ var LANGS = {
     flex_stop_many: 'Flex-Stopps',
     one_package: '1 Paket',
     shift_complete: 'Schicht abgeschlossen!',
+    verify_warn: '⚠ prüfen',
     sample_link: 'Keine Liste zur Hand? Beispielroute ausprobieren',
     sample_banner_title: 'Beispielroute',
     sample_banner_text: 'Erfundene Adressen und geschätzte Ersparnis, damit Sie sehen, wie es funktioniert. Nichts davon wird gespeichert oder als Ihre Route gezählt.',
@@ -2801,6 +2804,7 @@ var LANGS = {
     flex_stop_many: 'Paradas Flex',
     one_package: '1 paquete',
     shift_complete: '¡Turno completado!',
+    verify_warn: '⚠ revisar',
     sample_link: '¿No tienes tu lista a mano? Prueba una ruta de ejemplo',
     sample_banner_title: 'Ruta de ejemplo',
     sample_banner_text: 'Direcciones inventadas y ahorro estimado, para que veas cómo funciona. Nada se guarda ni cuenta como una de tus rutas.',
@@ -3073,6 +3077,7 @@ var LANGS = {
     flex_stop_many: 'Paradas Flex',
     one_package: '1 pacote',
     shift_complete: 'Turno concluído!',
+    verify_warn: '⚠ conferir',
     sample_link: 'Sem a lista à mão? Experimente uma rota de exemplo',
     sample_banner_title: 'Rota de exemplo',
     sample_banner_text: 'Endereços inventados e economia estimada, para você ver como funciona. Nada aqui é salvo nem conta como uma das suas rotas.',
@@ -4398,7 +4403,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v52</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v53</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -5529,8 +5534,8 @@ function rRow(s, i) {
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
     <div class="ri-addr" style="flex:1">${escH(s.address)}</div>
     ${s.coords ? `<a href="https://www.google.com/maps/search/?api=1&query=${s.coords.lat},${s.coords.lon}" target="_blank"
-      style="flex-shrink:0;font-size:11px;color:var(--t3);text-decoration:none;padding:3px 7px;border:1px solid var(--brd);border-radius:6px;white-space:nowrap;margin-top:2px"
-      title="Verify this location on Google Maps">&#128205; verify</a>` : ''}
+      style="flex-shrink:0;font-size:11px;color:${s.geoSuspect ? '#FFB300' : 'var(--t3)'};text-decoration:none;padding:3px 7px;border:1px solid ${s.geoSuspect ? '#FFB300' : 'var(--brd)'};border-radius:6px;white-space:nowrap;margin-top:2px;${s.geoSuspect ? 'font-weight:700' : ''}"
+      title="${s.geoSuspect ? escH('This stop may be on the wrong street (' + (s.geoNote || '') + '). Tap to see where the app put it.') : 'Verify this location on Google Maps'}">${s.geoSuspect ? t('verify_warn') : '&#128205; verify'}</a>` : ''}
   </div>
   ${(s.pkgCount||1) > 1 ? (function(){
     var _nums = (s.packageNums && s.packageNums.length > 1) ? s.packageNums.slice().sort(function(a,b){return a-b;}) : null;
@@ -6901,6 +6906,12 @@ async function optimize() {
 
   const startPt = startCoords || null;
   S._startPt = startPt;
+  // Is every stop on the street its address names? Moves the ones that are not, flags the ones it cannot fix.
+  const _street = await _verifyStopStreets(orderedForTrip, startPt);
+  if (_street.moved > 0) S._routeNotes.push('Moved ' + _street.moved + ' stop' + (_street.moved > 1 ? 's' : '') + ' onto the street named in ' + (_street.moved > 1 ? 'their addresses' : 'its address') +
+    ': ' + orderedForTrip.filter(function(s) { return s.geoFixed; }).slice(0, 3).map(function(s) { return s.address.split(',')[0]; }).join('; ') + '.');
+  if (_street.suspect > 0) S._routeNotes.push(_street.suspect + ' stop' + (_street.suspect > 1 ? 's' : '') + ' may be on the wrong street and could not be corrected: ' +
+    orderedForTrip.filter(function(s) { return s.geoSuspect; }).slice(0, 3).map(function(s) { return s.address.split(',')[0]; }).join('; ') + '. Tap \u26a0 check on the stop to see where the app put it.');
   const tripCoords = [
     ...(startPt ? [startPt] : []),
     ...orderedForTrip.map(s => s.coords),
@@ -9220,6 +9231,19 @@ async function fetchCandidates(q, limit) {
       candidates = _pick;
     }
 
+    // Prefer candidates that really are on the street this address names, and on the very house number. Before this,
+    // whichever candidate sat nearest the middle of the route won, whatever its label said, which can pull a stop onto
+    // a neighbouring street. Never leaves the list empty, so it cannot do worse than before.
+    var _wCore = _streetCoreOf(address), _wNum = _houseNumOf(address);
+    if (_checkableCore(_wCore)) {
+      var _onStreet = candidates.filter(function(c) { return _coreMatches(_streetCoreOf(c.label), _wCore); });
+      var _exact = _onStreet.filter(function(c) { var n = _houseNumOf(c.label); return _wNum != null && n === _wNum; });
+      var _pickL = _exact.length ? _exact : _onStreet;
+      if (_pickL.length && _pickL.length < candidates.length && typeof trackEvent === 'function') {
+        trackEvent('geocode_label_filtered', { dropped: candidates.length - _pickL.length, kept: _pickL.length, exact: _exact.length ? 1 : 0, region: S.userState || 'unknown' });
+      }
+      if (_pickL.length) candidates = _pickL;
+    }
     if (!biasLat || !biasLon) return candidates[0];
     // Pick candidate closest to cluster centroid
     return candidates.reduce(function(best, c) {
@@ -9563,7 +9587,12 @@ async function _osrmTable(coords) {
     var n = coords.length;
     if (d.code !== 'Ok' || !d.durations || !d.distances || d.durations.length !== n || d.distances.length !== n) return null;
     for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) if (d.durations[i][j] == null || d.distances[i][j] == null) return null;
-    return { dur: d.durations, dist: d.distances };
+    var names = null, snaps = null;
+    if (d.destinations && d.destinations.length === n) {        // the road each point snapped to, and how far away it is
+      names = d.destinations.map(function(w) { return (w && w.name) || ''; });
+      snaps = d.destinations.map(function(w) { return (w && typeof w.distance === 'number') ? w.distance : null; });
+    }
+    return { dur: d.durations, dist: d.distances, names: names, snaps: snaps };
   } catch (e) { return null; } finally { clearTimeout(t); }
 }
 // Fine-tuning is deliberately LOCAL. It repeatedly moves ONE stop to a nearby position (up to
@@ -9747,6 +9776,9 @@ function buildRouteReport() {
   if (r) L.push('Search       : ' + (r.approx ? 'STRAIGHT-LINE estimates (road table unavailable)' : 'road times') + ' | ' + r.starts + ' starting orders, best was #' + (r.from + 1) +
                 ' | ' + r.iters + ' shake rounds, ' + r.ms + ' ms | draft ' + f1(r.baseM) + ' -> ' + f1(r.bestM) + ' | ' + (r.kept ? 'KEPT' : 'not used'));
   else L.push('Search       : did not run (fewer than 4 stops, or the router was unavailable)');
+  var st = (S._diag && S._diag.street) || null;
+  L.push('Street check : ' + (st ? (st.ran ? st.checked + ' checked, ' + st.flagged + ' off their street, ' + st.moved + ' moved, ' + st.suspect + ' could not be confirmed (' + st.ms + ' ms)'
+                                             : 'did not run (the road table was unavailable)') : 'not run in this session'));
   var sv = _streetVisits(list);
   L.push('Streets      : ' + sv.total + ' separate street visits on ' + sv.streets + ' streets' + (sv.multi.length ? ' | returns to: ' + sv.multi.join(', ') : ' | no street is visited twice'));
   var amz = (S.stops || []).filter(function(s) { return !s.geoFailed; }).slice().sort(function(a, b) { return (a.flexNum == null ? 1e9 : a.flexNum) - (b.flexNum == null ? 1e9 : b.flexNum); });
@@ -9765,7 +9797,8 @@ function buildRouteReport() {
     }
     prevId = cur;
     L.push(String(i + 1).padEnd(4) + (s.flexNum != null ? ('#' + s.flexNum) : '-').padEnd(6) + leg + (s.coords ? s.coords.lat.toFixed(5) + ',' + s.coords.lon.toFixed(5) : 'no coords').padEnd(24) + s.address +
-           ((s.pkgCount || 1) > 1 ? '  [' + s.pkgCount + ' pkgs]' : ''));
+           ((s.pkgCount || 1) > 1 ? '  [' + s.pkgCount + ' pkgs]' : '') +
+           (s.geoFixed ? '   <-- MOVED ' + s.geoFixed + ' m onto its own street' : '') + (s.geoSuspect ? '   <-- SUSPECT: ' + (s.geoNote || '') : ''));
   });
   if (T && prevId != null && idx['__home__'] != null && idx[prevId] != null) {
     L.push('home'.padEnd(10) + String((T.dist[idx[prevId]][idx['__home__']] / 1000).toFixed(1)).padStart(6) + String(Math.round(T.dur[idx[prevId]][idx['__home__']] / 60)).padStart(8));
@@ -9784,6 +9817,160 @@ function showRouteReport() {
   pre.style.cssText = 'white-space:pre;overflow-x:auto;font-size:10.5px;line-height:1.45;color:#d8d8f0;font-family:ui-monospace,Menlo,Consolas,monospace;margin:0';
   pre.textContent = txt;
   ov.appendChild(b); ov.appendChild(pre); document.body.appendChild(ov);
+}
+
+
+// ─── Is this stop on the street its address names? ──────────────────────────────────────────────────────────────
+// A geocoder can put a stop on the WRONG street and still look plausible (house numbers rise in the right order,
+// the stop sits on a straight line). On a real route three Coxwell Ave stops were placed on Ashdale Ave, about 300 m
+// away, so the route kept hopping between two streets it thought were one. Nothing about the coordinates alone shows
+// that. The road network does: OSRM names the road each point snaps to. This compares that name with the street in
+// the address, and only when a stop is clearly on another street does it look for a better location, and only moves
+// the stop to one that the road network confirms. If nothing can be confirmed, the stop is FLAGGED so the driver is
+// told, instead of the app planning round a wrong pin in silence.
+var STREET_CHECK_ENABLED = true;
+var STREET_SNAP_MAX_M = 60;          // only trust a road name if the stop is this close to that road
+var STREET_NEAR_M = 80;              // "another road right beside it matches" (corner lots)
+var STREET_CHECK_BUDGET_MS = 14000;  // never spend longer than this on checks and corrections
+var STREET_CHECK_MAX = 8;            // at most this many stops are examined for correction
+var _STREET_DROP = { avenue:1, ave:1, road:1, rd:1, street:1, st:1, drive:1, dr:1, court:1, ct:1, crescent:1, cres:1, boulevard:1, blvd:1,
+  lane:1, ln:1, place:1, pl:1, terrace:1, way:1, trail:1, circle:1, cir:1, east:1, west:1, north:1, south:1, e:1, w:1, n:1, s:1 };
+function _streetCoreOf(addr) {
+  var a = String(addr || '').split(',')[0];
+  a = a.replace(/\b(unit|suite|ste|apt|apartment|front porch|buzz|bsmt|basement|floor|level|lvl|room)\b.*$/i, '');
+  a = a.replace(/^[A-Za-z]{0,3}\d+[A-Za-z]?\s*[\-\/]\s*(?=\d)/, '');                 // unit prefix: "4-1331", "TH4-1331", "906-1060"
+  a = a.replace(/^\d+[A-Za-z]?\s+(?:1\/2\s+)?/, '');                                  // house number: "737 1/2", "148A"
+  a = a.replace(/[.,#()]/g, ' ');
+  return a.toLowerCase().split(/\s+/).filter(function(w) { return w && !_STREET_DROP[w]; }).join(' ');
+}
+function _houseNumOf(addr) {
+  var a = String(addr || '').split(',')[0].trim();
+  var m = a.match(/^[A-Za-z]{0,3}\d+[A-Za-z]?\s*[\-\/]\s*(\d+)/) || a.match(/^(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+function _coreMatches(a, b) {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  var A = a.split(' '), B = b.split(' '), small = A.length <= B.length ? A : B, big = A.length <= B.length ? B : A;
+  return small.every(function(w) { return big.indexOf(w) >= 0; });                  // "gerrard" matches "lower gerrard"
+}
+// Only street names that are plain words can be compared safely (numbered roads and highways are named inconsistently).
+function _checkableCore(core) {
+  return !!core && core.length >= 4 && !/\d/.test(core) && !/\b(hwy|highway|route|rte|county|concession|line|rr|hc|pr|sideroad)\b/.test(core);
+}
+function _pause(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+// Roads within STREET_NEAR_M of a point, by name. true = one of them is the street we want, false = none is,
+// null = the lookup failed (never guess in that case).
+async function _nearbyRoadMatches(pt, core) {
+  try {
+    var res = await _tmo(fetch('https://router.project-osrm.org/nearest/v1/driving/' + pt.lon + ',' + pt.lat + '?number=4'), 6000, null);
+    if (!res || !res.ok) return null;
+    var d = await _tmo(res.json(), 4000, null);
+    if (!d || d.code !== 'Ok' || !d.waypoints || !d.waypoints.length) return null;
+    return d.waypoints.some(function(w) { return w && w.name && w.distance <= STREET_NEAR_M && _coreMatches(_streetCoreOf(w.name), core); });
+  } catch (e) { return null; }
+}
+// Candidate locations for an address, with their labels, from Photon (and Nominatim if Photon has nothing useful).
+async function _geoCandidatesFor(address, biasLat, biasLon) {
+  var parts = String(address || '').split(','), street = parts[0].replace(/\b(unit|suite|ste|apt|front porch|buzz)\b.*$/i, '').trim();
+  var um = street.match(/^[A-Za-z]{0,3}\d+[\-\/](\d+[A-Za-z]?)\s+(.*)$/); if (um) street = um[1] + ' ' + um[2];
+  var city = (parts[1] || '').trim();
+  var q = expandAbbr(street + (city ? ' ' + city : '')), out = [];
+  async function photon(bias) {
+    try {
+      var url = 'https://photon.komoot.io/api/?q=' + encodeURIComponent(q) + '&limit=8&lang=en' + (bias ? '&lat=' + biasLat.toFixed(5) + '&lon=' + biasLon.toFixed(5) : '');
+      var r = await _tmo(fetch(url), 6000, null); if (!r || !r.ok) return [];
+      var d = await _tmo(r.json(), 4000, null); if (!d || !d.features) return [];
+      return d.features.map(function(f) { return { lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1],
+        label: f.properties ? [f.properties.housenumber, f.properties.street || f.properties.name].filter(Boolean).join(' ') : '' }; });
+    } catch (e) { return []; }
+  }
+  var a = await photon(true), b = await photon(false);
+  a.concat(b).forEach(function(c) { if (!out.some(function(o) { return haversineKm(o.lat, o.lon, c.lat, c.lon) < 0.015; })) out.push(c); });
+  var core = _streetCoreOf(address);
+  if (!out.some(function(c) { return _coreMatches(_streetCoreOf(c.label), core); })) {
+    try {
+      var nr = await _tmo(fetch('/.netlify/functions/geocode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ provider: 'nominatim', query: q }) }), 8000, null);
+      if (nr && nr.ok) { var nd = await _tmo(nr.json(), 4000, null);
+        ((nd && nd.results) || []).forEach(function(f) { out.push({ lon: f.lon, lat: f.lat, label: (f.display_name || '').split(',').slice(0, 2).join(' ') }); }); }
+    } catch (e) {}
+  }
+  return out;
+}
+// The matrix for these points, in THIS order, reusing the one fetched by the street check when it covers them.
+async function _tableFor(pts, ids) {
+  var c = S._tableCache;
+  if (c && c.ids.length === ids.length) {
+    var pos = {}; c.ids.forEach(function(id, k) { pos[id] = k; });
+    var map = ids.map(function(id) { return pos[id]; });
+    var same = map.every(function(q, k) { return q != null && Math.abs(c.pts[q].lat - pts[k].lat) < 1e-6 && Math.abs(c.pts[q].lon - pts[k].lon) < 1e-6; });
+    if (same) {
+      var P = function(M) { return map.map(function(qi) { return map.map(function(qj) { return M[qi][qj]; }); }); };
+      return { dur: P(c.dur), dist: P(c.dist), names: c.names ? map.map(function(q) { return c.names[q]; }) : null };
+    }
+  }
+  return await _osrmTable(pts);
+}
+async function _verifyStopStreets(stops, startPt) {
+  var res = { checked: 0, flagged: 0, moved: 0, suspect: 0, ms: 0, ran: false };
+  S._diag = S._diag || {}; S._diag.street = res;       // recorded from the start, so the report can say "did not run" and why
+  S._tableCache = null;
+  stops.forEach(function(s) { s.geoSuspect = false; s.geoNote = ''; });
+  if (!STREET_CHECK_ENABLED || stops.length < 3) return res;
+  var t0 = Date.now(), deadline = t0 + STREET_CHECK_BUDGET_MS;
+  try {
+    var off = startPt ? 1 : 0;
+    var mk = function() { return { pts: [].concat(startPt ? [startPt] : [], stops.map(function(s) { return s.coords; }), S.homeCoords ? [S.homeCoords] : []),
+      ids: [].concat(startPt ? ['__start__'] : [], stops.map(function(s) { return s.id; }), S.homeCoords ? ['__home__'] : []) }; };
+    var m = mk(), D = await _osrmTable(m.pts);
+    if (!D) return res;
+    S._tableCache = { ids: m.ids, pts: m.pts, dur: D.dur, dist: D.dist, names: D.names };
+    if (!D.names) return res;
+    res.ran = true;
+    var flagged = [];
+    stops.forEach(function(s, k) {
+      var core = _streetCoreOf(s.address); if (!_checkableCore(core)) return;
+      res.checked++;
+      var name = D.names[k + off], snap = D.snaps ? D.snaps[k + off] : null;
+      if (!name || snap == null || snap > STREET_SNAP_MAX_M) return;           // an unnamed road, or too far to mean anything
+      if (_coreMatches(_streetCoreOf(name), core)) return;
+      flagged.push({ s: s, core: core, name: name });
+    });
+    res.flagged = flagged.length;
+    var med = (function() { var la = stops.map(function(s) { return s.coords.lat; }).sort(function(a, b) { return a - b; }), lo = stops.map(function(s) { return s.coords.lon; }).sort(function(a, b) { return a - b; });
+      return { lat: la[la.length >> 1], lon: lo[lo.length >> 1] }; })();
+    var changed = false;
+    for (var i = 0; i < flagged.length && i < STREET_CHECK_MAX; i++) {
+      if (Date.now() > deadline) break;
+      var f = flagged[i];
+      var near = await _nearbyRoadMatches(f.s.coords, f.core); await _pause(120);
+      if (near !== false) continue;                      // true: just a corner lot. null: the lookup failed, so do not guess.
+      var cands = await _geoCandidatesFor(f.s.address, med.lat, med.lon), num = _houseNumOf(f.s.address), fixed = null;
+      cands = cands.filter(function(c) {
+        var lbl = _streetCoreOf(c.label); if (!_coreMatches(lbl, f.core)) return false;
+        var cn = _houseNumOf(c.label); if (num != null && cn !== num) return false;       // the very house number, on the right street
+        if (haversineKm(c.lat, c.lon, med.lat, med.lon) > 8) return false;
+        return haversineKm(c.lat, c.lon, f.s.coords.lat, f.s.coords.lon) > 0.04;           // not the same wrong place again
+      }).sort(function(a, b) { return haversineKm(a.lat, a.lon, med.lat, med.lon) - haversineKm(b.lat, b.lon, med.lat, med.lon); });
+      for (var j = 0; j < cands.length && j < 3 && !fixed && Date.now() < deadline; j++) {
+        var ok = await _nearbyRoadMatches({ lat: cands[j].lat, lon: cands[j].lon }, f.core); await _pause(120);
+        if (ok === true) fixed = cands[j];
+      }
+      if (fixed) {
+        var moved = Math.round(haversineKm(f.s.coords.lat, f.s.coords.lon, fixed.lat, fixed.lon) * 1000);
+        f.s.coords = { lat: fixed.lat, lon: fixed.lon }; f.s.geoNote = 'moved ' + moved + ' m: it had been placed on ' + f.name;
+        f.s.geoFixed = moved; res.moved++; changed = true;
+      } else { f.s.geoSuspect = true; f.s.geoNote = 'placed on ' + f.name; res.suspect++; }
+    }
+    if (changed) {                                       // positions changed, so the road matrix has to be fetched again
+      m = mk(); var D2 = await _osrmTable(m.pts);
+      S._tableCache = D2 ? { ids: m.ids, pts: m.pts, dur: D2.dur, dist: D2.dist, names: D2.names } : null;
+    }
+  } catch (e) { console.warn('[FlexRoute] street check skipped:', e); }
+  res.ms = Date.now() - t0;
+  trackEvent('street_check', { checked: res.checked, flagged: res.flagged, moved: res.moved, suspect: res.suspect, ms: res.ms, region: S.userState || 'unknown' });
+  return res;
 }
 
 // Describe, in stop-list positions (1-based), how the FINAL order differs from the router's order.
@@ -9820,7 +10007,7 @@ async function _refineWithRoadTimes(order, startPt, homePt, lockedId, altOrders)
   var off = startPt ? 1 : 0;
   var pts = [].concat(startPt ? [startPt] : [], order.map(function(s) { return s.coords; }), homePt ? [homePt] : []);
   var n = pts.length;
-  var D = await _osrmTable(pts), approx = false;
+  var D = await _tableFor(pts, [].concat(startPt ? ['__start__'] : [], order.map(function(s) { return s.id; }), homePt ? ['__home__'] : [])), approx = false;
   // If the road table is unavailable (the public OSRM server is often busy), search on straight-line distances
   // instead of doing nothing; the caller re-measures on real roads and undoes the result if it is not shorter.
   if (!D) { D = _haversineMatrix(pts); approx = true; }

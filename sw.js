@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v52';   // v52: route search on the whole road-time matrix (2-opt, or-opt, restarts) starting from OSRM's draft AND Amazon's own order, a fallback when the road table is unavailable, a never-worse-than-Amazon guard, and a copyable route report (5 taps on the stop-count heading)
+const CACHE = 'flexroute-v53';   // v53: street check (a stop that sits on a different street than its address says is moved onto the right one when the road network confirms it, otherwise flagged with an amber check), label-aware geocoder choice, road table fetched once and reused
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
