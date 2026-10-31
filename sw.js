@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v55';   // v55: route report says which order the search proposed and how the route lookup rated it when the draft is kept; plainer wording on the search line
+const CACHE = 'flexroute-v56';   // v56: when the route lookup turns the search's order down, up to two smaller changes to the draft are tried against the same lookup and used only if clearly shorter
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

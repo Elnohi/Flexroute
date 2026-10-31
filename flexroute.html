@@ -399,7 +399,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.30-v55';
+  var FR_BUILD = 'v2026.10.30-v56';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1824,7 +1824,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.30-v55\n'
+            + 'build v2026.10.30-v56\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4403,7 +4403,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v55</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v56</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -6957,10 +6957,10 @@ async function optimize() {
       // OSRM's own order and figures, kept so every later step can be undone if it would lengthen the drive.
       const _osrmOrder = optimizedOrder.slice(), _osrmDist = tripDist, _osrmDur = tripDur;
       // 1) Refine OSRM's order with real road times (it is a heuristic: swaps/moves can still save time).
-      let _orderChanged = false, _groupedTogether = false, _refSavedS = 0, _refApprox = false, _refTot = null, _remeasure = 'not needed', _rej = null;
+      let _orderChanged = false, _groupedTogether = false, _refSavedS = 0, _refApprox = false, _refTot = null, _remeasure = 'not needed', _rej = null, _refAlts = [], _altInfo = null;
       try {
         const _ref = await _refineWithRoadTimes(optimizedOrder, startPt, S.homeCoords, S.lastId, [orderedForTrip]);
-        if (_ref.changed) { optimizedOrder = _ref.order; _orderChanged = true; _refSavedS = _ref.savedSec; _refApprox = !!_ref.approx; _refTot = { m: _ref.totM, s: _ref.totS }; }
+        if (_ref.changed) { optimizedOrder = _ref.order; _orderChanged = true; _refSavedS = _ref.savedSec; _refApprox = !!_ref.approx; _refTot = { m: _ref.totM, s: _ref.totS }; _refAlts = _ref.alts || []; }
       } catch (_e) { /* keep OSRM's order */ }
       // 2) Stops that are physically together are visited together (never at a cost of >1.5 km straight-line).
       const _grp = _groupColocated(optimizedOrder, s => s.coords, s => s.id === S.lastId);
@@ -6994,6 +6994,26 @@ async function optimize() {
           } else _remeasure = 'failed';
         } catch (_e) { _remeasure = 'failed'; /* keep the OSRM trip figures */ }
       }
+      // The main order was turned down. Smaller changes to the draft may still be better than the draft: try them against the
+      // same route lookup, and use one only if it is clearly shorter than the draft (so this can never make the drive longer).
+      if (_remeasure === 'reverted' && _refAlts.length) {
+        _altInfo = { tried: 0, used: false };
+        for (let _ai = 0; _ai < _refAlts.length && _optElapsed() < 60000; _ai++) {
+          let _cand = _refAlts[_ai].order;
+          const _g2 = _groupColocated(_cand, s => s.coords, s => s.id === S.lastId);
+          if (_g2.some((s, k) => s !== _cand[k]) && _pathKm(_g2, s => s.coords, startPt, S.homeCoords) <= _pathKm(_cand, s => s.coords, startPt, S.homeCoords) + 1.5) _cand = _g2;
+          let _n2 = null;
+          try { _n2 = await osrmRoute([...(startPt ? [startPt] : []), ..._cand.map(s => s.coords), ...(S.homeCoords ? [S.homeCoords] : [])]); } catch (_e) {}
+          _altInfo.tried++;
+          if (_n2 && _n2.distance < _osrmDist - 50 && _n2.duration <= _osrmDur + 60) {
+            optimizedOrder = _cand; tripDist = _n2.distance; tripDur = _n2.duration; _orderChanged = true; _groupedTogether = false;
+            _remeasure = 'ok (a smaller change to the draft; the full search order was turned down)'; _altInfo.used = true; _altInfo.routeM = Math.round(_n2.distance); _altInfo.routeS = Math.round(_n2.duration);
+            S._routeNotes = S._routeNotes.filter(n => !/^Kept the router's own order/.test(n));
+            trackEvent('route_alt_order_used', { stop_count: _cand.length, saved_m: Math.round(_osrmDist - _n2.distance), region: S.userState || 'unknown' });
+            break;
+          }
+        }
+      }
       // Last safeguard: never present an order that is longer AND slower than Amazon's own on the same roads.
       // Amazon's order is one of the drafts the search started from, so this should not happen; if it does, say so
       // and keep Amazon's order rather than show a worse one. (Skipped when a last stop is locked, which changes it.)
@@ -7005,7 +7025,7 @@ async function optimize() {
       }
       S._diag = S._diag || {};
       S._diag.route = { amazonM: origDist, amazonS: origDur, draftM: _osrmDist, draftS: _osrmDur, finalM: tripDist, finalS: tripDur,
-                        n: geocodedStops.length, at: Date.now(), remeasure: _remeasure, rejected: _rej };
+                        n: geocodedStops.length, at: Date.now(), remeasure: _remeasure, rejected: _rej, alt: _altInfo };
       // Say what changed, measured against the order the router gave and the route actually re-measured,
       // so the note can never describe a step that a later step undid.
       // Nothing is reported unless the order the driver actually gets differs from the router's own:
@@ -9716,9 +9736,10 @@ function _improveOrderGlobal(starts, Dt, Dd, lockLast, budgetMs) {
     }
     return a;
   }
-  var best = null;
+  var best = null, locals = [];
   starts.forEach(function(st, idx) {
     var a = localSearch(st), c = cost(a);
+    locals.push({ seq: a, cost: c, from: idx });                       // kept: smaller changes to the draft can be the fallback
     if (!best || c < best.c - 1e-9) best = { a: a, c: c, from: idx };
   });
   var cur = best.a, curC = best.c, iters = 0, m = hi - lo + 1;
@@ -9733,7 +9754,7 @@ function _improveOrderGlobal(starts, Dt, Dd, lockLast, budgetMs) {
     var cc = cost(cand);
     if (cc < curC - 1e-6) { cur = cand; curC = cc; }
   }
-  return { seq: cur, cost: curC, from: best.from, iters: iters, ms: Math.round(now() - t0) };
+  return { seq: cur, cost: curC, from: best.from, iters: iters, ms: Math.round(now() - t0), locals: locals };
 }
 // Straight-line stand-in for the road matrix, used only when OSRM's table is unavailable (x1.3 for roads, 30 km/h).
 function _haversineMatrix(pts) {
@@ -9793,6 +9814,8 @@ function buildRouteReport() {
     L.push('Rejected     : the search\'s order was rated ' + f1(rj.routeM) + ', ' + fm(rj.routeS) + ' by the route lookup, against the draft\'s ' + f1(d.draftM) + ', ' + fm(d.draftS) +
            (r ? ' (the road table had it at ' + f1(rj.tableM) + ' against ' + f1(r.baseM) + ')' : '') + ', so the draft was kept');
     L.push('   proposed  : ' + rj.flex.join(' '));
+    if (d.alt) L.push('Alternative  : ' + (d.alt.used ? 'used a smaller change to the draft, rated ' + f1(d.alt.routeM) + ', ' + fm(d.alt.routeS) + ' by the route lookup (the draft: ' + f1(d.draftM) + ', ' + fm(d.draftS) + ')'
+                                                        : 'tried ' + d.alt.tried + ' smaller change' + (d.alt.tried === 1 ? '' : 's') + ' to the draft; none was shorter than the draft on the route lookup'));
   }
   if (st && st.detail && st.detail.length) st.detail.forEach(function(x) { L.push('   flagged     : ' + x.addr + '  (snapped to ' + x.snappedTo + ')  ->  ' + x.outcome); });
   var sv = _streetVisits(list);
@@ -10101,12 +10124,25 @@ async function _refineWithRoadTimes(order, startPt, homePt, lockedId, altOrders)
                      baseM: Math.round(dBase), bestM: Math.round(dBest), baseS: Math.round(tBase), bestS: Math.round(tBest), kept: !!good };
   S._lastTable = { ids: [].concat(startPt ? ['__start__'] : [], order.map(function(s) { return s.id; }), homePt ? ['__home__'] : []), dur: D.dur, dist: D.dist, approx: approx };
   if (!good) return { order: order, changed: false };
-  var out = [];
-  best.forEach(function(k) { var idx = k - off; if (idx >= 0 && idx < order.length) out.push(order[idx]); });
-  if (out.length !== order.length) return { order: order, changed: false };
+  var toOrder = function(seq) {
+    var o = []; seq.forEach(function(k) { var idx = k - off; if (idx >= 0 && idx < order.length) o.push(order[idx]); });
+    return o.length === order.length ? o : null;
+  };
+  var out = toOrder(best);
+  if (!out) return { order: order, changed: false };
   var moved = 0; out.forEach(function(s, k) { if (s !== order[k]) moved++; });
   if (!moved) return { order: order, changed: false };
-  return { order: out, changed: true, swaps: moved, savedM: Math.round(savedM), savedSec: Math.round(savedT), approx: approx, totM: Math.round(dBest), totS: Math.round(tBest) };
+  // Smaller changes to the draft, found on the way. If the route lookup turns the main order down, one of these can still be used.
+  var alts = [], seen = [JSON.stringify(best), JSON.stringify(seq0)];
+  if (g && g.locals && !approx) {
+    g.locals.slice().sort(function(a, b) { return a.cost - b.cost; }).forEach(function(l) {
+      var key = JSON.stringify(l.seq); if (seen.indexOf(key) >= 0 || alts.length >= 2) return; seen.push(key);
+      var t = tot(D.dur, l.seq), d = tot(D.dist, l.seq);
+      if (!(t <= tBase && d <= dBase + 50 && (dBase - d >= 30 || tBase - t >= 10))) return;
+      var o = toOrder(l.seq); if (o) alts.push({ order: o, totM: Math.round(d), totS: Math.round(t) });
+    });
+  }
+  return { order: out, changed: true, swaps: moved, savedM: Math.round(savedM), savedSec: Math.round(savedT), approx: approx, totM: Math.round(dBest), totS: Math.round(tBest), alts: alts };
 }
 
 // Resolve with `fallback` if `p` has not settled within `ms`. A browser fetch has NO timeout of its own, so one
