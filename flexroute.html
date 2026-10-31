@@ -243,8 +243,11 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
 @keyframes floatIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .comp-wrap{display:flex;flex-direction:column;height:100vh;background:var(--bg);overflow:hidden}
 .comp-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--brd);flex-shrink:0;background:var(--surf)}
-.comp-prog{height:3px;background:var(--brd);flex-shrink:0}
-.comp-prog-fill{height:3px;background:var(--acc);transition:width .4s}
+.comp-prog{height:12px;margin:10px 16px 4px;background:var(--surf2);border:1px solid var(--brd2);border-radius:7px;overflow:hidden;flex-shrink:0}
+.comp-prog-fill{height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:6px;animation:compProg .55s ease-out}
+.comp-prog-fill.full{background:var(--ok)}
+@keyframes compProg{from{width:var(--from,0%)}to{width:var(--to,0%)}}
+@media (prefers-reduced-motion:reduce){.comp-prog-fill{animation:none}}
 .comp-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;text-align:center;overflow-y:auto}
 .comp-stopnum{font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:2px;color:var(--t3);text-transform:uppercase;margin-bottom:10px}
 .comp-addr{font-family:var(--sans);font-size:30px;font-weight:800;color:var(--t1);line-height:1.1;margin-bottom:10px;letter-spacing:-.5px;animation:cSlide .3s ease}
@@ -256,10 +259,9 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
 .comp-flexnums.n1{font-size:76px}.comp-flexnums.n2{font-size:58px}.comp-flexnums.n3{font-size:48px}.comp-flexnums.nm{font-size:38px}
 .comp-flexpk{font-family:var(--sans);font-size:18px;font-weight:700;color:var(--t1)}
 .comp-browse{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}
-.comp-bbtn{flex:0 0 auto;min-width:92px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:10px;padding:11px 14px;color:var(--t2);font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.comp-bbtn{flex:1 1 0;min-width:92px;background:var(--surf2);border:1.5px solid var(--brd);border-radius:10px;padding:11px 14px;color:var(--t2);font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 .comp-bbtn:active{background:var(--surf);color:var(--t1)}
 .comp-bbtn[disabled]{opacity:.3;cursor:default}
-.comp-bpos{flex:1;text-align:center;font-family:var(--sans);font-size:13px;font-weight:700;letter-spacing:1px;color:var(--t3)}
 .comp-review{display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(74,158,255,.1);border:1px solid rgba(74,158,255,.4);border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:12.5px;color:var(--inf);line-height:1.4}
 .comp-rback{flex-shrink:0;background:transparent;border:1px solid rgba(74,158,255,.5);border-radius:7px;padding:6px 10px;color:var(--inf);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);-webkit-tap-highlight-color:transparent}
 .comp-done-back{background:var(--inf);color:#fff}
@@ -399,7 +401,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.30-v57';
+  var FR_BUILD = 'v2026.10.30-v58';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1824,7 +1826,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.30-v57\n'
+            + 'build v2026.10.30-v58\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4403,7 +4405,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v57</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v58</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -4654,7 +4656,14 @@ function vCompanion() {
       '</button>' +
       '<div style="font-family:var(--sans);font-size:15px;font-weight:700;color:var(--acc)">' + done + '/' + total + '</div>' +
     '</div>' +
-    '<div class="comp-prog"><div class="comp-prog-fill" style="width:' + pct + '%"></div></div>' +
+    // The delivered counter above and this bar are the one place progress is shown. The bar is rebuilt on every update, so a CSS
+     // transition would never play; instead it starts at its previous width (--from) and grows to the new one (--to).
+     (function(){
+       var _from = done === 0 ? 0 : (typeof S._compPrevPct === 'number' ? S._compPrevPct : pct);
+       S._compPrevPct = pct;
+       return '<div class="comp-prog" role="progressbar" aria-label="Delivery progress" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + done + '" aria-valuetext="' + done + ' of ' + total + '">' +
+         '<div class="comp-prog-fill' + (pct >= 100 ? ' full' : '') + '" style="width:' + pct + '%;--from:' + _from + '%;--to:' + pct + '%"></div></div>';
+     })() +
     '<div class="comp-body">' +
       '<div class="comp-stopnum">' + t('stop_of').replace('{i}', idx+1).replace('{n}', total) + (isLast ? ' ' + t('last_stop') : '') + '</div>' +
       '<div class="comp-addr">' + escH(stop.address) + '</div>' +
@@ -4687,8 +4696,7 @@ function vCompanion() {
       // Prev / Next: look back and ahead along the route without changing what has been delivered.
       '<div class="comp-browse">' +
         '<button class="comp-bbtn" id="compPrevBtn"' + (idx <= 0 ? ' disabled' : '') + ' aria-label="Previous stop">' + t('prev_btn') + '</button>' +
-        '<div class="comp-bpos">' + (idx + 1) + ' / ' + total + '</div>' +
-        '<button class="comp-bbtn" id="compNextBtn"' + (idx >= total - 1 ? ' disabled' : '') + ' aria-label="Next stop">' + t('next_btn') + '</button>' +
+                '<button class="comp-bbtn" id="compNextBtn"' + (idx >= total - 1 ? ' disabled' : '') + ' aria-label="Next stop">' + t('next_btn') + '</button>' +
       '</div>' +
       (reviewing ? '<div class="comp-review">' +
         '<span>' + escH(t('reviewing_stop').replace('{n}', idx + 1)) + (viewDone ? ' \u00b7 ' + escH(t('already_delivered')) : '') + '</span>' +
