@@ -34,3 +34,12 @@
 # Daily 15:00 UTC (11:00 AM Eastern): day-10 subscriber check-in email. Does nothing unless REVIEW_EMAILS_ENABLED=1.
 [functions."review-checkin"]
   schedule = "0 15 * * *"
+
+# Daily 15:30 UTC (11:30 AM Eastern): reminder email three days before a 30-day pass ends. Does nothing unless REVIEW_EMAILS_ENABLED=1.
+[functions."pass-reminder"]
+  schedule = "30 15 * * *"
+
+# Daily 04:00 UTC (midnight Eastern): deletes records older than the retention periods in the privacy policy.
+# Set PURGE_DISABLED=1 to turn it off, or PURGE_DRY_RUN=1 to see what it would delete without deleting.
+[functions."purge-old-records"]
+  schedule = "0 4 * * *"

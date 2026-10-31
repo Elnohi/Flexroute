@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Privacy Policy — FlexRoute</title>
-<meta name="description" content="How FlexRoute handles addresses, screenshots, location and payment data.">
+<meta name="description" content="How FlexRoute handles addresses, screenshots, email, analytics and payment data, who receives what, and how long each kind of record is kept.">
 <link rel="canonical" href="https://flexrouteapp.com/privacy.html">
 <style>
   :root{
@@ -55,22 +55,27 @@
 <header>
   <div class="brand">FlexRoute</div>
   <h1>Privacy Policy</h1>
-  <div class="eff">Effective 1 August 2026 &middot; Last updated 21 July 2026</div>
+  <div class="eff">Effective 30 October 2026 &middot; Last updated 30 October 2026</div>
 </header>
 
 <div class="tl">
   <h2>The short version</h2>
   <ul>
-    <li>You don't need an account to use FlexRoute. No sign-up, no password, no delivery-platform login.</li>
+    <li>You don't need an account or a password to use FlexRoute, and it never asks for your delivery-platform login.</li>
     <li>Your stops, depot and home address live in your phone's local storage &mdash; not on our servers.</li>
     <li>Addresses are sent to mapping services so they can be turned into map pins and a route. That's what makes the app work.</li>
     <li>Screenshots you scan are read for text and then discarded. We don't keep them.</li>
-    <li>We ask for your email only if you buy a subscription. Card details go straight to Stripe &mdash; we never see them.</li>
+    <li>After your first free route the app asks for your email. We use it, with a device identifier, only to count your free routes. If you subscribe, your email is also used to sign you in and link your purchase. Card details go straight to Stripe &mdash; we never see them.</li>
+    <li>We use Google Analytics to see which features get used. It never receives your addresses, screenshots or email.</li>
     <li>We don't sell your data, and we don't run ads.</li>
   </ul>
 </div>
 
-<p style="font-size:13px;color:var(--t3)">The rest of this page explains each of those points precisely, including exactly which companies receive which data.</p>
+<p style="font-size:13px;color:var(--t3)">The rest of this page explains each of those points precisely, including exactly which companies receive which data and how long each kind of record is kept.</p>
+
+<div class="note">
+<strong>What this version adds.</strong> Earlier versions left out some things we do. This one spells them out: the email address and device identifier used to count free routes (section 4), the security log (section 4), Google Analytics and its cookies (section 6), the end-of-shift survey (section 3), the emails we send about your plan (section 5), and a stated retention period for every kind of record (section 7).
+</div>
 
 <h2>1. Who we are</h2>
 <p>FlexRoute is an independent route-optimisation tool operated by a single developer. You can reach us at <a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a> or through our <a href="/contact.html">contact page</a>.</p>
@@ -101,7 +106,7 @@
   <tr>
     <td>Map coordinates<br>for your stops</td>
     <td>OSRM routing service</td>
-    <td>To calculate real driving times and produce the optimised order</td>
+    <td>To calculate real driving times, produce the optimised order, and check that each stop was placed on the street named in its address</td>
   </tr>
   <tr>
     <td>Screenshots or<br>PDFs you scan</td>
@@ -110,8 +115,13 @@
   </tr>
   <tr>
     <td>Your email address</td>
-    <td>Resend (delivers the code), Stripe (payment records)</td>
-    <td>Only if you buy a subscription &mdash; to send your sign-in code and link your purchase</td>
+    <td>Our server (hosted by Netlify); Resend, which delivers our emails; Stripe, for payment records</td>
+    <td>After your first free route: to count your free routes. If you subscribe: to send your sign-in code, link your purchase and send the emails described in section 5</td>
+  </tr>
+  <tr>
+    <td>Device identifier<br>(a short code)</td>
+    <td>Our server (hosted by Netlify), stored next to your email</td>
+    <td>To stop free routes being claimed again and again on one device. How it is made is explained in section 4</td>
   </tr>
   <tr>
     <td>Payment details</td>
@@ -119,9 +129,19 @@
     <td>To process payment. These never touch FlexRoute's servers.</td>
   </tr>
   <tr>
-    <td>IP address and<br>basic request logs</td>
-    <td>Netlify, our host</td>
-    <td>Standard server logs, security and abuse prevention</td>
+    <td>Usage statistics</td>
+    <td>Google Analytics (Google)</td>
+    <td>To learn which screens and features are used and what breaks. Never your addresses, screenshots or email &mdash; see section 6</td>
+  </tr>
+  <tr>
+    <td>Survey answers</td>
+    <td>Our server (hosted by Netlify); a copy is emailed to us</td>
+    <td>The optional three-question survey shown after a shift: your answers, an optional note, and your platform, language and region. Please don't put personal details in the note</td>
+  </tr>
+  <tr>
+    <td>IP address and<br>request logs</td>
+    <td>Netlify, our host; and our own security log</td>
+    <td>Standard server logs, security and abuse prevention. Our own log is described in section 4</td>
   </tr>
 </table>
 
@@ -135,43 +155,76 @@
 <h3>About addresses and privacy</h3>
 <p>To be direct with you: delivery addresses and your home address are personal information. FlexRoute is built so that this data stays on your device wherever possible, but geocoding and routing genuinely require sending addresses to the mapping services listed above. Any tool that turns an address into a route must do this. What we can promise is that we don't store them server-side, don't attach them to your identity, and don't sell or share them for advertising.</p>
 
-<h2>4. Accounts and email</h2>
-<p>FlexRoute is usable with no account at all. If you subscribe, we ask for an email address and send you a six-digit sign-in code. We store that email and a short-lived code so we can confirm it's you and check whether your subscription is active. The code expires shortly after it's issued.</p>
-<p>We use your email only to: deliver sign-in codes, confirm your subscription status, and reply if you contact support. We don't send marketing email.</p>
+<h2>4. Accounts, email and free-route tracking</h2>
+<p>FlexRoute has no accounts and no passwords. There are two situations in which we hold an email address.</p>
 
-<h2>5. Payments</h2>
-<p>Subscriptions are handled by <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe</a>. Card numbers are entered on Stripe's own checkout page and are never transmitted to or stored by FlexRoute. We keep only your email and whether your subscription is currently active.</p>
+<h3>Free routes</h3>
+<p>FlexRoute includes a limited number of free optimised routes. After your first one, the app asks for your email address. We store it on our server with how many free routes you have used and the date of the last one. The address isn't verified, and we don't email you because of it. Its only purpose is to count your free routes.</p>
+<p>When you enter your email, the app also sends a <strong>device identifier</strong>: a short code calculated from your browser's user-agent string, language, screen size and colour depth, time zone, number of processor cores and platform, and from how your browser draws a small hidden test image (sometimes called a canvas fingerprint). We use it for one thing: counting free routes per device, so that clearing your browser data and typing a different email doesn't hand out unlimited free routes. We don't use it for advertising or to follow you between sites or apps, and the code can't be turned back into the settings it was made from. Because it comes from device settings, two people with identical phones and settings can occasionally end up sharing a count. If that happens to you, email us and we'll fix it.</p>
 
-<h2>6. How long we keep things</h2>
+<h3>Subscribing</h3>
+<p>If you subscribe or buy a pass, we ask for an email address and send you a six-digit sign-in code. We store that email, the code (for 10 minutes) and a sign-in session (for 180 days) so we can confirm it's you and check whether your plan is active.</p>
+<p>When you sign in or start a checkout, we also write a short <strong>security log</strong> entry: the time, your IP address, a shortened hash of your browser's user-agent string, and your email address. We use it to spot abuse, such as one address requesting codes for many different emails.</p>
+
+<h2>5. Payments and the emails we send</h2>
+<p>Plans and passes are handled by <a href="https://stripe.com/privacy" target="_blank" rel="noopener">Stripe</a>. Card numbers are entered on Stripe's own checkout page and are never transmitted to or stored by FlexRoute. Stripe keeps your payment record; on our side we keep only your email and the records described in section 7.</p>
+<p>We don't send marketing email, newsletters or promotions. The only emails we send are about your own plan:</p>
+<ul>
+  <li>the six-digit sign-in code;</li>
+  <li>about ten days after you subscribe, a short check-in asking how FlexRoute is working for you (it may include a link to leave a review);</li>
+  <li>after you cancel a monthly or yearly plan, a short note asking what led you to cancel;</li>
+  <li>for a 30-day pass, a reminder about three days before it ends, with a link to buy another.</li>
+</ul>
+<p>Every email except the sign-in code has a one-click unsubscribe link, and we keep a list of addresses that have unsubscribed so we never email them again. They are sent through Resend. Replies come to our inbox, and we read them.</p>
+
+<h2>6. Analytics and cookies</h2>
+<p>FlexRoute uses Google Analytics 4 on flexrouteapp.com and inside the app, to learn which features are used and what breaks.</p>
+<ul>
+  <li><strong>What it records:</strong> which screens are opened and which features are used (for example &ldquo;route optimised&rdquo; or &ldquo;Shift Mode started&rdquo;), counts such as how many stops a route had, your app version and language, and basic device, browser and approximate location (country and region) details that Google works out from your IP address. Google Analytics 4 does not store full IP addresses.</li>
+  <li><strong>What it never receives:</strong> your addresses, screenshots, stop details or email address.</li>
+  <li><strong>Cookies:</strong> Google sets first-party cookies (named <code>_ga</code> and <code>_ga_</code> followed by an ID) to tell visits apart. They last up to two years.</li>
+  <li><strong>Who runs it:</strong> Google, acting for us under its data processing terms. We don't use it for advertising or remarketing.</li>
+</ul>
+<p>You can opt out with Google's <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Analytics opt-out browser add-on</a>, by blocking cookies or analytics in your browser, or with a content blocker. FlexRoute works the same either way.</p>
+
+<h2>7. How long we keep things</h2>
+<p>Records we hold are deleted automatically once they pass the periods below.</p>
 <ul>
   <li><strong>On-device data</strong> &mdash; until you clear it or uninstall. We have no copy.</li>
   <li><strong>Screenshots</strong> &mdash; not retained. Discarded once text is extracted.</li>
   <li><strong>Addresses sent for geocoding</strong> &mdash; not retained by us. Third-party providers keep their own logs under their own policies.</li>
-  <li><strong>Sign-in codes</strong> &mdash; deleted shortly after they expire.</li>
-  <li><strong>Email and subscription status</strong> &mdash; kept while your subscription is active, and afterwards only as long as needed for tax and accounting records.</li>
+  <li><strong>Sign-in codes</strong> &mdash; valid for 10 minutes and deleted when used; any left unused are removed a day after they expire.</li>
+  <li><strong>Sign-in sessions</strong> &mdash; 180 days, then deleted.</li>
+  <li><strong>Free-route records</strong> (your email, device identifier, route count and last-used date) &mdash; deleted 24 months after you last used a free route.</li>
+  <li><strong>Security log</strong> (IP address, browser hash, email) &mdash; deleted after 180 days.</li>
+  <li><strong>Survey answers</strong> &mdash; deleted after 12 months.</li>
+  <li><strong>Records that an email was sent to you</strong> (used so we never send the same email twice) &mdash; deleted after 24 months.</li>
+  <li><strong>Unsubscribe list</strong> &mdash; kept until you ask us to remove an address, because deleting it would mean emailing people who asked us not to.</li>
+  <li><strong>Payments and subscriptions</strong> &mdash; held by Stripe for as long as tax and accounting law requires. We don't keep card details.</li>
+  <li><strong>Analytics</strong> &mdash; held by Google Analytics for no more than 14 months.</li>
   <li><strong>Server logs</strong> &mdash; kept briefly by Netlify for security and diagnostics.</li>
 </ul>
 
-<h2>7. Your rights</h2>
+<h2>8. Your rights</h2>
 <p>Because most of your data is on your own device, the fastest way to exercise most rights is <strong>Settings &rarr; Clear app data</strong>, which is immediate and complete.</p>
-<p>For anything we hold server-side &mdash; realistically, your email and subscription record &mdash; you can ask us to show it to you, correct it, delete it, or send you a copy. Email <a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a> and we'll respond within 30 days.</p>
-<p>If you're in the UK or the European Economic Area, the GDPR gives you these rights plus the right to object to processing and to complain to your national data protection authority. Our lawful bases are: performance of a contract, for delivering the service you asked for; legitimate interests, for security and abuse prevention; and consent, for optional device location.</p>
+<p>For anything we hold server-side &mdash; your email, free-route record, device identifier, sign-in records, security log entries and survey answers &mdash; you can ask us to show it to you, correct it, delete it, or send you a copy. Email <a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a> and we'll respond within 30 days.</p>
+<p>If you're in the UK or the European Economic Area, the GDPR gives you these rights plus the right to object to processing and to complain to your national data protection authority. Our lawful bases are: performance of a contract, for delivering the service you asked for; legitimate interests, for security, for preventing repeated free-route claims, and for understanding how the app is used (you can opt out of analytics, as section 6 explains); and consent, for optional device location.</p>
 <p>If you're in California, the CCPA gives you rights to know, delete, correct, and opt out of sale or sharing. <strong>We do not sell or share personal information</strong>, and we never have.</p>
 
-<h2>8. Children</h2>
+<h2>9. Children</h2>
 <p>FlexRoute is a tool for working delivery drivers and is not directed at children. We don't knowingly collect information from anyone under 13 (or under 16 in the EEA/UK). If you believe a child has provided us information, contact us and we'll delete it.</p>
 
-<h2>9. Security</h2>
+<h2>10. Security</h2>
 <p>Traffic to FlexRoute is encrypted over HTTPS. Payments are isolated at Stripe. Our backend functions reject requests that don't originate from our own domain, which limits third parties from running up our billed services in your name.</p>
 <p>No system is perfectly secure. If you find a vulnerability, please tell us at <a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a> before disclosing it publicly &mdash; we'll respond quickly and credit you if you'd like.</p>
 
-<h2>10. International transfers</h2>
+<h2>11. International transfers</h2>
 <p>Our providers &mdash; Netlify, Stripe, Google, Resend, and the mapping services &mdash; operate servers in several countries, including the United States. Using FlexRoute means your data may be processed outside your home country under those providers' own safeguards.</p>
 
-<h2>11. Changes to this policy</h2>
+<h2>12. Changes to this policy</h2>
 <p>If we change how FlexRoute handles data, we'll update this page and move the "last updated" date at the top. For changes that meaningfully affect your privacy, we'll show a notice in the app. Continuing to use FlexRoute after a change means you accept the updated policy.</p>
 
-<h2>12. Contact</h2>
+<h2>13. Contact</h2>
 <p>Questions about privacy, or a request about your data:<br>
 <a href="mailto:flexrouteapp@gmail.com">flexrouteapp@gmail.com</a> &middot; <a href="/contact.html">Contact page</a></p>
 

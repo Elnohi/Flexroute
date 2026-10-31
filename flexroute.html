@@ -399,7 +399,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.30-v56';
+  var FR_BUILD = 'v2026.10.30-v57';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1824,7 +1824,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.30-v56\n'
+            + 'build v2026.10.30-v57\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4403,7 +4403,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v56</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v57</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -6243,7 +6243,7 @@ async function optimize() {
       cd.style.cssText = 'background:#13131E;border:1px solid var(--acc);border-radius:20px;padding:28px 24px;max-width:400px;width:100%;font-family:var(--body,sans-serif);color:#FFF;text-align:center';
       cd.innerHTML =
         '<div style="font-family:var(--sans);font-size:20px;font-weight:700;color:var(--acc);margin-bottom:10px">Enter your email to continue</div>' +
-        '<div style="font-size:14px;color:var(--t2);line-height:1.5;margin-bottom:16px">Your email keeps your routes saved across sessions — no spam, ever.</div>' +
+        '<div style="font-size:14px;color:var(--t2);line-height:1.5;margin-bottom:16px">We use your email, and a device identifier built from your browser settings, only to count your free routes. No marketing email. <a href="/privacy.html" target="_blank" rel="noopener" style="color:var(--acc)">Privacy policy</a></div>' +
         '<input id="trialEmailInput" type="email" placeholder="you@example.com" autocomplete="email" style="width:100%;box-sizing:border-box;padding:14px 16px;border-radius:12px;border:1.5px solid var(--brd2);background:var(--surf2);color:var(--t1);font-size:15px;outline:none;margin-bottom:12px">' +
         '<div id="trialEmailErr" style="font-size:12px;color:var(--err);margin-bottom:10px;min-height:16px"></div>' +
         '<button id="trialEmailBtn" class="btn bp" style="height:50px;width:100%;font-size:15px">Continue — optimize my route</button>';
