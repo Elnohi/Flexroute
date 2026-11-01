@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.30-v59';
+  var FR_BUILD = 'v2026.11.01-v60';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1828,7 +1828,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.30-v59\n'
+            + 'build v2026.11.01-v60\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4408,7 +4408,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v59</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.11.01-v60</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -5901,7 +5901,7 @@ async function handleFiles(files) {
   let added = 0, failed = 0, lastErr = '', unreadable = 0, possibleMissing = 0;
   let unreadableDetails = [];
   let _sumDepot = false, _sumEnd = false, _sumUnres = 0, _sumSn = [], _sumTotal = null, _sumNew = false, _sumCounts = 0, _sumMode = 'row', _sumWhy = '',
-      _sumIcon = 0, _sumDeliver = 0, _sumBoth = 0, _sumConfOpen = 0, _sumConfFixed = 0;
+      _sumIcon = 0, _sumDeliver = 0, _sumBoth = 0, _sumConfOpen = 0, _sumConfFixed = 0, _sumOverlap = null;
   S._scanSummary = null; S._lastHighCounts = []; S._flexTotal = null;
   for (let i = 0; i < imgs.length; i++) {
     S.sc = { done: i, total: imgs.length, msg: `Scanning image ${i + 1} of ${imgs.length}...` };
@@ -5923,6 +5923,7 @@ async function handleFiles(files) {
         _sumCounts += items._meta.countsFound || 0;
         _sumIcon += items._meta.iconCounts || 0; _sumDeliver += items._meta.deliverCounts || 0; _sumBoth += items._meta.bothCounts || 0;
         _sumConfOpen += items._meta.conflictsOpen || 0; _sumConfFixed += items._meta.conflictsFixed || 0;
+        if (items._meta.overlap) _sumOverlap = { rows: (_sumOverlap ? _sumOverlap.rows : 0) + items._meta.overlap.rows, from: _sumOverlap ? Math.min(_sumOverlap.from, items._meta.overlap.from) : items._meta.overlap.from, to: _sumOverlap ? Math.max(_sumOverlap.to, items._meta.overlap.to) : items._meta.overlap.to };
         items._meta.serials.forEach(function(n) { if (_sumSn.indexOf(n) === -1) _sumSn.push(n); });
       }
       if (items._skippedDetails && items._skippedDetails.length) {
@@ -6033,7 +6034,7 @@ async function handleFiles(files) {
     } else {
       toast(`${added} stop${added > 1 ? 's' : ''} added`);
       S._scanSummary = _buildScanSummary({ depot: _sumDepot, end: _sumEnd, unres: _sumUnres, sn: _sumSn, total: _sumTotal, newLayout: _sumNew, counts: _sumCounts,
-        icon: _sumIcon, deliver: _sumDeliver, both: _sumBoth, confOpen: _sumConfOpen, confFixed: _sumConfFixed, pkgMode: _sumMode, pkgWhy: _sumWhy, high: S._lastHighCounts || [] });
+        icon: _sumIcon, deliver: _sumDeliver, both: _sumBoth, confOpen: _sumConfOpen, confFixed: _sumConfFixed, pkgMode: _sumMode, pkgWhy: _sumWhy, high: S._lastHighCounts || [], overlap: _sumOverlap });
     }
     S._flexTotal = _sumTotal; S._flexTotalStops = S.stops.length;     // Amazon's own total for this scan, if it was visible
     // Analytics: screenshot scanned successfully
@@ -6129,7 +6130,12 @@ function _buildScanSummary(ctx) {
       ? 'If the package count looks wrong, check it in your Flex app before you drive off.'
       : 'Compare with your Flex list and add a screenshot of any part that is missing.');
   }
-  trackEvent('scan_summary_shown', { complete: complete ? 1 : 0, stops: stops, packages: pkgs, merged: merged.length,
+  // The same stops appeared twice in the screenshot (an overlap between screenshots): say so, so the totals are not a surprise.
+  if (ctx.overlap && ctx.overlap.rows > 0) {
+    lines.unshift('Your screenshot repeated ' + ctx.overlap.rows + ' stop' + (ctx.overlap.rows > 1 ? 's' : '') + ' (Flex #' + ctx.overlap.from +
+      (ctx.overlap.to !== ctx.overlap.from ? '\u2013#' + ctx.overlap.to : '') + ') where two screenshots overlap. Each was counted once.');
+  }
+  trackEvent('scan_summary_shown', { complete: complete ? 1 : 0, overlap_rows: ctx.overlap ? ctx.overlap.rows : 0, stops: stops, packages: pkgs, merged: merged.length,
     missing_depot: ctx.depot ? 0 : 1, missing_end: ctx.end ? 0 : 1, gap: (gapAt || badStart) ? 1 : 0, in_app: FR_IN_APP,
     pkg_total_known: totalKnown ? 1 : 0, pkg_total_match: totalMatch ? 1 : 0, counts_read: ctx.counts || 0,
     count_conflicts: (ctx.confOpen || 0) + (ctx.confFixed || 0) });
@@ -7512,6 +7518,13 @@ function geoFromWords(words, pageW) {
     var badge = null, bx = -1;
     ws.forEach(function(w) { if (w.cx < LEFT && Math.abs(w.cy - a.cy) <= 0.9 * mh && w.cx > bx) { var b = _geoBadgeOf(w.t); if (b !== null) { badge = b; bx = w.cx; } } });
     out.badges.push(badge);
+    // The green "Next Stop" row prints its number box on the line ABOVE "Scheduled", so the own-row search finds nothing.
+    // Keep the nearest box-sized number in the band just above; it is only used if it slots between its neighbours (below).
+    var ab = null, aby = -1;
+    if (badge === null) ws.forEach(function(w) {
+      if (w.cx < W * 0.20 && w.cy < a.cy - 0.9 * mh && w.cy >= a.cy - 3.4 * mh && _geoBadgeOf(w.t) !== null && w.cy > aby) { ab = _geoBadgeOf(w.t); aby = w.cy; }
+    });
+    out.above = out.above || []; out.above.push(ab);
     // package count: right zone, below the anchor row, inside this stop's band. Tokens are grouped into rows;
     // on each row the LEFTMOST number is the count (anything to its right is the package icon read as a digit).
     // An expanded group lists a number per sub-row, so the stop's count is the sum over its rows.
@@ -7530,12 +7543,21 @@ function geoFromWords(words, pageW) {
     out.alts.push(_d2.length === 2 && /^\d{2}$/.test(_d2) && parseInt(_d2, 10) <= 40 ? parseInt(_d2, 10) : null);
   });
 
+  // An above-row number is accepted only where it fits between the neighbouring numbers, so a stray digit can never become a stop number.
+  (out.above || []).forEach(function(c, i) {
+    if (out.badges[i] !== null || c === null || c === undefined) return;
+    var prev = null, next = null, p, n;
+    for (p = i - 1; p >= 0; p--) if (out.badges[p] !== null) { prev = out.badges[p]; break; }
+    for (n = i + 1; n < out.badges.length; n++) if (out.badges[n] !== null) { next = out.badges[n]; break; }
+    if ((prev !== null || next !== null) && (prev === null || c > prev) && (next === null || c < next)) out.badges[i] = c;
+  });
+  delete out.above;
   // The route total, printed at the far right of the warehouse row (only when that row is in the screenshot).
   var pk = ws.filter(function(w) { return _geoIsPicked(w.t); }).sort(function(a, b) { return a.cy - b.cy; })[0];
   if (pk && pk.cy < anchors[0].cy) {
     var cand = ws.filter(function(w) { return w.cx > RIGHT && w.cy >= pk.cy - 0.9 * mh && w.cy < anchors[0].cy - 0.9 * mh && /^\d{1,3}\D{0,2}$/.test(String(w.t).trim()); })
                  .sort(function(p, q) { return p.cy - q.cy || p.cx - q.cx; });
-    if (cand.length) { var tv = parseInt(String(cand[0].t).replace(/\D/g, ''), 10); if (tv >= out.anchors) out.total = tv; }
+    if (cand.length) { var tv = parseInt(String(cand[0].t).replace(/\D/g, ''), 10); out.totalRaw = tv; if (tv >= out.anchors) out.total = tv; }
   }
   return out;
 }
@@ -8801,7 +8823,7 @@ function parseFlexOCR(rawText, geo) {
     var raw = String((entry.ref && entry.ref.raw) || '');
     return (/^[A-Z0-9]{1,3}\s*-\s*\d{2}\.\d/i.test(raw) ? 2 : 0) + (raw.length <= 24 ? 1 : 0);
   }
-  var _geoUsed = false, _geoWhy = '', _geoBadges = false;
+  var _geoUsed = false, _geoWhy = '', _geoBadges = false, _overlap = null;
   if (geo && geo.anchors) {
     var _al = _blockLog.filter(function(e) { return e.sched !== undefined; });
     if (_al.length > geo.anchors) {
@@ -8817,6 +8839,40 @@ function parseFlexOCR(rawText, geo) {
     if (_al.length !== geo.anchors) {
       _geoWhy = 'the screenshot has ' + geo.anchors + ' stop rows but the text produced ' + _al.length + ' blocks';
     } else {
+      // (0) One screenshot can show the SAME stops twice: two screenshots stitched with an overlap, or a scrolling capture
+      // that jumped back. A row with the same circle number AND the same address as a row already seen is that stop again,
+      // never a second delivery (Flex numbers are unique). Leave the repeats out BEFORE numbering and counting. Left in,
+      // the repeated run breaks the consecutive numbering (everything after it looks nine places too late) and its package
+      // counts are added to the first reading: 36 packages scanned as 45, and numbers like #1 and #2 on stops 10 and 11.
+      (function() {
+        var bd0 = geo.badges, first = {}, dupIdx = [], maxKept = null;
+        function akey(e) { return String((e.ref && e.ref.address) || '').split(',')[0].toLowerCase().replace(/[^a-z0-9]/g, ''); }
+        function sameAddr(a, b) { if (!a || !b) return false; if (a === b) return true; var sh = a.length <= b.length ? a : b, lo = a.length <= b.length ? b : a; return sh.length >= 8 && lo.indexOf(sh) === 0; }
+        _al.forEach(function(e, q) {
+          var b = bd0[q]; if (b === null || b === undefined) return;
+          var p = first[b];
+          // a repeat: this number was already seen, we have already moved past it, and it is the same address
+          if (p !== undefined && maxKept !== null && b <= maxKept && sameAddr(akey(_al[p]), akey(e))) { dupIdx.push(q); return; }
+          if (p === undefined) first[b] = q;
+          if (maxKept === null || b > maxKept) maxKept = b;
+        });
+        if (!dupIdx.length) return;
+        var dupSet = {}, nums = [];
+        dupIdx.forEach(function(q) { dupSet[q] = true; nums.push(bd0[q]); });
+        var removed = dupIdx.map(function(q) { return _al[q]; });
+        removed.forEach(function(e) { var k = _blockLog.indexOf(e); if (k >= 0) _blockLog.splice(k, 1); });
+        removed.forEach(function(e) {      // re-total each affected stop from the blocks that remain
+          var tot = 0, n = 0; _blockLog.forEach(function(x) { if (x.kind === 'ok' && x.ref === e.ref) { tot += x.pk; n++; } });
+          if (n) e.ref.pkgCount = tot || 1;
+        });
+        var keep = function(arr) { return (arr || []).filter(function(v, q) { return !dupSet[q]; }); };
+        _al = keep(_al);
+        geo = Object.assign({}, geo, { anchors: _al.length, badges: keep(geo.badges), counts: keep(geo.counts), alts: keep(geo.alts) });
+        // The route total is only believed when it is at least the number of rows seen; the repeats had pushed that count above it.
+        if (geo.total == null && geo.totalRaw != null && geo.totalRaw >= geo.anchors) geo.total = geo.totalRaw;
+        _overlap = { rows: dupIdx.length, from: Math.min.apply(null, nums), to: Math.max.apply(null, nums) };
+        if (typeof trackEvent === 'function') trackEvent('ocr_overlap_removed', { rows: dupIdx.length });
+      })();
       // (a) circle numbers: exact serials, straight from the left edge of each row
       var _bd = geo.badges, _nn = _bd.filter(function(b) { return b !== null; }), _inc = true, _steps = 0, _prevB = null;
       _bd.forEach(function(b) { if (b === null) return; if (_prevB !== null) { if (b <= _prevB) _inc = false; else _steps += (b - _prevB - 1); } _prevB = b; });
@@ -8991,7 +9047,7 @@ function parseFlexOCR(rawText, geo) {
     newLayout: _newLayout,
     highCounts: _hiList,
     pkgWhy: _pkgWhy,
-    geoUsed: _geoUsed, geoBadges: _geoBadges, geoWhy: _geoWhy,
+    geoUsed: _geoUsed, geoBadges: _geoBadges, geoWhy: _geoWhy, overlap: _overlap,
     pkgMode: _geoUsed ? 'geo' : _clusterUsed ? 'cluster' : (_lineUsed || _okLog.filter(function(e) { return e.src === 'lone' && e.pkI != null; }).length * 2 > _iconBlocks ? 'lone' : (_iconBlocks > 0 ? 'row' : (_deliverBlocks > 0 ? 'deliver' : 'none'))),
     totalPackages: _totalPackages,                       // Amazon's own total for the route (new layout), else null
     countsFound: _okLog.filter(function(e) { return e.pkI != null || e.pkD != null; }).length,  // stops whose package count was actually read
