@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.01-v60';
+  var FR_BUILD = 'v2026.11.01-v61';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1828,7 +1828,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.11.01-v60\n'
+            + 'build v2026.11.01-v61\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4209,7 +4209,7 @@ function vInput() {
     if (S._ocrWarn.possibleMissingNote) {
       h += '<div style="margin:8px 0;opacity:.85">' + escH(S._ocrWarn.possibleMissingNote) + '</div>';
     }
-    h += '<div style="margin-top:6px">' + escH(S._ocrWarn.note) + '</div>';
+    if (S._ocrWarn.note) h += '<div style="margin-top:6px">' + escH(S._ocrWarn.note) + '</div>';
     h += '<button id="ocrWarnDismiss" aria-label="Dismiss" style="position:absolute;top:8px;right:8px;background:transparent;border:none;color:inherit;opacity:.6;font-size:16px;line-height:1;cursor:pointer;padding:4px">&#10005;</button>';
     h += '</div>';
   }
@@ -4408,7 +4408,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.11.01-v60</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.11.01-v61</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -5908,6 +5908,21 @@ async function handleFiles(files) {
     render();
     try {
       const items = await extractFromFile(imgs[i]);
+      // An "unreadable" block that carries the Flex number of a stop that WAS read (in this screenshot or an earlier one) is the
+      // same row seen twice, e.g. a header whose address came out separately, or a half-visible row at a screenshot's edge. Flex
+      // numbers are unique, so there is nothing missing and nothing to report. A stop that really is missing has a number nobody
+      // read, and the scan card still names any gap in the numbering.
+      if (items._skippedDetails && items._skippedDetails.length) {
+        const _read = {};
+        S.stops.forEach(function(s) { (s.packageNums && s.packageNums.length ? s.packageNums : (s.flexNum != null ? [s.flexNum] : [])).forEach(function(n) { _read[n] = 1; }); });
+        items.forEach(function(it) { (it.packageNums || []).forEach(function(n) { _read[n] = 1; }); });
+        const _keep = items._skippedDetails.filter(function(d) { return !(d && d.num != null && _read[d.num]); });
+        const _gone = items._skippedDetails.length - _keep.length;
+        if (_gone > 0) {
+          items._skippedDetails = _keep; items._skipped = Math.max(0, (items._skipped || 0) - _gone);
+          trackEvent('ocr_unreadable_already_read', { n: _gone });
+        }
+      }
       unreadable += items._skipped || 0;
       possibleMissing += items._possibleMissing || 0;
       if (items._meta) {
@@ -6011,11 +6026,9 @@ async function handleFiles(files) {
       // Mid-shift, that false alarm is exactly what pushes a driver to give
       // up on the app entirely instead of losing 10 seconds to add 2 stops.
       var _summary = unreadable > 0
-        ? `${added} stop${added > 1 ? 's' : ''} added — ${unreadable} couldn't be read automatically`
-        : `${added} stop${added > 1 ? 's' : ''} added`;
-      var _note = unreadable > 0
-        ? `You're good to optimize now with these ${added}. Fix the missed ${unreadable > 1 ? 'ones' : 'one'} below, or add ${unreadable > 1 ? 'them' : 'it'} from your Flex app, whenever you get a chance.`
-        : `You're good to optimize now with these ${added}.`;
+        ? `${unreadable} stop${unreadable > 1 ? 's' : ''} couldn't be read`
+        : `Possible missing stop${possibleMissing > 1 ? 's' : ''}`;
+      var _note = '';      // the Optimize button is right below; no reassurance paragraph needed
       // possibleMissing: a stop that vanished with NO trace at all — not
       // added, not in the list above. We only know an unaccounted-for
       // "Deliver N package(s)" line exists somewhere in the scan, not which
@@ -6025,16 +6038,16 @@ async function handleFiles(files) {
       // No raw text exists to pre-fill for this case, so it stays a plain
       // note rather than an editable row like the items below.
       var _possibleMissingNote = possibleMissing > 0
-        ? `Possible missing stop${possibleMissing > 1 ? 's' : ''} — your screenshot may contain ${possibleMissing} more delivery${possibleMissing > 1 ? 'ies' : ''} than FlexRoute found. Double-check your Flex app's stop count before you start.`
+        ? `Your screenshot may contain ${possibleMissing} more deliver${possibleMissing > 1 ? 'ies' : 'y'} than FlexRoute found. Check your Flex app's stop count.`
         : null;
       S._ocrWarn = { summary: _summary, items: unreadableDetails.slice(), possibleMissingNote: _possibleMissingNote, note: _note };
       S._lastOcrWarnAt = Date.now();
       trackEvent('ocr_stops_unreadable', { unreadable: unreadable, possible_missing: possibleMissing, added: added, hadStopNum: unreadableDetails.filter(function(d){return d.num;}).length });
       S._scanSummary = null;
     } else {
-      toast(`${added} stop${added > 1 ? 's' : ''} added`);
       S._scanSummary = _buildScanSummary({ depot: _sumDepot, end: _sumEnd, unres: _sumUnres, sn: _sumSn, total: _sumTotal, newLayout: _sumNew, counts: _sumCounts,
         icon: _sumIcon, deliver: _sumDeliver, both: _sumBoth, confOpen: _sumConfOpen, confFixed: _sumConfFixed, pkgMode: _sumMode, pkgWhy: _sumWhy, high: S._lastHighCounts || [], overlap: _sumOverlap });
+      if (!S._scanSummary || !S._scanSummary.complete) toast(`${added} stop${added > 1 ? 's' : ''} added`);
     }
     S._flexTotal = _sumTotal; S._flexTotalStops = S.stops.length;     // Amazon's own total for this scan, if it was visible
     // Analytics: screenshot scanned successfully
@@ -6089,21 +6102,11 @@ function _buildScanSummary(ctx) {
   var title, lines = [];
   if (complete) {
     title = '\u2713 Full list read: ' + flexN + ' Flex stop' + (flexN > 1 ? 's' : '') + ', ' + pkgs + ' package' + (pkgs > 1 ? 's' : '');
+    // Everything the app settled by itself (repeated rows, which reading of the counts was used, how Amazon numbers its stops)
+    // stays quiet. The one thing worth a line: why the number of stops differs from Flex's.
     if (merged.length && flexN > stops) {
-      lines.push((flexN - stops) + ' Flex stop' + (flexN - stops > 1 ? 's' : '') + ' share a building with another one, so FlexRoute shows ' + stops +
-        ' stops, not ' + flexN + '. Nothing is missing. Combined: ' + combinedList + '.');
+      lines.push((flexN - stops) + ' Flex stop' + (flexN - stops > 1 ? 's' : '') + ' share a building with another, so ' + stops + ' stops are listed.');
     }
-    // Which independent readings of the package counts agree with each other?
-    var srcs = [];
-    if (ctx.icon > 0) srcs.push("each stop's package icon");
-    if (ctx.deliver > 0) srcs.push(ctx.icon > 0 ? 'its \u201cDeliver N packages\u201d line' : 'the \u201cDeliver N packages\u201d lines');
-    if (totalKnown) srcs.push("Amazon's route total (" + ctx.total + ")");
-    if (srcs.length >= 2) {
-      lines.push('Package counts confirmed by ' + (srcs.length === 2 ? srcs.join(' and ') : srcs.slice(0, -1).join(', ') + ' and ' + srcs[srcs.length - 1]) + '.');
-    }
-    if (ctx.confFixed > 0) lines.push('The package icon and the \u201cDeliver N packages\u201d line differed on ' + ctx.confFixed + ' stop' + (ctx.confFixed > 1 ? 's' : '') + "; we used the readings that add up to Amazon's total.");
-    if ((ctx.pkgMode === 'lone' || ctx.pkgMode === 'cluster') && pkgs > stops) lines.push("The package counts were read from a separate column of numbers and add up to Amazon's total (" + ctx.total + "); double-check which stops have several packages.");
-    lines.push('Flex counts the warehouse as stop 1, so its list ends at #' + max + '.');
   } else {
     title = stopsComplete
       ? '\u2713 All ' + flexN + ' stops read \u2014 package count unconfirmed'
@@ -6112,29 +6115,22 @@ function _buildScanSummary(ctx) {
     if (!ctx.depot && !topOk && !badStart) lines.push("We couldn't see the warehouse row (Picked up at\u2026) or a Flex #2, so we can't tell whether this screenshot starts at the top of your list. Scroll to the very top and scan again if stops are missing.");
     if (!ctx.end) lines.push("We couldn't see Flex's end-of-list message at the bottom, so we can't confirm the whole list was captured.");
     if (gapAt) lines.push('Missing Flex numbers: ' + missingNums.slice(0, 12).map(function(n) { return '#' + n; }).join(', ') + (missingNums.length > 12 ? ' \u2026' : '') + ' (not read from the screenshot).');
-    if (merged.length && flexN > stops) lines.push((flexN - stops) + ' Flex stop' + (flexN - stops > 1 ? 's were' : ' was') + ' combined with another stop in the same building (so they are not missing). Combined: ' + combinedList + '.');
+    if (merged.length && flexN > stops) lines.push((flexN - stops) + ' Flex stop' + (flexN - stops > 1 ? 's' : '') + ' share a building with another, so ' + stops + ' stops are listed.');
     if (badStart && !gapAt) lines.push('Amazon counts the warehouse as stop 1, so your first delivery should be Flex #2 \u2014 but this list starts at #' + min + '. ' + (min > 3 ? 'Stops #2\u2013#' + (min - 1) + ' were' : 'Stop #2 was') + ' not read. Scroll up and add a screenshot of the top of the list.');
     if (ctx.unres > 0) lines.push("Some Flex stop numbers couldn't be read.");
-    if (stopsComplete) lines.push('Flex counts the warehouse as stop 1, so its list ends at #' + max + '.');
     if (totalKnown && !totalMatch) lines.push("Amazon's list shows " + ctx.total + " packages, but FlexRoute counted " + pkgs + ". Check the stops with several packages" + (pkgs < ctx.total ? ", or add a screenshot of any part that is missing." : "."));
     if (hasHigh) ctx.high.slice(0, 3).forEach(function(h) { lines.push('\u201c' + h.address + '\u201d was read as ' + h.was + ' packages, which is unusual, so it was set to 1. Check it in your Flex app.'); });
     if (countsUnread) lines.push("We couldn't read the package counts from this screenshot, so the package total may be off.");
     if (unverified) lines.push(pkgs === stops
       ? "No stop showed more than one package, and Amazon's route total wasn't visible to check against. If your Flex app shows more than " + pkgs + " packages, a multi-package stop was missed."
       : "The package counts come from a separate column of numbers and could not be checked against Amazon's route total, so the package total (" + pkgs + ") may be wrong. Compare it with your Flex app before you drive off.");
-    if (unverified && ctx.pkgWhy) lines.push("Why: " + ctx.pkgWhy + ". If this keeps happening, send this screen to support.");
     if (ctx.confOpen > 0) lines.push('The package icon and the \u201cDeliver N packages\u201d line disagree on ' + ctx.confOpen + ' stop' + (ctx.confOpen > 1 ? 's' : '') + ' (we used the \u201cDeliver\u201d line). Check those stops.');
     // When every stop is already accounted for, asking for a screenshot of "any part that is missing"
     // contradicts the line above it. Point at the package counts instead, which is the open question.
-    lines.push(stopsComplete
-      ? 'If the package count looks wrong, check it in your Flex app before you drive off.'
-      : 'Compare with your Flex list and add a screenshot of any part that is missing.');
+    if (!stopsComplete) lines.push('Compare with your Flex list and add a screenshot of any part that is missing.');
+    else if (!lines.length) lines.push('If the package count looks wrong, check it in your Flex app before you drive off.');
   }
-  // The same stops appeared twice in the screenshot (an overlap between screenshots): say so, so the totals are not a surprise.
-  if (ctx.overlap && ctx.overlap.rows > 0) {
-    lines.unshift('Your screenshot repeated ' + ctx.overlap.rows + ' stop' + (ctx.overlap.rows > 1 ? 's' : '') + ' (Flex #' + ctx.overlap.from +
-      (ctx.overlap.to !== ctx.overlap.from ? '\u2013#' + ctx.overlap.to : '') + ') where two screenshots overlap. Each was counted once.');
-  }
+  // A screenshot that repeats stops (an overlap) is handled silently; it is only counted (overlap_rows below).
   trackEvent('scan_summary_shown', { complete: complete ? 1 : 0, overlap_rows: ctx.overlap ? ctx.overlap.rows : 0, stops: stops, packages: pkgs, merged: merged.length,
     missing_depot: ctx.depot ? 0 : 1, missing_end: ctx.end ? 0 : 1, gap: (gapAt || badStart) ? 1 : 0, in_app: FR_IN_APP,
     pkg_total_known: totalKnown ? 1 : 0, pkg_total_match: totalMatch ? 1 : 0, counts_read: ctx.counts || 0,

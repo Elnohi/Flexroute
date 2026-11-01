@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v60';   // v60: a screenshot that repeats stops (overlap) is counted once; the green Next Stop number is read
+const CACHE = 'flexroute-v61';   // v61: quieter scan notes; no false "couldn't be read" for a stop that was read
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
