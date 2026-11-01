@@ -331,6 +331,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
 .lang-pill span{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.5px;padding:5px 10px;border-radius:16px;transition:background .15s,color .15s;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .lang-pill span.up-on{background:var(--acc);color:#000}
 .lang-pill span.up-off{color:var(--t3)}
+.lang-pill.five span{font-size:11px;letter-spacing:.3px;padding:6px 7px}
 .planCard{font-family:var(--sans);text-align:left}
 .setup-step{display:flex;gap:12px;padding:11px 0;border-bottom:1px solid var(--brd)}
 .setup-step:last-child{border-bottom:none}
@@ -401,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.10.30-v58';
+  var FR_BUILD = 'v2026.10.30-v59';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1785,6 +1786,7 @@ function bind() {
         if (typeof trackEvent === 'function') trackEvent('route_zoom_changed', { level: S.routeZoom });
         render();
         break;
+      case 'gpsChangeBtn': clearGPS(); break;
       case 'clearStartBtn': S.startAddr=''; localStorage.removeItem('fr_sa'); localStorage.removeItem('fr_start'); toast('Starting address cleared'); render(); break;
       case 'clearHomeBtn':  S.home=''; localStorage.removeItem('fr_hm'); toast('Home address cleared'); render(); break;
       case 'retryOptBtn': S.errMsg=''; optimize(); break;
@@ -1826,7 +1828,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.10.30-v58\n'
+            + 'build v2026.10.30-v59\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -3295,10 +3297,11 @@ function t(key) {
 
 function langPill() {
   var lang = S.lang || 'en';
-  var ptUser = lang === 'pt' || /^pt/i.test(navigator.language || '');
-  var langs = ptUser ? ['en','pt'] : ['en','fr','de','es'];
+  // All five languages for everyone. Portuguese used to appear only on phones set to Portuguese, so nobody on an English phone
+  // could choose it. Five chips are drawn compactly (.five) so the row takes about the width the four chips used to.
+  var langs = ['en','fr','de','es','pt'];
   var labels = {en:'EN', fr:'FR', de:'DE', es:'ES', pt:'PT'};
-  return '<div class="lang-pill" id="langPill">' +
+  return '<div class="lang-pill five" id="langPill">' +
     langs.map(function(l){
       return '<span class="' + (lang===l?'up-on':'up-off') + '" data-lang="'+l+'">' + labels[l] + '</span>';
     }).join('') +
@@ -4091,7 +4094,7 @@ function vInput() {
   }
   h += '</div>';
   if (S.gpsCoords) {
-    h += '<button class="btn" id="gpsBtn" style="border:1px solid #22D98A;color:#22D98A;padding:4px 10px;font-size:11px;background:transparent;white-space:nowrap;flex-shrink:0;border-radius:6px">' + t('change') + '</button>';
+    h += '<button class="btn" id="gpsChangeBtn" style="border:1px solid #22D98A;color:#22D98A;padding:4px 10px;font-size:11px;background:transparent;white-space:nowrap;flex-shrink:0;border-radius:6px">' + t('change') + '</button>';
   } else if (S.startAddr) {
     h += '<button id="clearStartBtn" style="background:transparent;border:none;color:#7878A0;font-size:16px;cursor:pointer;padding:4px;line-height:1;flex-shrink:0">&#10005;</button>';
   }
@@ -4405,7 +4408,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v58</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.10.30-v59</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -5740,6 +5743,16 @@ function applyAutoRegion(code, label) {
   if (sel) sel.value = code;
   render();
   toast('📍 Region auto-set: ' + label + ' — tap Change to update');
+}
+
+// "Change" next to a GPS start used to call getGPS() again, and the typing box is hidden while a GPS position is set. A driver who
+// tapped GPS (at home, say) could therefore never enter the warehouse address. Change now clears the GPS position and the saved
+// start address, which brings back both the "Use GPS" button and the box for typing the depot or warehouse.
+function clearGPS() {
+  S.gpsCoords = null; S.gpsAddr = ''; S.startAddr = ''; S._startPt = null;
+  try { localStorage.removeItem('fr_sa'); localStorage.removeItem('fr_start'); } catch (e) {}
+  if (typeof trackEvent === 'function') trackEvent('start_gps_cleared', { region: S.userState || 'unknown' });
+  render();
 }
 
 async function getGPS() {

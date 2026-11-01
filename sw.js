@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v58';   // v58: Shift Mode shows progress once: header counter plus a clear progress bar; the duplicate counter between Prev and Next is removed
+const CACHE = 'flexroute-v59';   // v59: GPS "Change" lets you type the warehouse address; Portuguese is offered to everyone (five compact language chips)
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
