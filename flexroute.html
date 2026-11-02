@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.01-v61';
+  var FR_BUILD = 'v2026.11.01-v63';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1828,7 +1828,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.11.01-v61\n'
+            + 'build v2026.11.01-v63\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4293,7 +4293,7 @@ function sRow(s, i) {
 
   // Normal stop
   return `<div class="si ${isL ? 'islast' : ''}" style="${!hn && !s.scanned ? 'border-style:dashed;' : ''}">
-  <div class="fn ${hn ? '' : 'nnum'}" title="${hn ? 'Flex pkg #' + s.flexNum : (s.scanned ? 'Number not read from the screenshot' : 'Manually added')}">${hn ? s.flexNum : (s.scanned ? '?' : '+')}</div>
+  <div class="fn ${hn ? '' : 'nnum'}" title="${hn ? 'Flex stop #' + s.flexNum : (s.scanned ? 'Number not read from the screenshot' : 'Manually added')}">${hn ? s.flexNum : (s.scanned ? '?' : '+')}</div>
   <div class="sb">
     <div class="sa">${escH(s.address)}</div>
     <div class="sm">
@@ -4408,7 +4408,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.11.01-v61</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.11.01-v63</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -5806,12 +5806,13 @@ function shareRoute() {
     saved_km: S.savings ? S.savings.savedKm : 0
   });
   var lines = S.optimized.filter(function(s){return !s.geoFailed;}).map(function(s,i){
-    return (i+1) + '. ' + s.address;
+    return (i+1) + '. ' + s.address + ((s.pkgCount || 1) > 1 ? ' [' + s.pkgCount + ' pkgs]' : '');
   });
+  var _stopCount = lines.length;     // the header used lines.length AFTER the Start and Home lines were added, so 33 stops said "35 stops"
   var _shareStart = S.gpsCoords ? S.gpsAddr : S.startAddr;
   if (_shareStart) lines.unshift('Start: ' + _shareStart);
   if (S.home) lines.push('Home: ' + S.home);
-  var text = 'My FlexRoute (' + lines.length + ' stops):\n' + lines.join('\n');
+  var text = 'My FlexRoute (' + _stopCount + ' stops):\n' + lines.join('\n');
   if (navigator.share) {
     navigator.share({ title: 'FlexRoute', text: text })
       .catch(function(){});
@@ -5858,7 +5859,13 @@ function copyRoute() {
   const lines = [
     _startLbl ? `Start: ${_startLbl}` : '',
     S.savings ? `Saved: ${S.savings.savedKm}km, ~${S.savings.savedMin}min vs Amazon order${S.savings.realGPS ? ' (real GPS)' : ''}` : '',
-    ...S.optimized.map((s, i) => `${i + 1}.${s.flexNum != null ? ` [pkg #${(s.packageNums && s.packageNums.length > 1) ? s.packageNums.join(', ') : s.flexNum}]` : ''} ${s.address}`),
+    ...S.optimized.map((s, i) => {
+      // "stop #" is Amazon's stop number; "pkg" alone read like a package count. Stops with several packages say so.
+      const several = s.packageNums && s.packageNums.length > 1;
+      const tag = s.flexNum != null ? ` [stop${several ? 's' : ''} #${several ? s.packageNums.join(', ') : s.flexNum}]` : '';
+      const pk = (s.pkgCount || 1) > 1 ? ` [${s.pkgCount} pkgs]` : '';
+      return `${i + 1}.${tag} ${s.address}${pk}`;
+    }),
     S.home ? `End — Home: ${S.home}` : ''
   ].filter(Boolean).join('\n');
   // Primary: Clipboard API (HTTPS, modern browsers)
@@ -8682,16 +8689,26 @@ function parseFlexOCR(rawText, geo) {
     }
     // Other placements the OCR can produce: the number just BEFORE the "Picked up" line, further down the
     // warehouse block, or glued to its address/city line ("400 Nugget Avenue 36").
+    // (A number ABOVE the screen's title is the phone's status bar, e.g. the battery percentage, never the total.)
+    var _titleAt = -1;
+    for (var _tk = Math.max(0, _depotIdx - 8); _tk < _depotIdx; _tk++) if (/itinerary\s*summary/i.test(lines[_tk])) _titleAt = _tk;
+    var _near = [];
     for (var _q2 = Math.max(0, _depotIdx - 3); _newLayout && _q2 < Math.min(_depotIdx + 14, lines.length); _q2++) {
       if (_q2 === _depotIdx) continue;
+      if (_q2 < _titleAt) continue;
       if (_q2 > _depotIdx && (isScheduled(lines[_q2]) || /next stop/i.test(lines[_q2]))) break;
       var _l2 = lines[_q2].trim();
       var _a2 = _l2.match(/^(\d{1,3})(?:\s*[^\w\s()]{1,3})*$/);
       var _g2 = (_q2 === _depotIdx + 1 || _q2 === _depotIdx + 2) ? _l2.match(/^[A-Za-z0-9].*[A-Za-z]\s+(\d{2,3})(?!\d)\W{0,3}$/) : null;
-      if (_a2) _tc.push(parseInt(_a2[1], 10)); else if (_g2) _tc.push(parseInt(_g2[1], 10));
+      var _v2 = _a2 ? parseInt(_a2[1], 10) : (_g2 ? parseInt(_g2[1], 10) : null);
+      if (_v2 !== null) _near.push({ v: _v2, d: Math.abs(_q2 - _depotIdx), after: _q2 > _depotIdx });
     }
-    // a route can't hold fewer packages than it has stops
-    _tc = _tc.filter(function(v) { return v >= _okBlocks && _okBlocks > 0; });
+    // the nearest line to the warehouse row wins; lines above it before lines below it (as before)
+    _near.sort(function(a, b) { return (a.after - b.after) || (a.d - b.d); }).forEach(function(c) { _tc.push(c.v); });
+    // a route can't hold fewer packages than it has DISTINCT stops. (Counting repeated rows made a stitched screenshot of 33 stops
+    // look like 42, which threw out the real total (36) and left the battery percentage (100) as the only "total" standing.)
+    var _minTot = Math.max(1, Math.floor(results.length * 0.9));
+    _tc = _tc.filter(function(v) { return v >= _minTot && _okBlocks > 0; });
     if (_tc.length) _totalPackages = _tc[0];
   }
   var _clusterUsed = false, _pkgWhy = '';
@@ -8880,6 +8897,8 @@ function parseFlexOCR(rawText, geo) {
       var _cn = geo.counts, _have = _cn.filter(function(c) { return c !== null; }).length;
       var _gsum = _cn.reduce(function(a, c) { return a + (c === null ? 1 : c); }, 0);
       var _tsum = _okBlocks ? _blockLog.filter(function(e) { return e.kind === 'ok'; }).reduce(function(a, e) { return a + e.pk; }, 0) : 0;
+      // The number printed on the warehouse row itself beats anything guessed from the text around it.
+      if (geo.total != null && geo.total !== _totalPackages) _totalPackages = geo.total;
       var _tot = (_totalPackages != null) ? _totalPackages : geo.total;
       if (_have < 0.9 * _cn.length) {
         _geoWhy = 'only ' + _have + ' of ' + _cn.length + ' rows had a readable package number';
