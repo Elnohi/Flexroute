@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.01-v63';
+  var FR_BUILD = 'v2026.11.02-v65';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1828,7 +1828,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.11.01-v63\n'
+            + 'build v2026.11.02-v65\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4196,7 +4196,7 @@ function vInput() {
     if (S._ocrWarn.items && S._ocrWarn.items.length) {
       h += S._ocrWarn.items.map(function(d, idx){
         var label = d.num ? `Stop #${d.num}` : `stop ${idx + 1} of ${S._ocrWarn.items.length}`;
-        var prefill = d.raw ? escH(d.raw) : '';
+        var prefill = d.raw ? escH(cleanUnreadableRaw(d.raw, d.city)) : '';
         return '<div style="margin:8px 0;display:flex;flex-direction:column;gap:5px">'
           + '<div style="opacity:.85;font-size:13px">' + escH(label) + '</div>'
           + '<div style="display:flex;gap:6px">'
@@ -4408,7 +4408,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.11.01-v63</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.11.02-v65</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -5880,6 +5880,24 @@ function copyRoute() {
     fallbackCopy(lines);
   }
 }
+// The "couldn't be read" box used to be pre-filled with everything the scanner saw for that stop, e.g.
+// "D-37.3G / Scheduled 3:00 - 8:00 a.m. / 12Armour / Green 5394", so tapping Add made an "address not found" stop out of it.
+// Keep only what could be an address (plus the city, when it was seen), with a glued house number given its space.
+function cleanUnreadableRaw(raw, city) {
+  var keep = [];
+  String(raw || '').split(/\s*\/\s*/).forEach(function(p) {
+    p = p.trim(); if (!p) return;
+    if (/^[A-Z]{1,3}-\d{1,3}(?:\.\d+)?[A-Z]{0,2}$/.test(p)) return;                                   // route code: D-37.3G
+    if (/^scheduled\b/i.test(p)) return;                                                              // Scheduled 3:00 - 8:00 a.m.
+    if (/^(green|yellow|blue|red|orange|purple|pink|white|black|gr[ae]y|brown|teal|cyan|lime|gold|silver)\s+\d{2,5}$/i.test(p)) return;   // colour label: Green 5394
+    if (/^[A-Z]{1,3}-[A-Z]-\d{3,4}-\d{2,4}-[A-Z]{2,4}$/.test(p)) return;                               // route label: AP-C-0008-516-DON
+    if (/^next\s*stop\b/i.test(p)) return;
+    keep.push(p);
+  });
+  var out = keep.join(', ').replace(/^(\d{1,5})([A-Za-z]{3,})(?=\s|$)/, function(m, d, w) { return (/^(st|nd|rd|th)$/i.test(w) || /^(st|nd|rd|th)(?=[A-Z])/.test(w)) ? m : d + ' ' + w; });
+  if (out && city && out.toLowerCase().indexOf(String(city).toLowerCase()) < 0) out += ', ' + city;
+  return out;
+}
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -5960,7 +5978,10 @@ async function handleFiles(files) {
         trackEvent('depot_autodetected', {});
       }
       for (const it of items) {
-        if (addStop(it.address, it.num, true, it.pkgCount || 1, it.packageNums, true)) added++;
+        if (addStop(it.address, it.num, true, it.pkgCount || 1, it.packageNums, true)) {
+          added++;
+          if (it.loose) { var _ls = S.stops.filter(function(q) { return q.address === it.address.trim(); }).pop(); if (_ls) _ls.loose = true; }
+        }
       }
     } catch (err) {
       failed++;
@@ -6891,6 +6912,7 @@ async function optimize() {
 
   // Same street + nearby house numbers must be near each other; fix a stop that geocoded across the city.
   try { await _reconcileSameStreetNeighbors(); } catch (e) { console.warn('[FlexRoute] neighbour check skipped:', e); }
+  try { await _reconcileLooseWithFlexNeighbours(); } catch (e) { console.warn('[FlexRoute] loose-address check skipped:', e); }
 
   const geocodedStops = S.stops.filter(s => s.coords !== null);
   const failedStops   = S.stops.filter(s => s.coords === null);
@@ -8338,6 +8360,7 @@ function parseFlexOCR(rawText, geo) {
 
       var pendingCity = '';
       var _sawDeliver = false, _orphanAt = -1;
+      var _looseBlock = false;      // set when this stop's address had to be rescued from a line with no street type ("12 Armour")
       while (j < lines.length && j < i + 18) {
         var ln = lines[j].replace(/^[|\[\]]+\s*/, '');  // strip OCR pipe/bracket artifacts from Flex UI columns
         if (isScheduled(ln)) break;
@@ -8456,10 +8479,13 @@ function parseFlexOCR(rawText, geo) {
         for (var _lk = i + 1; _lk < j && !addrLine; _lk++) {
           if (!lines[_lk] || isNoise(lines[_lk]) || isCity(lines[_lk])) continue;
           var _lenientLine = cleanLine(lines[_lk]);
+          // "12Armour": the number glued to the street name, with no space and no "Street" or "Avenue" after it. Give it its space.
+          // (Ordinals such as 1st, 2nd, 3rd, 4th and a unit letter as in 209A are left alone.)
+          _lenientLine = _lenientLine.replace(/^(\d{1,5})([A-Za-z]{3,})(?=\s|$)/, function(m, d, w) { return (/^(st|nd|rd|th)$/i.test(w) || /^(st|nd|rd|th)(?=[A-Z])/.test(w)) ? m : d + ' ' + w; });
           if (/^\d{1,5}[a-z]?\s+[A-Za-z]{2,}/.test(_lenientLine) && _lenientLine.length >= 8 && _lenientLine.length <= 60) {
             var _lenientAddr = truncateAfterStreetType(_lenientLine);
             if (_lenientAddr && /^\d/.test(_lenientAddr) && _lenientAddr.length >= 6) {
-              addrLine = _lenientAddr;
+              addrLine = _lenientAddr; _looseBlock = true;
               if (!cityLine) cityLine = pendingCity || '';
               if (typeof trackEvent === 'function') {
                 trackEvent('ocr_line_rescued', { stop_num: extractStopNum(lines[i]) });
@@ -8595,8 +8621,10 @@ function parseFlexOCR(rawText, geo) {
             _addPackageNum(_existingResult);
           }
         } else {
-          results.push({ num: _stopNum, address: fullAddr, pkgCount: currentPkgCount,
-            packageNums: _stopNum !== null ? [_stopNum] : [] });
+          var _newRes = { num: _stopNum, address: fullAddr, pkgCount: currentPkgCount,
+            packageNums: _stopNum !== null ? [_stopNum] : [] };
+          if (_looseBlock) _newRes.loose = true;
+          results.push(_newRes);
         }
         // A header-less fragment that merged into an address we ALREADY have is
         // a duplicated slice from the stitch, not another Amazon stop — it must
@@ -8639,7 +8667,7 @@ function parseFlexOCR(rawText, geo) {
           trackEvent('ocr_fragment_ignored', { had_num: _skipNum != null });
         }
         if (_skipRaw || _skipHasDeliver) {
-          var _skipDetail = { num: _skipNum, raw: _skipRaw };
+          var _skipDetail = { num: _skipNum, raw: _skipRaw, city: cityLine || pendingCity || '' };
           _skippedDetails.push(_skipDetail);
           _blockLog.push({ kind: 'skip', read: _skipNum, sched: i, ref: _skipDetail });
         } else {
@@ -8691,7 +8719,7 @@ function parseFlexOCR(rawText, geo) {
     // warehouse block, or glued to its address/city line ("400 Nugget Avenue 36").
     // (A number ABOVE the screen's title is the phone's status bar, e.g. the battery percentage, never the total.)
     var _titleAt = -1;
-    for (var _tk = Math.max(0, _depotIdx - 8); _tk < _depotIdx; _tk++) if (/itinerary\s*summary/i.test(lines[_tk])) _titleAt = _tk;
+    for (var _tk = Math.max(0, _depotIdx - 8); _tk < _depotIdx; _tk++) if (/itinerary\s*(summary|list)/i.test(lines[_tk])) _titleAt = _tk;
     var _near = [];
     for (var _q2 = Math.max(0, _depotIdx - 3); _newLayout && _q2 < Math.min(_depotIdx + 14, lines.length); _q2++) {
       if (_q2 === _depotIdx) continue;
@@ -9585,6 +9613,29 @@ function _nearestOtherKm(stop, exclude) {
     var d = _distKm(stop.coords, o.coords); if (d < best) best = d;
   });
   return best;
+}
+// A stop that had to be rescued from an incomplete address ("12 Armour": no Street or Avenue) can match several streets of that
+// name. Amazon numbers its stops in delivery order, so the stops either side of it (by Flex number) are close to it. If it landed
+// far from them, search again aimed at THEM, and keep the new match only if it is clearly nearer. Marked stops only; capped.
+async function _reconcileLooseWithFlexNeighbours() {
+  var loose = S.stops.filter(function(s) { return s.loose && s.coords && !s.geoFailed && s.flexNum != null; });
+  if (!loose.length) return;
+  var budget = Date.now() + 10000, calls = 0;
+  for (var i = 0; i < loose.length; i++) {
+    if (calls >= 4 || Date.now() > budget) break;
+    var s = loose[i];
+    var nb = S.stops.filter(function(o) { return o !== s && o.coords && !o.geoFailed && !o.loose && o.flexNum != null && Math.abs(o.flexNum - s.flexNum) <= 2; });
+    if (!nb.length) continue;
+    var aLat = 0, aLon = 0; nb.forEach(function(o) { aLat += o.coords.lat; aLon += o.coords.lon; }); aLat /= nb.length; aLon /= nb.length;
+    var away = haversineKm(s.coords.lat, s.coords.lon, aLat, aLon);
+    if (away <= 3) continue;                                   // already beside its neighbours: nothing to do
+    var r = null; calls++;
+    try { r = await geocode(s.address, aLat, aLon); } catch (e) { r = null; }
+    if (r && haversineKm(r.lat, r.lon, aLat, aLon) < away - 1) {
+      s.coords = r;
+      if (typeof trackEvent === 'function') trackEvent('loose_stop_moved', { km: Math.round(away * 10) / 10, region: S.userState || 'unknown' });
+    }
+  }
 }
 async function _reconcileSameStreetNeighbors() {
   // This is the only step that makes extra geocoding calls inside a loop, and those calls are rate

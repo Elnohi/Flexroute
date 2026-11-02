@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v63';   // v63: copied and shared route text says "stop #" and marks multi-package stops
+const CACHE = 'flexroute-v65';   // v65: a stop rescued from an incomplete address is checked against its Flex neighbours
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
