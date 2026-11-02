@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.02-v65';
+  var FR_BUILD = 'v2026.11.02-v67';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1828,7 +1828,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.11.02-v65\n'
+            + 'build v2026.11.02-v67\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4408,7 +4408,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.11.02-v65</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.11.02-v67</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -5980,7 +5980,10 @@ async function handleFiles(files) {
       for (const it of items) {
         if (addStop(it.address, it.num, true, it.pkgCount || 1, it.packageNums, true)) {
           added++;
-          if (it.loose) { var _ls = S.stops.filter(function(q) { return q.address === it.address.trim(); }).pop(); if (_ls) _ls.loose = true; }
+          if (it.loose || it.multiUnit) {
+            var _ls = S.stops.filter(function(q) { return q.address === it.address.trim(); }).pop();
+            if (_ls) { if (it.loose) _ls.loose = true; if (it.multiUnit) _ls.multiUnit = true; }
+          }
         }
       }
     } catch (err) {
@@ -7600,6 +7603,15 @@ function geoFilterWords(list) {
 
 // Parse Amazon Flex itinerary text extracted by Tesseract
 function parseFlexOCR(rawText, geo) {
+// A multi-unit building (tower, townhouse complex, suite): the unit is cut off the address, so note it here from the original line.
+  // "101-19 Avondale Avenue", "1-73 Blantyre Avenue", "Suite 636", "TH 304", "Building D", "Code 2020", "Boulevard 1105".
+  function _isMultiUnitLine(line) {
+    var t = String(line || '').trim();
+    if (/^\d{1,5}\s*-\s*\d{1,6}[A-Za-z]?\s+\S/.test(t)) return true;
+    if (/\b(apt|apartment|unit|suite|ste|th|ph|bldg|building|code|buzz|tower)\b/i.test(t)) return true;
+    return /\b(st|street|ave|avenue|blvd|boulevard|rd|road|dr|drive|cres|crescent|ct|court|ln|lane|way|pl|place|terr|terrace|gdns|gardens|hts|heights|pkwy|parkway|cir|circle)\.?\s*#?\s*\d{3,5}[A-Za-z]?\s*$/i.test(t);
+  }
+
   var lines = rawText.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
 
   // ── International address formats ──────────────────────────────────────────────────────────────
@@ -8360,7 +8372,7 @@ function parseFlexOCR(rawText, geo) {
 
       var pendingCity = '';
       var _sawDeliver = false, _orphanAt = -1;
-      var _looseBlock = false;      // set when this stop's address had to be rescued from a line with no street type ("12 Armour")
+      var _looseBlock = false, _multiUnitBlock = false;      // set when this stop's address had to be rescued from a line with no street type ("12 Armour")
       while (j < lines.length && j < i + 18) {
         var ln = lines[j].replace(/^[|\[\]]+\s*/, '');  // strip OCR pipe/bracket artifacts from Flex UI columns
         if (isScheduled(ln)) break;
@@ -8449,6 +8461,7 @@ function parseFlexOCR(rawText, geo) {
               .replace(/\.{2,}$/, '')
               .trim()
           );
+          _multiUnitBlock = _isMultiUnitLine(ln);
           if (pendingCity && !cityLine) cityLine = pendingCity;
           // Continuation: next line is the street type (e.g. "Court" on its own line)
           if (nextLn2 && /^(court|crt|cour|cres|crescent|avenue|ave|street|st|road|rd|drive|dr|boulevard|blvd|trail|trl|terrace|terr|lane|ln|way|place|pl|grove|grv|gardens|gdns|heights|hts|circle|close|gate|parkway|pkwy|highway|hwy|crossing|nook|keep|cove|cv|mews|bend|common|green|end|row|rise|vale|path|park|run|loop|pass|ridge|manor|view|vista|bay|hill|hills|wood|woods)\b/i.test(nextLn2) && !/\d/.test(nextLn2) && !isScheduled(nextLn2)) {
@@ -8624,6 +8637,7 @@ function parseFlexOCR(rawText, geo) {
           var _newRes = { num: _stopNum, address: fullAddr, pkgCount: currentPkgCount,
             packageNums: _stopNum !== null ? [_stopNum] : [] };
           if (_looseBlock) _newRes.loose = true;
+          if (_multiUnitBlock) _newRes.multiUnit = true;
           results.push(_newRes);
         }
         // A header-less fragment that merged into an address we ALREADY have is
@@ -9596,6 +9610,17 @@ function _cityFamily(city) {
   var c = String(city || '').toLowerCase().trim();
   return /^(toronto|scarborough|north york|etobicoke|york|east york)$/.test(c) ? 'toronto' : c;   // Toronto's former cities
 }
+// The city of an address. parts[1] is the city in "19 Avondale Avenue, North York", but in "25 Avondale Avenue, TH 304, North York" it is
+// the townhouse unit, so the street check searched for "25 Avondale Avenue TH 304" and the same-street check saw the city as "th 304".
+// Only when the second part is clearly a unit and a later part names a place does this differ from parts[1].
+function _cityPart(address) {
+  var parts = String(address || '').split(',').map(function(p) { return p.trim(); });
+  var first = parts[1] || '';
+  var unitLike = function(p) { return /\d/.test(p) || /^(unit|apt|apartment|suite|ste|th|ph|bsmt|basement|rear|upper|lower|main|front|floor|fl)\b\.?$/i.test(p); };
+  if (!unitLike(first)) return first;
+  for (var k = 2; k < parts.length; k++) { if (parts[k] && !unitLike(parts[k]) && !/^[A-Z]{2}$/.test(parts[k])) return parts[k]; }
+  return first;
+}
 function _streetParts(address) {
   var parts = String(address || '').split(',');
   var m = parts[0].replace(/\./g, '').trim().match(/^[A-Za-z]{0,2}(\d{1,6})[A-Za-z]?\s+(.+)$/);
@@ -9603,7 +9628,7 @@ function _streetParts(address) {
   var words = m[2].toLowerCase().split(/\s+/).map(function(w) { return _ST_ABBR[w] || w; });
   for (var k = 0; k < words.length; k++) { if (k > 0 && _UNIT_WORD.test(words[k])) { words = words.slice(0, k); break; } }
   if (words.length < 2) return null;
-  return { num: parseInt(m[1], 10), street: words.join(' '), fam: _cityFamily(parts[1]) };
+  return { num: parseInt(m[1], 10), street: words.join(' '), fam: _cityFamily(_cityPart(address)) };
 }
 function _distKm(a, b) { return haversineKm(a.lat, a.lon, b.lat, b.lon); }
 function _nearestOtherKm(stop, exclude) {
@@ -10031,7 +10056,8 @@ function showRouteReport() {
 // told, instead of the app planning round a wrong pin in silence.
 var STREET_CHECK_ENABLED = true;
 var STREET_SNAP_MAX_M = 60;          // only trust a road name if the stop is this close to that road
-var STREET_NEAR_M = 80;              // "another road right beside it matches" (corner lots)
+var STREET_NEAR_M = 80;
+var STREET_NEAR_MULTI_M = 140;       // the same test for a multi-unit building (set back from its street), looking at the 8 nearest roads              // "another road right beside it matches" (corner lots)
 var STREET_CHECK_BUDGET_MS = 14000;  // never spend longer than this on checks and corrections
 var STREET_CHECK_MAX = 8;            // at most this many stops are examined for correction
 var _STREET_DROP = { avenue:1, ave:1, road:1, rd:1, street:1, st:1, drive:1, dr:1, court:1, ct:1, crescent:1, cres:1, boulevard:1, blvd:1,
@@ -10078,20 +10104,21 @@ function _pause(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
 // Roads within STREET_NEAR_M of a point, by name. true = one of them is the street we want, false = none is,
 // null = the lookup failed (never guess in that case).
-async function _nearbyRoadMatches(pt, core) {
+async function _nearbyRoadMatches(pt, core, multiUnit) {
   try {
-    var res = await _tmo(fetch('https://router.project-osrm.org/nearest/v1/driving/' + pt.lon + ',' + pt.lat + '?number=4'), 6000, null);
+    var res = await _tmo(fetch('https://router.project-osrm.org/nearest/v1/driving/' + pt.lon + ',' + pt.lat + '?number=' + (multiUnit ? 8 : 4)), 6000, null);
     if (!res || !res.ok) return null;
     var d = await _tmo(res.json(), 4000, null);
     if (!d || d.code !== 'Ok' || !d.waypoints || !d.waypoints.length) return null;
-    return d.waypoints.some(function(w) { return w && w.name && w.distance <= STREET_NEAR_M && _coreMatches(_streetCoreOf(w.name), core); });
+    var _r = multiUnit ? STREET_NEAR_MULTI_M : STREET_NEAR_M;
+    return d.waypoints.some(function(w) { return w && w.name && w.distance <= _r && _coreMatches(_streetCoreOf(w.name), core); });
   } catch (e) { return null; }
 }
 // Candidate locations for an address, with their labels, from Photon (and Nominatim if Photon has nothing useful).
 async function _geoCandidatesFor(address, biasLat, biasLon) {
   var parts = String(address || '').split(','), street = parts[0].replace(/\b(unit|suite|ste|apt|front porch|buzz)\b.*$/i, '').trim();
   var um = street.match(/^[A-Za-z]{0,3}\d+[\-\/](\d+[A-Za-z]?)\s+(.*)$/); if (um) street = um[1] + ' ' + um[2];
-  var city = (parts[1] || '').trim();
+  var city = (_cityPart(address) || '').trim();
   var q = expandAbbr(street + (city ? ' ' + city : '')), out = [];
   async function photon(bias) {
     try {
@@ -10144,13 +10171,13 @@ async function _verifyStopStreets(stops, startPt) {
     S._tableCache = { ids: m.ids, pts: m.pts, dur: D.dur, dist: D.dist, names: D.names };
     if (!D.names) return res;
     res.ran = true;
-    var flagged = [];
+    var flagged = [], okSet = new Set();      // okSet: stops whose own street was verified; only these may vouch for another stop
     stops.forEach(function(s, k) {
       var core = _streetCoreOf(s.address); if (!_checkableCore(core)) return;
       res.checked++;
       var name = D.names[k + off], snap = D.snaps ? D.snaps[k + off] : null;
       if (!name || snap == null || snap > STREET_SNAP_MAX_M) return;           // an unnamed road, or too far to mean anything
-      if (_coreMatches(_streetCoreOf(name), core)) return;
+      if (_coreMatches(_streetCoreOf(name), core)) { okSet.add(s); return; }
       flagged.push({ s: s, core: core, name: name });
     });
     res.flagged = flagged.length;
@@ -10159,8 +10186,8 @@ async function _verifyStopStreets(stops, startPt) {
     var changed = false; res.detail = [];
     async function handle(f) {
       var d = { addr: f.s.address.split(',')[0], snappedTo: f.name, outcome: '' }; res.detail.push(d);
-      var near = await _nearbyRoadMatches(f.s.coords, f.core);
-      if (near === true) { d.outcome = 'fine: its own street is right beside it (a corner lot)'; return; }
+      var near = await _nearbyRoadMatches(f.s.coords, f.core, !!f.s.multiUnit);
+      if (near === true) { okSet.add(f.s); d.outcome = 'fine: its own street is right beside it (a corner lot)'; return; }
       if (near === null) { d.outcome = 'not checked: the road lookup failed'; return; }
       var both = await Promise.all([_geoCandidatesFor(f.s.address, med.lat, med.lon)]), cands = both[0], num = _houseNumOf(f.s.address), fixed = null;
       cands = cands.filter(function(c) {
@@ -10170,13 +10197,13 @@ async function _verifyStopStreets(stops, startPt) {
         return haversineKm(c.lat, c.lon, f.s.coords.lat, f.s.coords.lon) > 0.04;           // not the same wrong place again
       }).sort(function(a, b) { return haversineKm(a.lat, a.lon, med.lat, med.lon) - haversineKm(b.lat, b.lon, med.lat, med.lon); });
       for (var j = 0; j < cands.length && j < 2 && !fixed && Date.now() < deadline; j++) {
-        var ok = await _nearbyRoadMatches({ lat: cands[j].lat, lon: cands[j].lon }, f.core);
+        var ok = await _nearbyRoadMatches({ lat: cands[j].lat, lon: cands[j].lon }, f.core, !!f.s.multiUnit);
         if (ok === true) fixed = cands[j];
       }
       if (fixed) {
         var moved = Math.round(haversineKm(f.s.coords.lat, f.s.coords.lon, fixed.lat, fixed.lon) * 1000);
         f.s.coords = { lat: fixed.lat, lon: fixed.lon }; f.s.geoNote = 'moved ' + moved + ' m: it had been placed on ' + f.name;
-        f.s.geoFixed = moved; res.moved++; changed = true; d.outcome = 'moved ' + moved + ' m onto its own street';
+        f.s.geoFixed = moved; res.moved++; changed = true; okSet.add(f.s); d.outcome = 'moved ' + moved + ' m onto its own street';
         // A misspelt street (one letter off) is corrected in the address too, so navigation by address finds it as well.
         var fc = _streetCoreOf(fixed.label), nm = String(f.s.address).match(/^([A-Za-z]{0,3}\d+[A-Za-z]?\s*(?:[\-\/]\s*\d+[A-Za-z]?\s*)?(?:1\/2\s+)?)([^,]+?)(\s*(?:,.*)?)$/);
         var right = String(fixed.label || '').replace(/^\S*\d\S*\s+/, '').trim();
@@ -10188,6 +10215,28 @@ async function _verifyStopStreets(stops, startPt) {
     var queue = flagged.slice(0, STREET_CHECK_MAX);
     async function worker() { while (queue.length && Date.now() < deadline) { await handle(queue.shift()); await _pause(60); } }
     await Promise.all([worker(), worker(), worker()]);                  // three stops at a time, not one after another
+    // A stop that could not be moved onto its street may still be right: another stop on the SAME street, within 12 house numbers and
+    // 150 m, whose own street WAS verified, vouches for it (19 and 25 Avondale placed 47 m apart). Stops that were flagged themselves
+    // never vouch for one another, which is how three Coxwell stops sat on Ashdale together. (Being "beside verified neighbours in
+    // Amazon's order" was tried and rejected: it silenced a real stop that was 270 m off its street.)
+    (function() {
+      var sus = stops.filter(function(s) { return s.geoSuspect; });
+      if (!sus.length) return;
+      var dist = function(a, b) { return haversineKm(a.coords.lat, a.coords.lon, b.coords.lat, b.coords.lon); };
+      var unflag = function(s, why) {
+        s.geoSuspect = false; s.geoNote = ''; res.suspect--; okSet.add(s);
+        var dd = res.detail.filter(function(x) { return x.addr === s.address.split(',')[0]; })[0]; if (dd) dd.outcome = 'fine: ' + why;
+      };
+      sus.forEach(function(s) {                                                   // (a)
+        var ps = _streetParts(s.address); if (!ps) return;
+        var partner = stops.filter(function(o) {
+          if (o === s || !okSet.has(o) || !o.coords) return false;
+          var po = _streetParts(o.address);
+          return po && po.street === ps.street && po.fam === ps.fam && Math.abs(po.num - ps.num) <= 12 && dist(s, o) <= 0.15;
+        })[0];
+        if (partner) unflag(s, 'consistent with ' + partner.address.split(',')[0] + ', verified on the same street, ' + Math.round(dist(s, partner) * 1000) + ' m away');
+      });
+    })();
     queue.forEach(function(f) { res.detail.push({ addr: f.s.address.split(',')[0], snappedTo: f.name, outcome: 'not checked: out of time' }); });
     if (changed) {                                       // positions changed, so the road matrix has to be fetched again
       m = mk(); var D2 = await _osrmTable(m.pts);
