@@ -123,7 +123,7 @@ function formatDate(unixSeconds) {
 }
 
 function footer(email) {
-  return '\n\n--\nDon\'t want emails like this? Click here and we won\'t send another: ' + optoutUrl(email);
+  return '\n\n--\nDon\'t want emails like this? Unsubscribe here (you\'ll be asked to confirm): ' + optoutUrl(email);
 }
 
 // Greets "Hi There" rather than by name: the name on a Stripe customer is the billing name,
@@ -178,7 +178,8 @@ async function resendSend(to, subject, text, unsubscribeUrl) {
       reply_to: ADMIN_EMAIL,           // replies land in the owner inbox
       subject: subject,
       text: text,
-      headers: unsubscribeUrl ? { 'List-Unsubscribe': '<' + unsubscribeUrl + '>' } : undefined
+      // RFC 8058: the second header lets Gmail, Yahoo and Apple Mail unsubscribe with one tap (a POST to the same link).
+      headers: unsubscribeUrl ? { 'List-Unsubscribe': '<' + unsubscribeUrl + '>', 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' } : undefined
     })
   });
   if (!resp.ok) throw new Error('email provider returned ' + resp.status);

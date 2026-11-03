@@ -98,8 +98,24 @@ function isMonthPass(sub) {
   return !!(sub && sub.metadata && sub.metadata.flexroute_plan === 'month_pass');
 }
 
+// Why a subscription ended. Stripe sets cancellation_details.reason to 'cancellation_requested' (the customer or the owner cancelled),
+// 'payment_failed' (the card kept failing until Stripe gave up) or 'payment_disputed'. The last two are not a decision to leave, so the
+// "what led you to cancel?" email, which also says "you won't be charged again", would be wrong. Only an explicit involuntary
+// reason stops it; when Stripe states nothing, the email goes as before.
+function endReason(sub) {
+  return (sub && sub.cancellation_details && sub.cancellation_details.reason) || '';
+}
+function isInvoluntary(sub) {
+  const r = endReason(sub);
+  return r === 'payment_failed' || r === 'payment_disputed';
+}
+
 async function onCancelSignal(sub, ended) {
   if (isMonthPass(sub)) return { email: null, status: 'skipped (30-day pass)', endsAt: null, pass: true };
+  if (isInvoluntary(sub)) {
+    console.log('[FlexRoute] stripe-webhook: cancel-feedback skipped, the subscription ended because of', endReason(sub), sub.id);
+    return { email: null, status: 'skipped (' + endReason(sub) + ')', endsAt: null, involuntary: true };
+  }
   try {
     const customer = await stripe.customers.retrieve(sub.customer);
     const email = (customer && !customer.deleted && customer.email) || null;
@@ -195,10 +211,18 @@ exports.handler = async (event) => {
     }
     case 'customer.subscription.deleted': {
       const sub = stripeEvent.data.object;
+      const reason = endReason(sub);
+      const why = reason === 'payment_failed' ? 'the card payment failed (Stripe stopped retrying)'
+        : reason === 'payment_disputed' ? 'a payment was disputed'
+        : reason === 'cancellation_requested' ? 'cancellation requested'
+        : 'not stated by Stripe';
       await notifyAdmin(
-        '👋 FlexRoute subscription cancelled',
+        isInvoluntary(sub) ? '⚠️ FlexRoute subscription ended: ' + (reason === 'payment_failed' ? 'card payment failed' : 'payment disputed')
+                           : '👋 FlexRoute subscription cancelled',
         'Customer: ' + sub.customer + '\nSubscription: ' + sub.id +
-          '\nCancelled at: ' + (sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : 'unknown')
+          '\nCancelled at: ' + (sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : 'unknown') +
+          '\nReason: ' + why +
+          (isInvoluntary(sub) ? '\nNo feedback email was sent: this was not their decision.' : '')
       );
       await onCancelSignal(sub, true); // no-op duplicate if the scheduling event already sent it
       break;

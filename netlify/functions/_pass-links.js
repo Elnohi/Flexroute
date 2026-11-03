@@ -45,7 +45,7 @@ function buildPassReminderEmail(opts) {
     'Renewing on or after ' + when + ' gets the most out of both.\n\n' +
     'If the pass didn\'t do what you hoped, just reply and tell us what went wrong. We read every message.\n\n' +
     'Thanks,\nThe FlexRoute Team' +
-    '\n\n--\nDon\'t want emails like this? Click here and we won\'t send another: ' + reviewEmails.optoutUrl(opts.email);
+    '\n\n--\nDon\'t want emails like this? Unsubscribe here (you\'ll be asked to confirm): ' + reviewEmails.optoutUrl(opts.email);
   return { subject: 'Your FlexRoute pass ends on ' + when, text: text };
 }
 

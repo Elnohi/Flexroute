@@ -102,7 +102,8 @@ async function sendEmail(email, code) {
       from: 'FlexRoute <noreply@flexrouteapp.com>',
       to: email,
       subject: 'Your FlexRoute code: ' + code,
-      text: 'Your FlexRoute verification code is ' + code + '. It expires in 10 minutes.'
+      text: 'Your FlexRoute verification code is ' + code + '. It expires in 10 minutes.\n\n' +
+            'If you didn\'t ask for this code, you can safely ignore this email. Don\'t share the code with anyone.'
     })
   });
   if (!resp.ok) throw new Error('email provider returned ' + resp.status);
