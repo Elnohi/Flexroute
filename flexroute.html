@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.02-v67';
+  var FR_BUILD = 'v2026.11.08-v69';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1454,7 +1454,7 @@ function bind() {
               var stop2 = S.stops.find(function(s){ return s.id === sid2; });
               if (stop2) {
                 e.target.style.borderColor='#00CC88'; e.target.style.background='rgba(0,204,136,.08)'; e.target.style.color='#00CC88';
-                stop2.address = addr; stop2.geoFailed = false; stop2.coords = null;
+                stop2.address = addr; stop2.geoFailed = false; stop2.coords = null; stop2._noGeocode = false; stop2._estPos = false; stop2._rescued = null;
                 S.geoFailed = []; S.stops.forEach(function(s){ if(s.geoFailed) S.geoFailed.push(s.address); });
                 saveSession(); setTimeout(function(){ render(); }, 600);
               }
@@ -1511,7 +1511,7 @@ function bind() {
         var stop = S.stops.find(function(s){ return s.id === sid; });
         if (stop) {
           if (inp) { inp.style.borderColor='#00CC88'; inp.style.background='rgba(0,204,136,.1)'; inp.style.color='#00CC88'; }
-          stop.address = newAddr; stop.geoFailed = false; stop.coords = null;
+          stop.address = newAddr; stop.geoFailed = false; stop.coords = null; stop._noGeocode = false; stop._estPos = false; stop._rescued = null;
           S.geoFailed = []; S.stops.forEach(function(s){ if (s.geoFailed) S.geoFailed.push(s.address); });
           toast('\u2713 Address updated. Tap Optimize to retry.');
           saveSession(); setTimeout(function(){ render(); }, 700);
@@ -5545,8 +5545,8 @@ function rRow(s, i) {
   <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
     <div class="ri-addr" style="flex:1">${escH(s.address)}</div>
     ${s.coords ? `<a href="https://www.google.com/maps/search/?api=1&query=${s.coords.lat},${s.coords.lon}" target="_blank"
-      style="flex-shrink:0;font-size:11px;color:${s.geoSuspect ? '#FFB300' : 'var(--t3)'};text-decoration:none;padding:3px 7px;border:1px solid ${s.geoSuspect ? '#FFB300' : 'var(--brd)'};border-radius:6px;white-space:nowrap;margin-top:2px;${s.geoSuspect ? 'font-weight:700' : ''}"
-      title="${s.geoSuspect ? escH('This stop may be on the wrong street (' + (s.geoNote || '') + '). Tap to see where the app put it.') : 'Verify this location on Google Maps'}">${s.geoSuspect ? t('verify_warn') : '&#128205; verify'}</a>` : ''}
+      style="flex-shrink:0;font-size:11px;color:${(s.geoSuspect || s._estPos) ? '#FFB300' : 'var(--t3)'};text-decoration:none;padding:3px 7px;border:1px solid ${(s.geoSuspect || s._estPos) ? '#FFB300' : 'var(--brd)'};border-radius:6px;white-space:nowrap;margin-top:2px;${(s.geoSuspect || s._estPos) ? 'font-weight:700' : ''}"
+      title="${s.geoSuspect ? escH('This stop may be on the wrong street (' + (s.geoNote || '') + '). Tap to see where the app put it.') : (s._estPos ? 'Position estimated from the stops before and after it. Tap to check it in Maps.' : 'Verify this location on Google Maps')}">${(s.geoSuspect || s._estPos) ? t('verify_warn') : '&#128205; verify'}</a>` : ''}
   </div>
   ${(s.pkgCount||1) > 1 ? (function(){
     var _nums = (s.packageNums && s.packageNums.length > 1) ? s.packageNums.slice().sort(function(a,b){return a-b;}) : null;
@@ -5898,6 +5898,205 @@ function cleanUnreadableRaw(raw, city) {
   if (out && city && out.toLowerCase().indexOf(String(city).toLowerCase()) < 0) out += ', ' + city;
   return out;
 }
+
+// ─── Silent recovery of unreadable stops ──────────────────────────────────────────────────────────────────────
+// The scanner flags a stop "unreadable" when its address is cut off or garbled. Amazon numbers stops in delivery
+// order, so the stops before and after it (by Flex number) are close to it and usually share its street.
+//   1. At scan time: finish the cut-off street from the neighbouring stops' addresses ("12 Armour" -> "12 Armour Boulevard").
+//   2. At optimize time: search aimed at the midpoint of the neighbours; accept a result only if it lies near them.
+//   3. Last resort: put the stop between its neighbours, marked with the amber "check" badge, so the route is still built.
+// No error box is shown for any of this; only a block with no text and no Flex number at all stays in the old warning.
+function _rcLev(a, b) {
+  var m = a.length, n = b.length, d = [], i, j;
+  for (i = 0; i <= m; i++) { d[i] = [i]; }
+  for (j = 1; j <= n; j++) { d[0][j] = j; }
+  for (i = 1; i <= m; i++) for (j = 1; j <= n; j++)
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  return d[m][n];
+}
+function _rcNorm(x) { return String(x || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim(); }
+function _rcSim(part, full) {
+  var p = _rcNorm(part), f = _rcNorm(full);
+  if (!p || !f) return 0;
+  if (p === f) return 3;
+  if (p.length >= 3 && f.indexOf(p) === 0) return 2;                 // cut off at the end: "armour" -> "armour boulevard"
+  var pw = p.split(' ')[0], fw = f.split(' ')[0];
+  if (pw.length >= 4 && fw.length >= 4 && _rcLev(pw, fw) <= (pw.length >= 7 ? 2 : 1)) return 1;   // OCR slip: "Armor" / "Armour"
+  return 0;
+}
+// "12 Armour, North York" -> { hn: '12', street: 'Armour', rest: 'North York' }; a street with no number is allowed (hn '')
+function _rcParse(cleaned) {
+  var parts = String(cleaned || '').split(',').map(function(x) { return x.trim(); }).filter(Boolean);
+  if (!parts.length) return null;
+  var first = parts[0].replace(/\./g, '').trim();
+  var m = first.match(/^(\d{1,6}[A-Za-z]?(?:-\d{1,6}[A-Za-z]?)?)\s+([A-Za-z][A-Za-z'\- ]{2,40})$/);
+  var hn = '', street = '';
+  if (m) { hn = m[1]; street = m[2].trim(); }
+  else if (/^[A-Za-z][A-Za-z'\- ]{3,40}$/.test(first)) { street = first; }
+  else return null;
+  if (street.replace(/[^A-Za-z]/g, '').length < 3) return null;
+  return { hn: hn, street: street, rest: parts.slice(1).join(', ') };
+}
+function _rcStreetOf(addr) {
+  var parts = String(addr || '').split(',');
+  var m = parts[0].replace(/\./g, '').trim().match(/^[A-Za-z]{0,2}\d[\w-]*\s+(.+)$/);
+  if (!m) return null;
+  return { name: m[1].trim(), rest: parts.slice(1).map(function(x) { return x.trim(); }).filter(Boolean).join(', ') };
+}
+// Which street of the neighbouring stops does a cut-off street name belong to? Unique best match only; ties between
+// different streets are ambiguous and left to the geocoder.
+function _rcBestStreet(partial, num) {
+  var cands = [];
+  S.stops.forEach(function(o) {
+    var st = _rcStreetOf(o.address); if (!st) return;
+    var sim = _rcSim(partial, st.name); if (!sim) return;
+    var d = (num != null && o.flexNum != null) ? Math.abs(o.flexNum - num) : 99;
+    if (sim === 1 && d > 3) return;                                    // a fuzzy match only counts right beside the gap
+    cands.push({ name: st.name, rest: st.rest, sim: sim, d: d });
+  });
+  if (!cands.length) return null;
+  cands.sort(function(a, b) { return b.sim - a.sim || a.d - b.d; });
+  var top = cands[0];
+  var rival = cands.filter(function(c) { return c.sim === top.sim && c.d === top.d && _rcNorm(c.name) !== _rcNorm(top.name); });
+  return rival.length ? null : top;
+}
+function _silentRecoverUnreadable(items) {
+  var out = { recovered: [], left: [] };
+  (items || []).forEach(function(d) {
+    var cleaned = '', P = null;
+    try { cleaned = cleanUnreadableRaw(d.raw, d.city); P = _rcParse(cleaned); } catch (e) { P = null; }
+    var addr = null, kind = null, noGeo = false;
+    if (P) {
+      var best = _rcBestStreet(P.street, d.num);
+      var city = P.rest || (best && best.rest) || S._inferredCity || '';
+      if (best) { addr = [(P.hn ? P.hn + ' ' : '') + best.name, city].filter(Boolean).join(', '); kind = 'street'; }
+      else      { addr = [(P.hn ? P.hn + ' ' : '') + P.street, city].filter(Boolean).join(', '); kind = P.hn ? 'partial' : 'streetonly'; }
+    } else if (d.num != null) {
+      addr = 'Stop #' + d.num + ' (address not read)'; kind = 'placeholder'; noGeo = true;
+    }
+    if (!addr) { out.left.push(d); return; }
+    if (!addStop(addr, d.num, true, d.pk || 1, d.num != null ? [d.num] : [], true)) { out.left.push(d); return; }
+    var st = S.stops.filter(function(q) { return q.address === addr.trim(); }).pop();
+    if (!st) { out.left.push(d); return; }
+    st._rescued = kind; st.loose = true;
+    if (noGeo || kind === 'streetonly') st._estPos = true;
+    if (noGeo) st._noGeocode = true;
+    if (d.num != null) {                                               // keep the list in Amazon's order, like the manual fix does
+      var ri = S.stops.indexOf(st), j = -1, q;
+      if (ri === S.stops.length - 1) {
+        for (q = 0; q < ri; q++) { if (S.stops[q].flexNum != null && S.stops[q].flexNum > d.num) { j = q; break; } }
+        if (j >= 0) { S.stops.splice(ri, 1); S.stops.splice(j, 0, st); }
+      }
+    }
+    out.recovered.push(d.num);
+    if (typeof trackEvent === 'function') trackEvent('ocr_unreadable_silent', { kind: kind, had_num: d.num != null });
+  });
+  return out;
+}
+function _fillFlexNumberGaps() {
+  var nums = function(o) { return (o.packageNums && o.packageNums.length) ? o.packageNums : (o.flexNum != null ? [o.flexNum] : []); };
+  // 1) a placeholder is only a stand-in: drop it when a real stop already carries its number
+  var real = {};
+  S.stops.forEach(function(o) { if (!o._noGeocode) nums(o).forEach(function(n) { real[n] = 1; }); });
+  S.stops = S.stops.filter(function(o) { return !(o._noGeocode && nums(o).length && nums(o).every(function(n) { return real[n]; })); });
+  // 2) interior gaps in Amazon's numbering: both neighbours were read from the same list, so the stop in between exists
+  var have = {}; S.stops.forEach(function(o) { nums(o).forEach(function(n) { have[n] = 1; }); });
+  var list = Object.keys(have).map(Number).sort(function(a, b) { return a - b; });
+  var made = 0;
+  for (var i = 1; i < list.length && made < 20; i++) {
+    for (var n = list[i - 1] + 1; n < list[i] && made < 20; n++) {
+      if (have[n]) continue;
+      var addr = 'Stop #' + n + ' (not read - check Flex app)';
+      if (!addStop(addr, n, true, 1, [n], true)) continue;
+      var st = S.stops.filter(function(q) { return q.address === addr; }).pop(); if (!st) continue;
+      st._rescued = 'gap'; st._noGeocode = true; st._estPos = true; st.loose = true;
+      var ri = S.stops.indexOf(st), j = -1, q;                         // keep Amazon's order in the list
+      for (q = 0; q < ri; q++) { if (S.stops[q].flexNum != null && S.stops[q].flexNum > n) { j = q; break; } }
+      if (j >= 0) { S.stops.splice(ri, 1); S.stops.splice(j, 0, st); }
+      made++;
+      if (typeof trackEvent === 'function') trackEvent('ocr_gap_placeholder', { num_gap: 1 });
+    }
+  }
+  return made;
+}
+// optimize(): place the stops that came from unreadable text. coordMap holds the positions found so far.
+async function _recoverUnreadableStops(coordMap, finalPass) {
+  var mine = S.stops.filter(function(s) { return (s._rescued || s._noGeocode) && !coordMap[s.id]; });
+  if (!mine.length) return;
+  var t0 = Date.now(), budget = finalPass ? 15000 : 30000, placed = 0, estimated = 0;
+  function posOf(o) { var c = coordMap[o.id] || (o.coords && !o.geoFailed ? o.coords : null); return (c && !c._est) ? c : null; }
+  mine.sort(function(a, b) { return (a.flexNum == null ? 1e9 : a.flexNum) - (b.flexNum == null ? 1e9 : b.flexNum); });
+  for (var i = 0; i < mine.length; i++) {
+    var s = mine[i], res = null, how = '';
+    // the stops just before and just after it in Amazon's numbering
+    var prev = null, next = null;
+    if (s.flexNum != null) {
+      S.stops.forEach(function(o) {
+        if (o === s || o.flexNum == null || !posOf(o)) return;
+        if (o.flexNum < s.flexNum && (!prev || o.flexNum > prev.flexNum)) prev = o;
+        if (o.flexNum > s.flexNum && (!next || o.flexNum < next.flexNum)) next = o;
+      });
+    }
+    var anchors = [prev, next].filter(Boolean).map(posOf), cLat, cLon, R;
+    if (anchors.length) {
+      cLat = anchors.reduce(function(a, c) { return a + c.lat; }, 0) / anchors.length;
+      cLon = anchors.reduce(function(a, c) { return a + c.lon; }, 0) / anchors.length;
+      R = anchors.length === 2 ? Math.max(4, haversineKm(anchors[0].lat, anchors[0].lon, anchors[1].lat, anchors[1].lon) + 2) : 6;
+    } else {
+      var all = S.stops.map(posOf).filter(Boolean);
+      if (all.length) {
+        cLat = all.reduce(function(a, c) { return a + c.lat; }, 0) / all.length;
+        cLon = all.reduce(function(a, c) { return a + c.lon; }, 0) / all.length;
+        R = 25;
+      }
+    }
+    if (cLat == null) {                                                // nothing located yet to anchor it
+      if (finalPass && s._noGeocode) { s.geoFailed = true; if (S.geoFailed.indexOf(s.address) < 0) S.geoFailed.push(s.address); }   // never drop it silently
+      continue;
+    }
+    var near = function(c) {
+      if (!c) return false;
+      if (!anchors.length) return haversineKm(c.lat, c.lon, cLat, cLon) <= R;
+      return anchors.every(function(a) { return haversineKm(c.lat, c.lon, a.lat, a.lon) <= R; });
+    };
+    if (!s._noGeocode && Date.now() - t0 < budget) {
+      // 1) the address as it stands, searched around its neighbours (autocompletes a cut street)
+      var r1 = await _tmo(geocode(s.address, cLat, cLon), 9000, null);
+      if (near(r1)) { res = r1; how = 'neighbour_search'; }
+      // 2) street only (no house number), accepted as an approximate spot on the right street
+      if (!res && Date.now() - t0 < budget) {
+        await sleep(400);
+        var P2 = _rcParse(s.address), q2 = P2 && P2.hn ? [P2.street, P2.rest || S._inferredCity || ''].filter(Boolean).join(', ') : '';
+        if (q2) {
+          var r2 = await _tmo(geocode(q2, cLat, cLon), 9000, null);
+          if (near(r2)) { res = { lat: r2.lat, lon: r2.lon, _approximate: true }; how = 'street_only'; s._estPos = true; }
+        }
+      }
+      // 3) US only: the Census address service
+      if (!res && Date.now() - t0 < budget) {
+        var ctx = inferRegionContext(), stt = ctx.state || S.userState || '';
+        if (stt && stateToCountry(stt) === 'us') {
+          var r3 = await _tmo(tryCensusBureau(s.address, stt, cLat, cLon, R), 10000, null);
+          if (near(r3)) { res = r3; how = 'census'; }
+        }
+      }
+    }
+    // 4) last resort (final pass only): between the stops before and after it
+    if (!res && finalPass && anchors.length) {
+      res = { lat: cLat, lon: cLon, _approximate: true, _est: true }; how = 'between_neighbours'; s._estPos = true; estimated++;
+    }
+    if (res) {
+      coordMap[s.id] = res; s.coords = res; s.geoFailed = false; placed++;
+      S.geoFailed = S.geoFailed.filter(function(a) { return a !== s.address; });
+      if (typeof trackEvent === 'function') trackEvent('ocr_unreadable_placed', { how: how, anchors: anchors.length });
+    } else if (finalPass && s._noGeocode) {
+      // nothing located at all to anchor it: hand it to the normal fix flow instead of dropping it silently
+      s.geoFailed = true; if (S.geoFailed.indexOf(s.address) < 0) S.geoFailed.push(s.address);
+    }
+    if (i < mine.length - 1) await sleep(400);
+  }
+  if (typeof trackEvent === 'function') trackEvent('ocr_unreadable_pass', { final: !!finalPass, stops: mine.length, placed: placed, estimated: estimated, ms: Date.now() - t0 });
+}
 function toast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -5928,6 +6127,7 @@ async function handleFiles(files) {
   let _sumDepot = false, _sumEnd = false, _sumUnres = 0, _sumSn = [], _sumTotal = null, _sumNew = false, _sumCounts = 0, _sumMode = 'row', _sumWhy = '',
       _sumIcon = 0, _sumDeliver = 0, _sumBoth = 0, _sumConfOpen = 0, _sumConfFixed = 0, _sumOverlap = null;
   S._scanSummary = null; S._lastHighCounts = []; S._flexTotal = null;
+  S.stops = S.stops.filter(function(s) { return s._rescued !== 'gap'; });   // rebuilt below from the numbers actually read
   for (let i = 0; i < imgs.length; i++) {
     S.sc = { done: i, total: imgs.length, msg: `Scanning image ${i + 1} of ${imgs.length}...` };
     render();
@@ -5939,7 +6139,7 @@ async function handleFiles(files) {
       // read, and the scan card still names any gap in the numbering.
       if (items._skippedDetails && items._skippedDetails.length) {
         const _read = {};
-        S.stops.forEach(function(s) { (s.packageNums && s.packageNums.length ? s.packageNums : (s.flexNum != null ? [s.flexNum] : [])).forEach(function(n) { _read[n] = 1; }); });
+        S.stops.forEach(function(s) { if (s._noGeocode) return; (s.packageNums && s.packageNums.length ? s.packageNums : (s.flexNum != null ? [s.flexNum] : [])).forEach(function(n) { _read[n] = 1; }); });
         items.forEach(function(it) { (it.packageNums || []).forEach(function(n) { _read[n] = 1; }); });
         const _keep = items._skippedDetails.filter(function(d) { return !(d && d.num != null && _read[d.num]); });
         const _gone = items._skippedDetails.length - _keep.length;
@@ -6011,6 +6211,23 @@ async function handleFiles(files) {
     var _topCity = Object.keys(_cHits).sort(function(a,b){ return _cHits[b]-_cHits[a]; })[0];
     if (_topCity) { S._inferredCity = _topCity; console.log('[FlexRoute] Inferred city:', _topCity); }
   }
+  // Silent recovery of stops whose address could not be read: finish a cut-off street from the stops around it
+  // (by Flex number), or keep the partial text / a placeholder and let optimize() place it between its neighbours.
+  // Only what cannot be recovered at all stays in the "couldn't be read" box.
+  if (unreadableDetails.length && added > 0) {
+    try {
+      var _rec = _silentRecoverUnreadable(unreadableDetails);
+      if (_rec.recovered.length) {
+        unreadable = unreadable > _rec.recovered.length ? unreadable - _rec.recovered.length : 0;
+        unreadableDetails = _rec.left;
+        added += _rec.recovered.length;
+        _rec.recovered.forEach(function(n) { if (n != null && _sumSn.indexOf(n) === -1) _sumSn.push(n); });
+      }
+    } catch (e) { console.warn('[FlexRoute] silent recovery skipped:', e); }
+  }
+  // Never lose a stop: a real read replaces any placeholder carrying the same Flex number, and any number missing from
+  // the middle of the list (16, ?, 18) gets a placeholder slot so the route still has a place for it.
+  if (added > 0) { try { _fillFlexNumberGaps(); } catch (e) { console.warn('[FlexRoute] gap fill skipped:', e); } }
   // Stops carry Amazon's own itinerary-wide numbers (continuous across
   // screenshots), so there is nothing to renumber here. This block used to
   // overwrite flexNum with the list position to stop per-image numbers
@@ -6387,7 +6604,7 @@ async function optimize() {
     { key: '__home__',  address: S.home },
     { key: '__start__', address: S.startAddr },
     ...S.stops
-      .filter(s => !coordMap[s.id])   // skip stops we already have coords for
+      .filter(s => !coordMap[s.id] && !s._noGeocode)   // skip stops we already have coords for; placeholders are placed by _recoverUnreadableStops
       .map(s => ({ key: s.id, address: s.address }))
   ].filter(x => x.address);
   let done = 0;
@@ -6533,6 +6750,8 @@ async function optimize() {
   // asymmetric: this block still only runs at all when something actually
   // failed, so a clean route (the common case) is completely unaffected.
   var _nonHomeStartTotal = toGeocode.filter(function(x){ return x.key !== '__home__' && x.key !== '__start__'; }).length;
+  // Stops recovered from unreadable text: search aimed at the stops before and after them (first pass; the estimate comes after the retries).
+  try { await _recoverUnreadableStops(coordMap, false); } catch (e) { console.warn('[FlexRoute] unreadable-stop pass skipped:', e); }
   if (S.geoFailed.length > 0) {
     var _backoffs = [3000, 8000, 20000];
     var _retryT0 = Date.now(), _initFailed = S.geoFailed.length, _recPer = [];
@@ -6575,6 +6794,9 @@ async function optimize() {
       console.warn('[FlexRoute] Geocode failure persisted after ' + _backoffs.length + ' retries (' + S.geoFailed.length + '/' + _nonHomeStartTotal + ' still failing) — likely genuinely hard addresses or a sustained outage, not a blip. These stops remain flagged for manual correction, never dropped from the route.');
     }
   }
+
+  // Final pass: whatever is still unplaced from an unreadable stop is put between its Flex neighbours, so the route is never held up.
+  try { await _recoverUnreadableStops(coordMap, true); } catch (e) { console.warn('[FlexRoute] unreadable-stop final pass skipped:', e); }
 
   // Store cluster centroid on S so fix screen handler can use it (it runs outside optimize() scope).
   S._biasLat = biasLat; S._biasLon = biasLon;
@@ -7110,6 +7332,12 @@ async function optimize() {
   if (!optimizedOrder) { await optimizeWithGemini(); return; }
 
   S.optimized = [...optimizedOrder, ...failedStops];
+  // Integrity guard: every stop the driver has must be in the route. Anything that fell out is put back at the end.
+  (function() {
+    var have = {}; S.optimized.forEach(function(o) { have[o.id] = 1; });
+    var lost = S.stops.filter(function(o) { return !have[o.id]; });
+    if (lost.length) { lost.forEach(function(o) { S.optimized.push(o); }); trackEvent('route_integrity_repaired', { lost: lost.length, total: S.stops.length }); }
+  })();
   // New route = new shift — reset companion progress so it starts fresh
   S.cIdx = 0; S.cDone = []; S.cShiftStart = null; S.cView = null;
 
@@ -8681,7 +8909,12 @@ function parseFlexOCR(rawText, geo) {
           trackEvent('ocr_fragment_ignored', { had_num: _skipNum != null });
         }
         if (_skipRaw || _skipHasDeliver) {
-          var _skipDetail = { num: _skipNum, raw: _skipRaw, city: cityLine || pendingCity || '' };
+          var _skipPk = 1;   // the block's own "Deliver N packages" line still tells us the count even when the address is unreadable
+          for (var _pk = i + 1; _pk < j; _pk++) {
+            var _pm = (lines[_pk] || '').match(/^deliver\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d+)\s+packages?/i);
+            if (_pm) { _skipPk = ({one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10})[_pm[1].toLowerCase()] || parseInt(_pm[1], 10) || 1; break; }
+          }
+          var _skipDetail = { num: _skipNum, raw: _skipRaw, city: cityLine || pendingCity || '', pk: _skipPk };
           _skippedDetails.push(_skipDetail);
           _blockLog.push({ kind: 'skip', read: _skipNum, sched: i, ref: _skipDetail });
         } else {

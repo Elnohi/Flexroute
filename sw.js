@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v67';   // v67: fewer false "wrong street" notes for towers and townhouses; unit no longer mistaken for the city
+const CACHE = 'flexroute-v69';   // v69: no stop is ever lost (numbering gaps get a slot, route integrity guard); unreadable stops recovered silently
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
