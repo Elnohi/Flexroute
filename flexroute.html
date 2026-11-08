@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.08-v71';
+  var FR_BUILD = 'v2026.11.08-v74';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -9273,6 +9273,132 @@ function parseFlexOCR(rawText, geo) {
       _confFixed = _conf.length;
     }
   }
+  // ── The same run of stops twice (stitched or scrolled screenshot) ───────────────────────────────────────────
+  // A stitched capture can show rows #3-#13 and then the list again from #3. Left in, the repeats are merged into the first
+  // reading (package counts add up: 2 pkgs instead of 1), and the circle numbers beside them (3, 4, 5 ... after 13) are
+  // resolved against the wrong neighbours, which produced #1 and #2 for stops 12 and 13 and left the first stop with no
+  // number. This works from the text alone, so it also applies when the position-based reading could not be used. A run is
+  // only treated as a repeat when 3 or more consecutive stops match an earlier run, address for address, in order, with at
+  // least 2 different addresses (six deliveries to one building in a row are real). Unreadable blocks match anything.
+  var _dupExtra = 0;
+  (function() {
+    var n = _blockLog.length; if (n < 6) return;
+    function key(e) {
+      if (e.kind !== 'ok' || !e.ref) return '';
+      return String(e.ref.address || '').split(',')[0].toLowerCase().replace(/[^a-z0-9]/g, '');
+    }
+    function same(a, b) {      // equal addresses, or one is the other cut off by OCR (>= 8 characters shared)
+      if (a === b) return true;
+      var sh = a.length <= b.length ? a : b, lo = a.length <= b.length ? b : a;
+      return sh.length >= 8 && lo.indexOf(sh) === 0;
+    }
+    var keys = _blockLog.map(key), drop = {}, k = 1, removedRuns = 0;
+    while (k < n) {
+      var bestL = 0;
+      for (var j = 0; j < k; j++) {
+        var L = 0, real = 0, distinct = {}, numOk = 0;
+        while (k + L < n && j + L < k) {
+          var ka = keys[j + L], kb = keys[k + L];
+          if (ka && kb) { if (!same(ka, kb)) break; real++; distinct[ka] = 1; }
+          else if (!ka && !kb) break;               // two unreadable rows tell us nothing
+          // Flex numbers are unique, so a true repeat carries the SAME circle numbers as the first copy. Two different numbers
+          // at the same addresses are two real deliveries (that is how same-building stops arrive), never a repeat. The first
+          // row of the repeat is exempt: at the seam of a stitched capture two circles overlap and that number is unreliable.
+          if (L >= 1) {
+            var na = _blockLog[j + L].read, nb = _blockLog[k + L].read;
+            if (na != null && nb != null) { if (na !== nb) break; numOk++; }
+          }
+          L++;
+        }
+        if (L >= 3 && real >= 3 && numOk >= 2 && Object.keys(distinct).length >= 2 && L > bestL) bestL = L;
+      }
+      if (bestL) { for (var t = 0; t < bestL; t++) drop[k + t] = true; k += bestL; removedRuns++; }
+      else k++;
+    }
+    var removed = _blockLog.filter(function(e, q) { return drop[q]; });
+    if (!removed.length) return;
+    var minN = null, maxN = null;
+    removed.forEach(function(e) {
+      if (e.read != null) { minN = minN === null ? e.read : Math.min(minN, e.read); maxN = maxN === null ? e.read : Math.max(maxN, e.read); }
+      _dupExtra += 1 + (e.kind === 'ok' && e.pk > 1 ? e.pk : 0);
+      if (e.kind === 'skip') { var d = _skippedDetails.indexOf(e.ref); if (d >= 0) _skippedDetails.splice(d, 1); _skippedBlocks = _skippedBlocks > 0 ? _skippedBlocks - 1 : 0; }
+    });
+    _blockLog = _blockLog.filter(function(e, q) { return !drop[q]; });
+    removed.forEach(function(e) {      // re-total each affected stop from the blocks that remain
+      if (e.kind !== 'ok' || !e.ref) return;
+      var tot = 0, c = 0; _blockLog.forEach(function(x) { if (x.kind === 'ok' && x.ref === e.ref) { tot += x.pk; c++; } });
+      if (c) e.ref.pkgCount = tot || 1;
+    });
+    if (!_overlap && minN !== null) _overlap = { rows: removed.length, from: minN, to: maxN };
+    if (typeof trackEvent === 'function') trackEvent('ocr_overlap_text', { rows: removed.length, runs: removedRuns });
+  })();
+  // ── Short repeats: one or two stops shown twice ─────────────────────────────────────────────────────────────
+  // Too short for the run rule above. Two independent clues, both about WHETHER A STOP CAN EXIST, never about guessing:
+  //  N. The same address with the same readable Flex number is the same stop (Flex numbers are unique). Two stops at one
+  //     building arrive with DIFFERENT numbers, so they are never touched by this.
+  //  R. Room: between a stop read as #5 and the next read as #6 there is room for zero other stops. A block sitting in that
+  //     gap whose address is already there is a repeat, even when its own circle could not be read. The rule acts only when
+  //     the number of surplus repeats equals the number of surplus blocks, so a real same-address pair (4 and 5 unread,
+  //     between #3 and #6: room for exactly two) is left alone. With no readable numbers around, nothing is removed and the
+  //     package-total check on the scan summary is what warns the driver.
+  (function() {
+    function key(e) { return (e.kind === 'ok' && e.ref) ? String(e.ref.address || '').split(',')[0].toLowerCase().replace(/[^a-z0-9]/g, '') : ''; }
+    function same(a, b) { if (!a || !b) return false; if (a === b) return true; var sh = a.length <= b.length ? a : b, lo = a.length <= b.length ? b : a; return sh.length >= 8 && lo.indexOf(sh) === 0; }
+    var removedAll = [], minN = null, maxN = null;
+    function removeAt(i, keeper) {
+      var e = _blockLog[i];
+      if (keeper && e.pk > keeper.pk) keeper.pk = e.pk;                // a cut copy may show fewer packages: keep the larger count
+      if (e.read != null) { minN = minN === null ? e.read : Math.min(minN, e.read); maxN = maxN === null ? e.read : Math.max(maxN, e.read); }
+      _dupExtra += 1 + (e.pk > 1 ? e.pk : 0);
+      _blockLog.splice(i, 1); removedAll.push(e);
+    }
+    // N: same address + same readable number, anywhere in the list
+    for (var i = 1; i < _blockLog.length; i++) {
+      var e = _blockLog[i]; if (e.kind !== 'ok' || e.read == null) continue;
+      var ke = key(e);
+      for (var b = 0; b < i; b++) {
+        var f = _blockLog[b];
+        if (f.kind === 'ok' && f.read === e.read && same(key(f), ke)) { removeAt(i, f); i--; break; }
+      }
+    }
+    // R: more blocks than numbers available between two readable numbers
+    var guard = 0, again = true;
+    while (again && guard++ < 8) {
+      again = false;
+      var known = []; _blockLog.forEach(function(x, q) { if (x.read != null) known.push(q); });
+      for (var t = 0; t + 1 < known.length && !again; t++) {
+        var pI = known[t], qI = known[t + 1], m = qI - pI - 1; if (m <= 0) continue;
+        var avail = _blockLog[qI].read - _blockLog[pI].read - 1; if (avail < 0) continue;
+        var excess = m - avail; if (excess <= 0) continue;
+        var groups = {}, order = [];
+        for (var u = (pI - 2 < 0 ? 0 : pI - 2); u <= Math.min(_blockLog.length - 1, qI + 2); u++) {
+          var ku = key(_blockLog[u]); if (!ku) continue;
+          var hit = null; order.forEach(function(g) { if (!hit && same(g, ku)) hit = g; });
+          if (!hit) { hit = ku; order.push(ku); groups[ku] = []; }
+          groups[hit].push(u);
+        }
+        var removable = [];
+        order.forEach(function(g) {
+          var members = groups[g], between = members.filter(function(u) { return u > pI && u < qI; });
+          var hasAnchor = members.some(function(u) { return u <= pI || u >= qI; });
+          if (members.length < 2) return;
+          (hasAnchor ? between : between.slice(1)).forEach(function(u) { removable.push({ u: u, keep: members.filter(function(v) { return v !== u; })[0] }); });
+        });
+        if (removable.length !== excess) continue;                     // ambiguous: keep every delivery
+        removable.sort(function(a, b) { return b.u - a.u; });
+        removable.forEach(function(r) { removeAt(r.u, _blockLog[r.keep]); });
+        again = true;
+      }
+    }
+    if (!removedAll.length) return;
+    removedAll.forEach(function(e) {                                   // re-total each affected stop from the blocks that remain
+      if (!e.ref) return;
+      var tot = 0, c = 0; _blockLog.forEach(function(x) { if (x.kind === 'ok' && x.ref === e.ref) { tot += x.pk; c++; } });
+      if (c) e.ref.pkgCount = tot || 1;
+    });
+    if (!_overlap && minN !== null) _overlap = { rows: removedAll.length, from: minN, to: maxN };
+    if (typeof trackEvent === 'function') trackEvent('ocr_overlap_short', { rows: removedAll.length });
+  })();
   // A fragment can also be exposed by the circle numbers alone. Between a stop numbered 16 and the next numbered
   // 17 there is room for ZERO other stops, so a skipped block sitting between them is not a stop. (A real
   // unreadable stop leaves a visible gap instead: 16, ?, 18.) Both neighbours must be corroborated by THEIR
@@ -9328,6 +9454,14 @@ function parseFlexOCR(rawText, geo) {
       depot_first: _depotFirst
     });
   }
+  // "5 Wellesley Avenue Toronto On Ca, Toronto": Flex cuts a long line at "... Toronto On Canada" and prints the city again
+  // below. Drop the repeated tail so the address reads (and searches) as "5 Wellesley Avenue, Toronto".
+  results.forEach(function(r) {
+    var parts = String(r.address || '').split(','); if (parts.length < 2) return;
+    var city = parts[parts.length - 1].trim(); if (!city) return;
+    var re = new RegExp('\\s+' + city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s+(?:ON|QC|BC|AB|MB|SK|NS|NB|NL|PE)\\s+(?:CA|Canada)\\b\\.*\\s*$', 'i');
+    if (re.test(parts[0])) { parts[0] = parts[0].replace(re, ''); r.address = parts.join(','); }
+  });
   results._skipped = _skippedBlocks;
   results._skippedDetails = _skippedDetails;
 
@@ -9357,7 +9491,7 @@ function parseFlexOCR(rawText, geo) {
   // stops produce so the comparison is fair.
   var _multiPkgExtra = 0;
   results.forEach(function(r) { if (r.pkgCount > 1) _multiPkgExtra += r.pkgCount; });
-  var _accountedFor = results.length + _skippedBlocks + _multiPkgExtra;
+  var _accountedFor = results.length + _skippedBlocks + _multiPkgExtra + _dupExtra;
   if (_deliverMatches.length > _accountedFor + 1) {  // +1 tolerance for OCR noise
     results._possibleMissing = _deliverMatches.length - _accountedFor;
   }
