@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.08-v69';
+  var FR_BUILD = 'v2026.11.08-v70';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -418,6 +418,14 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   }
   // 1 when opened inside Facebook/Instagram/etc. in-app browsers (same pattern the scanner warnings use).
   var FR_IN_APP = /Instagram|FBAV|FBAN|Twitter|Line|LinkedInApp|Snapchat|TikTok/i.test(navigator.userAgent) ? 1 : 0;
+
+  // Android Chrome offers a real one-tap install when the page keeps its install event; the card after a route uses it.
+  var FR_INSTALL_EVT = null;
+  window.addEventListener('beforeinstallprompt', function(e) { e.preventDefault(); FR_INSTALL_EVT = e; trackEvent('install_prompt_available', {}); });
+  window.addEventListener('appinstalled', function() {
+    FR_INSTALL_EVT = null; trackEvent('pwa_installed', {});
+    try { var _ist = JSON.parse(localStorage.getItem('fr_a2hs') || '{}'); _ist.dismissed = true; localStorage.setItem('fr_a2hs', JSON.stringify(_ist)); } catch (e) {}
+  });
 
   // User-scoped, so GA4 can segment whole users (not just events) by installed vs browser.
   if (typeof gtag !== 'undefined') {
@@ -912,6 +920,10 @@ function a2hsCard() {
   h += '<div class="a2hs-head"><span class="a2hs-emoji">&#128241;</span>';
   h += '<div><div class="a2hs-title">Keep FlexRoute one tap away</div>';
   h += '<div class="a2hs-sub">Add it to your home screen: opens full screen, loads instantly, and your routes work even with no signal.</div></div></div>';
+  if (!ios && FR_INSTALL_EVT) {
+    h += '<button id="a2hsInstall" style="margin-top:11px;width:100%;padding:11px;border:none;border-radius:10px;background:var(--acc);color:#000;font-weight:800;font-size:15px;cursor:pointer">Install FlexRoute</button></div>';
+    return h;
+  }
   h += '<div class="a2hs-steps">';
   steps.forEach(function(st2) { h += '<div class="a2hs-step"><span class="a2hs-num">' + st2[0] + '</span><span>' + st2[1] + '</span></div>'; });
   h += '</div></div>';
@@ -1913,6 +1925,17 @@ const startInp = document.getElementById('startInput');
     var _a2Fn = function(e) { e.preventDefault(); e.stopPropagation(); dismissA2HS(); };
     _a2x.addEventListener('click', _a2Fn);
     _a2x.addEventListener('touchend', _a2Fn, { passive: false });
+  }
+
+  var _a2i = document.getElementById('a2hsInstall');
+  if (_a2i) {
+    _a2i.addEventListener('click', function(e) {
+      e.preventDefault();
+      var ev = FR_INSTALL_EVT; if (!ev) return;
+      FR_INSTALL_EVT = null;
+      try { ev.prompt(); } catch (err) { render(); return; }
+      Promise.resolve(ev.userChoice).then(function(c) { trackEvent('install_prompt_result', { outcome: (c && c.outcome) || 'unknown' }); render(); }).catch(function() { render(); });
+    });
   }
 
   var dz=document.querySelector('.dz');
@@ -7142,7 +7165,19 @@ async function optimize() {
   const geocodedStops = S.stops.filter(s => s.coords !== null);
   const failedStops   = S.stops.filter(s => s.coords === null);
 
-  if (S.geoFailed.length > 0) {
+  if (S.geoFailed.length > 0 && geocodedStops.length >= 2) {
+    // Enough stops are located to build a route, so build it. The stops that could not be placed go at the end of the
+    // route, each with its own inline "type the corrected address" box on the result screen. The driver is never
+    // sent back to a fix screen before seeing a route.
+    S.stops.forEach(function(s) { s.geoFailed = S.geoFailed.indexOf(s.address) >= 0; });
+    trackEvent('route_with_unplaced', {
+      failed_count: S.geoFailed.length,
+      total_stops: S.stops.length,
+      region: S.userState || 'unknown',
+      duration_ms: S._optT0 ? Date.now() - S._optT0 : 0,
+      in_app: FR_IN_APP
+    });
+  } else if (S.geoFailed.length > 0) {
     trackEvent('fix_screen_shown', {
       failed_count: S.geoFailed.length,
       total_stops: S.stops.length,

@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v69';   // v69: no stop is ever lost (numbering gaps get a slot, route integrity guard); unreadable stops recovered silently
+const CACHE = 'flexroute-v70';   // v70: route is built even when some addresses are not found; one-tap Android install; tagged start_url (offline match ignores the query)
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
@@ -91,7 +91,7 @@ self.addEventListener('fetch', e => {
           caches.open(CACHE).then(cache => cache.put(e.request, clone));
         }
         return response;
-      }).catch(() => caches.match(e.request))
+      }).catch(() => caches.match(e.request, { ignoreSearch: true }))
     );
     return;
   }

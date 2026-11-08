@@ -3,7 +3,7 @@
   "name": "FlexRoute – Route Optimizer",
   "short_name": "FlexRoute",
   "description": "Scan your delivery itinerary and get the shortest route in seconds. Free, no login required.",
-  "start_url": "/flexroute",
+  "start_url": "/flexroute?utm_source=installed_app&utm_medium=pwa&utm_campaign=home_screen",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
