@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.08-v74';
+  var FR_BUILD = 'v2026.11.08-v75';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -9296,21 +9296,29 @@ function parseFlexOCR(rawText, geo) {
     while (k < n) {
       var bestL = 0;
       for (var j = 0; j < k; j++) {
-        var L = 0, real = 0, distinct = {}, numOk = 0;
+        var L = 0, real = 0, distinct = {}, numOk = 0, conflicts = 0;
         while (k + L < n && j + L < k) {
           var ka = keys[j + L], kb = keys[k + L];
           if (ka && kb) { if (!same(ka, kb)) break; real++; distinct[ka] = 1; }
           else if (!ka && !kb) break;               // two unreadable rows tell us nothing
-          // Flex numbers are unique, so a true repeat carries the SAME circle numbers as the first copy. Two different numbers
-          // at the same addresses are two real deliveries (that is how same-building stops arrive), never a repeat. The first
-          // row of the repeat is exempt: at the seam of a stitched capture two circles overlap and that number is unreliable.
+          // Flex numbers are unique, so a true repeat carries the SAME circle numbers as the first copy, while two real stops
+          // at one building carry different ones. Only a few circles are readable in practice (7 of 43 on a real route), so
+          // the numbers corroborate when they are there; they are not required. The first row of the repeat is exempt: at the
+          // seam of a stitched capture two circles overlap and that number is unreliable.
           if (L >= 1) {
             var na = _blockLog[j + L].read, nb = _blockLog[k + L].read;
-            if (na != null && nb != null) { if (na !== nb) break; numOk++; }
+            if (na != null && nb != null) { if (na !== nb) conflicts++; else numOk++; }
           }
           L++;
         }
-        if (L >= 3 && real >= 3 && numOk >= 2 && Object.keys(distinct).length >= 2 && L > bestL) bestL = L;
+        // What decides it is how many DIFFERENT addresses repeat in the same order. Four or more different addresses repeating
+        // in order is a copied strip; readable numbers only veto it when they contradict it more often than they agree (one
+        // misread digit must not keep a duplicate alive, but every number differing means two real visits).
+        // Three need no contradicting number. Two (A,B,A,B) are also what alternating real stops look like, so they need
+        // matching numbers. One address repeated (A,A,A,A) is never treated as a repeat.
+        var nd = Object.keys(distinct).length;
+        var accept = (nd >= 4 && conflicts <= numOk) || (nd === 3 && conflicts === 0) || (nd === 2 && numOk >= 2 && conflicts === 0);
+        if (L >= 3 && real >= 3 && accept && L > bestL) bestL = L;
       }
       if (bestL) { for (var t = 0; t < bestL; t++) drop[k + t] = true; k += bestL; removedRuns++; }
       else k++;
