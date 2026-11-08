@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.08-v70';
+  var FR_BUILD = 'v2026.11.08-v71';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -5565,8 +5565,8 @@ function rRow(s, i) {
     ${hn ? `<div class="rpkg"><div class="rpkg-l">pkg</div><div class="rpkg-v">${'#'+s.flexNum}</div></div>` : '<div style="height:4px"></div>'}
   </div>
   <div style="flex:1;min-width:0">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
-    <div class="ri-addr" style="flex:1">${escH(s.address)}</div>
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:4px 8px">
+    <div class="ri-addr" style="flex:1 1 170px;min-width:0">${escH(s.address)}</div>
     ${s.coords ? `<a href="https://www.google.com/maps/search/?api=1&query=${s.coords.lat},${s.coords.lon}" target="_blank"
       style="flex-shrink:0;font-size:11px;color:${(s.geoSuspect || s._estPos) ? '#FFB300' : 'var(--t3)'};text-decoration:none;padding:3px 7px;border:1px solid ${(s.geoSuspect || s._estPos) ? '#FFB300' : 'var(--brd)'};border-radius:6px;white-space:nowrap;margin-top:2px;${(s.geoSuspect || s._estPos) ? 'font-weight:700' : ''}"
       title="${s.geoSuspect ? escH('This stop may be on the wrong street (' + (s.geoNote || '') + '). Tap to see where the app put it.') : (s._estPos ? 'Position estimated from the stops before and after it. Tap to check it in Maps.' : 'Verify this location on Google Maps')}">${(s.geoSuspect || s._estPos) ? t('verify_warn') : '&#128205; verify'}</a>` : ''}
@@ -6044,7 +6044,7 @@ function _fillFlexNumberGaps() {
 }
 // optimize(): place the stops that came from unreadable text. coordMap holds the positions found so far.
 async function _recoverUnreadableStops(coordMap, finalPass) {
-  var mine = S.stops.filter(function(s) { return (s._rescued || s._noGeocode) && !coordMap[s.id]; });
+  var mine = S.stops.filter(function(s) { return (s._rescued || s._noGeocode || (s.geoFailed && s.flexNum != null)) && !coordMap[s.id]; });
   if (!mine.length) return;
   var t0 = Date.now(), budget = finalPass ? 15000 : 30000, placed = 0, estimated = 0;
   function posOf(o) { var c = coordMap[o.id] || (o.coords && !o.geoFailed ? o.coords : null); return (c && !c._est) ? c : null; }
@@ -9432,6 +9432,10 @@ function expandAbbr(q) {
   // European: "Str." → "Straße", "Str " → "Straße "
   q = q.replace(/\bStr\.\s/g, 'Straße ');
   q = q.replace(/\bstr\.\s/gi, 'Straße ');
+  // Flex prints Avenue as "Av" (e.g. "30 Sylla Av Unit"): at the end of the street, or before a unit word, it is Avenue.
+  q = q.replace(/\bAv\.?(?=\s*(?:,|$|unit\b|apt\b|apartment\b|suite\b|ste\b|#))/gi, 'Avenue');
+  // A unit word whose number was cut off ("... Unit, Scarborough") only confuses the search: drop it.
+  q = q.replace(/\s+(?:unit|apt|apartment|suite|ste)\.?\s*(?=,|$)/gi, '');
   // Spanish/Portuguese: "Av." → "Avenida"
   q = q.replace(/\bAv\.?\s+(?=[A-Z])/g, 'Avenida ');
   q = q.replace(/\bCalle\b/gi, 'Calle');

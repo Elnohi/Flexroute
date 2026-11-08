@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v70';   // v70: route is built even when some addresses are not found; one-tap Android install; tagged start_url (offline match ignores the query)
+const CACHE = 'flexroute-v71';   // v71: Flex "Av" read as Avenue; any failed stop with Flex neighbours is placed between them; addresses no longer break mid-word
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
