@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.08-v75';
+  var FR_BUILD = 'v2026.11.09-v76';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -6150,6 +6150,7 @@ async function handleFiles(files) {
   let _sumDepot = false, _sumEnd = false, _sumUnres = 0, _sumSn = [], _sumTotal = null, _sumNew = false, _sumCounts = 0, _sumMode = 'row', _sumWhy = '',
       _sumIcon = 0, _sumDeliver = 0, _sumBoth = 0, _sumConfOpen = 0, _sumConfFixed = 0, _sumOverlap = null;
   S._scanSummary = null; S._lastHighCounts = []; S._flexTotal = null;
+  if (!S.stops.length) S._scanTrace = [];
   S.stops = S.stops.filter(function(s) { return s._rescued !== 'gap'; });   // rebuilt below from the numbers actually read
   for (let i = 0; i < imgs.length; i++) {
     S.sc = { done: i, total: imgs.length, msg: `Scanning image ${i + 1} of ${imgs.length}...` };
@@ -6173,6 +6174,7 @@ async function handleFiles(files) {
       }
       unreadable += items._skipped || 0;
       possibleMissing += items._possibleMissing || 0;
+      S._scanTrace = (S._scanTrace || []).concat([{ file: (imgs[i] && imgs[i].name) ? String(imgs[i].name).slice(0, 30) : '', realigned: items._realigned || 0, rows: items._trace || [] }]);
       if (items._meta) {
         _sumDepot = _sumDepot || !!items._meta.depotFirst;
         _sumEnd = _sumEnd || !!items._meta.endMarker;
@@ -9430,6 +9432,18 @@ function parseFlexOCR(rawText, geo) {
     toDrop.forEach(_dropBlock);
   })();
   var _serials = _resolveSerials(_blockLog.map(function(e) { return e.read; }), _depotFirst);
+  // Amazon numbers every block consecutively from the depot (#1), so on a COMPLETE capture - the depot row at the top, the
+  // "you'll see them in your itinerary" text at the bottom, and exactly one "Deliver ..." line for every block read - block k
+  // is stop #k+2. Circle digits are the least reliable part of the screenshot: stray digits can agree with each other and move
+  // every stop after them (a real list showed #28 for stop #25). When the numbers resolved from the circles disagree with the
+  // structure, the structure wins. Not applied when anything could be missing (the delivery lines and blocks must match).
+  var _realigned = 0, _preSerials = _serials.slice();
+  if (_depotFirst && /assigned more stops|see them in your itinerary/i.test(rawText) && _blockLog.length >= 3) {
+    var _dlines = (String(rawText).match(/^\s*deliver\s+\w+\s+packages?\b/gim) || []).length;
+    if (_dlines === _blockLog.length) {
+      for (var _sk = 0; _sk < _serials.length; _sk++) { if (_serials[_sk] !== _sk + 2) { _serials[_sk] = _sk + 2; _realigned++; } }
+    }
+  }
   results.forEach(function(r) { r._sn = []; r._pk = {}; r._unres = 0; });
   _blockLog.forEach(function(e, k) {
     var sv = _serials[k];
@@ -9454,6 +9468,11 @@ function parseFlexOCR(rawText, geo) {
     }
     delete r._sn; delete r._pk; delete r._unres;
   });
+  results._trace = _blockLog.map(function(e, k) {
+    return { k: k, read: e.read, was: _preSerials[k], num: _serials[k], kind: e.kind, pk: e.pk, a: String((e.ref && (e.ref.address || e.ref.raw)) || '').split(',')[0].slice(0, 34) };
+  });
+  results._realigned = _realigned;
+  if (_realigned && typeof trackEvent === 'function') trackEvent('ocr_numbers_realigned', { blocks: _blockLog.length, changed: _realigned });
   if (typeof trackEvent === 'function' && _blockLog.length) {
     trackEvent('stop_serials_resolved', {
       blocks: _blockLog.length,
@@ -10423,6 +10442,19 @@ function buildRouteReport() {
   });
   if (T && prevId != null && idx['__home__'] != null && idx[prevId] != null) {
     L.push('home'.padEnd(10) + String((T.dist[idx[prevId]][idx['__home__']] / 1000).toFixed(1)).padStart(6) + String(Math.round(T.dur[idx[prevId]][idx['__home__']] / 60)).padStart(8));
+  }
+  // What the scanner read for every block of the itinerary (circle digit read, number before/after the structure check),
+  // so a wrong Flex number can be traced to the read that caused it.
+  var tr = S._scanTrace || [];
+  if (tr.length) {
+    L.push('');
+    L.push('--- scan trace (block | circle read | resolved from reads | final number | kind | pkgs | address) ---');
+    tr.forEach(function(f) {
+      L.push('file ' + (f.file || '?') + (f.realigned ? '  [numbers realigned to the list structure: ' + f.realigned + ']' : ''));
+      f.rows.slice(0, 80).forEach(function(w) {
+        L.push(String(w.k + 1).padStart(3) + '  ' + String(w.read == null ? '-' : w.read).padStart(4) + '  ' + String(w.was == null ? '-' : w.was).padStart(4) + '  ' + String(w.num == null ? '-' : w.num).padStart(4) + '  ' + String(w.kind || '').padEnd(5) + ' ' + String(w.pk == null ? '' : w.pk).padStart(2) + '  ' + w.a);
+      });
+    });
   }
   return L.join('\n');
 }

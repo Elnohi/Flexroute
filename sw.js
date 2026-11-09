@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v75';   // v75: a stitched strip is recognised from its repeated addresses even when almost no circle number can be read
+const CACHE = 'flexroute-v76';   // v76: a complete capture is numbered by its structure when stray circle reads disagree; scan trace in the route report
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
