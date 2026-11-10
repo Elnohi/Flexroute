@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.09-v76';
+  var FR_BUILD = 'v2026.11.10-v78';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -6655,6 +6655,10 @@ async function optimize() {
       // The run has used its time. Mark this and every remaining stop as not placed so the screen moves on to
       // the "couldn't place" list instead of spinning; the stops already located are kept for the next try.
       coordMap[x.key] = null; done++; S.ldProg = Math.round(done / toGeocode.length * 100);
+      // A stop skipped for time is a stop not placed: flag it, so the neighbour-based rescue below can place it between the stops
+      // before and after it (and it is listed, not silently left at the end of the route with no position).
+      var _tbs = S.stops.find(function(q) { return q.id === x.key; });
+      if (_tbs && !_tbs._noGeocode) { _tbs.geoFailed = true; if (S.geoFailed.indexOf(_tbs.address) < 0) S.geoFailed.push(_tbs.address); }
       trackEvent('geocode_time_budget', { remaining: toGeocode.length - i, region: S.userState || 'unknown' });
       continue;
     }
@@ -9362,13 +9366,29 @@ function parseFlexOCR(rawText, geo) {
       _dupExtra += 1 + (e.pk > 1 ? e.pk : 0);
       _blockLog.splice(i, 1); removedAll.push(e);
     }
-    // N: same address + same readable number, anywhere in the list
+    // N: same address + same readable number, confirmed by the numbering around it. A repeated stop inserts extra blocks, so every
+    // readable number AFTER it sits lower in the list than the numbers before it by exactly the number of inserted blocks (the
+    // "offset" read-minus-position drops). A misread digit moves ONE read and leaves the offset unchanged. So it is a repeat only
+    // when the reads before it agree on one offset, the reads after it agree on another, and the two differ by exactly the
+    // number of blocks between the twins. Anything less certain keeps the block: a package is never dropped on a hunch.
+    function offs(from, step) {
+      var out = [], q = from;
+      for (; q >= 0 && q < _blockLog.length && out.length < 3; q += step) { var rd = _blockLog[q].read; if (rd != null) out.push(rd - q); }
+      if (step < 0 && q < 0 && out.length < 3 && _depotFirst) out.push(2);       // the depot row is #1, one position above the first block
+      return out;
+    }
+    function allSame(a) { return a.length > 0 && a.every(function(v) { return v === a[0]; }); }
     for (var i = 1; i < _blockLog.length; i++) {
       var e = _blockLog[i]; if (e.kind !== 'ok' || e.read == null) continue;
       var ke = key(e);
       for (var b = 0; b < i; b++) {
         var f = _blockLog[b];
-        if (f.kind === 'ok' && f.read === e.read && same(key(f), ke)) { removeAt(i, f); i--; break; }
+        if (f.kind === 'ok' && f.read === e.read && same(key(f), ke)) {
+          var before = offs(b - 1, -1), after = offs(i + 1, 1), gap = i - b;
+          if (before.length >= 2 && after.length >= 2 && allSame(before) && allSame(after) && before[0] - after[0] === gap &&
+              e.read - i === after[0] && f.read - b === before[0]) { removeAt(i, f); i--; }
+          break;
+        }
       }
     }
     // R: more blocks than numbers available between two readable numbers
@@ -9380,6 +9400,11 @@ function parseFlexOCR(rawText, geo) {
         var pI = known[t], qI = known[t + 1], m = qI - pI - 1; if (m <= 0) continue;
         var avail = _blockLog[qI].read - _blockLog[pI].read - 1; if (avail < 0) continue;
         var excess = m - avail; if (excess <= 0) continue;
+        // The two numbers bounding the gap must be trustworthy before anything is removed: the reads on each side agree on one
+        // offset (read - position) and the offsets differ by exactly the surplus. A single misread bounding number breaks that
+        // agreement, so the rule abstains and every block stays.
+        var offB = offs(pI, -1), offA = offs(qI, 1);
+        if (!(offB.length >= 2 && offA.length >= 2 && allSame(offB) && allSame(offA) && offB[0] - offA[0] === excess)) continue;
         var groups = {}, order = [];
         for (var u = (pI - 2 < 0 ? 0 : pI - 2); u <= Math.min(_blockLog.length - 1, qI + 2); u++) {
           var ku = key(_blockLog[u]); if (!ku) continue;
@@ -9441,7 +9466,7 @@ function parseFlexOCR(rawText, geo) {
   if (_depotFirst && /assigned more stops|see them in your itinerary/i.test(rawText) && _blockLog.length >= 3) {
     var _dlines = (String(rawText).match(/^\s*deliver\s+\w+\s+packages?\b/gim) || []).length;
     if (_dlines === _blockLog.length) {
-      for (var _sk = 0; _sk < _serials.length; _sk++) { if (_serials[_sk] !== _sk + 2) { _serials[_sk] = _sk + 2; _realigned++; } }
+      for (var _rk = 0; _rk < _serials.length; _rk++) { if (_serials[_rk] !== _rk + 2) { _serials[_rk] = _rk + 2; _realigned++; } }
     }
   }
   results.forEach(function(r) { r._sn = []; r._pk = {}; r._unres = 0; });
