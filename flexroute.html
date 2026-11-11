@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.10-v80';
+  var FR_BUILD = 'v2026.11.10-v81';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -1840,7 +1840,7 @@ function bind() {
         try {
           var _cnt = (S.stops || []).map(function(s) { return (s.packageNums || []).join('+') + ':' + (s.pkgCount || 1); }).join(' ');
           _hdr = '--- FlexRoute parse report ---\n'
-            + 'build v2026.11.02-v67\n'
+            + 'build ' + FR_BUILD + '\n'
             + 'stops ' + (S.stops || []).length + '  packages ' + (S.stops || []).reduce(function(a, s) { return a + (s.pkgCount || 1); }, 0) + '\n'
             + 'count source: ' + (_m.pkgMode || '?') + '   route total: ' + (_m.totalPackages == null ? 'not read' : _m.totalPackages) + '\n'
             + 'position reading: ' + (_m.geoUsed ? 'USED' + (_m.geoBadges ? ' (counts + circle numbers)' : ' (counts)') : 'not used')
@@ -4431,7 +4431,7 @@ function vResult() {
 <div class="hdr">
   <div class="hbrand">
     <img src="${window._LOGO_}" style="height:46px;width:auto;display:block;border-radius:10px;background:transparent" alt="FlexRoute">
-    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">v2026.11.02-v67</span></div>
+    <div style="font-size:9px;letter-spacing:2.5px;color:var(--t3);text-transform:uppercase;margin-left:8px;align-self:center;line-height:1.4">${t("optimized_route_label")}<br><span style="font-size:8px;letter-spacing:1px;opacity:0.4">${escH(FR_BUILD)}</span></div>
   </div>
   <div class="hbtns" style="gap:8px">
     ${acctPill()}
@@ -7327,7 +7327,7 @@ async function optimize() {
           ]);
           // An order found with straight-line estimates (the road table was unavailable) has to be PROVEN shorter on
           // real roads; anything else is undone. One found on real road times only has to be no meaningfully longer.
-          if ((_nr && _nr.distance > _osrmDist + 200) || (_refApprox && (!_nr || _nr.distance > _osrmDist - 30))) {
+          if ((_nr && (_nr.distance > _osrmDist + 200 || _nr.duration > _osrmDur + OPT_MAX_EXTRA_S)) || (_refApprox && (!_nr || _nr.distance > _osrmDist - 30))) {
             // Safeguard: these changes would make the drive longer than OSRM's own order. Don't ship them.
             // (What was turned down, and how each measure rated it, goes in the route report.)
             _rej = { flex: optimizedOrder.map(function(s) { return s.flexNum != null ? '#' + s.flexNum : '?'; }), routeM: _nr ? Math.round(_nr.distance) : null, routeS: _nr ? Math.round(_nr.duration) : null,
@@ -7335,8 +7335,8 @@ async function optimize() {
             optimizedOrder = _osrmOrder; tripDist = _osrmDist; tripDur = _osrmDur;
             _orderChanged = false; _groupedTogether = false;
             _remeasure = 'reverted';
-            S._routeNotes.push("Kept the router's own order (the fine-tuning would have added driving distance).");
-            trackEvent('route_changes_reverted', { extra_m: Math.round(_nr.distance - _osrmDist), region: S.userState || 'unknown' });
+            S._routeNotes.push("Kept the router's own order (the fine-tuning would have made the drive longer).");
+            trackEvent('route_changes_reverted', { extra_m: Math.round(_nr.distance - _osrmDist), extra_s: Math.round(_nr.duration - _osrmDur), region: S.userState || 'unknown' });
           } else if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; _remeasure = 'ok'; }
           else if (_refTot && _refTot.m != null) {
             // The route lookup did not answer. The order IS the new one, so show the road table's total for it rather than
@@ -10856,6 +10856,7 @@ function _tmo(p, ms, fallback) {
 function _optElapsed() { return Date.now() - (S._optT0 || Date.now()); }
 var OPT_SKIP_RETRIES_AFTER = 70000;     // no bulk-retry pass once a run is this old
 var OPT_SKIP_RESCUE_AFTER  = 100000;    // no outlier rescue once a run is this old
+var OPT_MAX_EXTRA_S = 180;   // a fine-tuned order that the route lookup rates this many seconds SLOWER than the router's own is not shipped, however much shorter it is
 var OPT_STOP_GEOCODING_AFTER = 85000;   // stop geocoding NEW stops; the rest go to the "couldn't place" list
 
 // The package total to display. Amazon prints the route total on the warehouse row; when it was visible for this
