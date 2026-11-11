@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v78';   // v78: audit - repeat removal needs agreeing numbers on both sides, so a misread digit can never drop a real package
+const CACHE = 'flexroute-v80';   // v80: home address is searched around the depot first (a comma-less home address could land on the wrong street); route report shows it
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

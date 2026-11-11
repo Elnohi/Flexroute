@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.10-v78';
+  var FR_BUILD = 'v2026.11.10-v80';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -4424,7 +4424,7 @@ function vFix() {
 
 function vResult() {
   const mu = gMapsURL();
-  const wu = S.optimized.length ? `https://waze.com/ul?q=${encodeURIComponent(S.optimized[0].address)}&navigate=yes` : '#';
+  const wu = S.optimized.length ? buildNavURL('waze', navQ(S.optimized[0])) : '#';
   const hasPkg = S.optimized.some(s => s.flexNum != null);
   const sv = S.savings;
   return `
@@ -4592,7 +4592,7 @@ function vResult() {
         <div style="font-size:12px;color:var(--t3);margin-bottom:10px;line-height:1.5">${t('one_stop_low_mem')}</div>
         <div style="display:flex;flex-wrap:wrap;gap:6px">
           ${S.optimized.map(function(s,i){
-            var wu2 = 'https://waze.com/ul?q=' + encodeURIComponent(s.address) + '&navigate=yes';
+            var wu2 = buildNavURL('waze', navQ(s));
             return '<a href="'+wu2+'" target="_blank" rel="noreferrer" data-stop="'+(i+1)+'" style="display:inline-flex;align-items:center;gap:5px;background:var(--surf2);border:1px solid var(--brd2);border-radius:8px;padding:8px 12px;font-size:13px;font-family:var(--sans);font-weight:700;color:var(--t1);text-decoration:none"><span style=\'color:var(--acc)\'>' + (i+1) + '</span> Waze</a>';
           }).join('')}
         </div>
@@ -4630,9 +4630,27 @@ function vResult() {
 // "confirmed" the intent:// version worked was done in a desktop browser,
 // where _IS_ANDROID is false and the broken branch never ran.
 function buildNavURL(app, address) {
+  // A bare "lat,lon" (see navQ) goes out as coordinates; everything else is an address search as before.
+  var _ll = String(address).match(/^\s*(-?\d+\.\d+),\s*(-?\d+\.\d+)\s*$/);
+  if (_ll && app === 'waze') return 'https://waze.com/ul?ll=' + _ll[1] + '%2C' + _ll[2] + '&navigate=yes';
   var q = encodeURIComponent(address);
   if (app === 'waze') return 'https://waze.com/ul?q=' + q + '&navigate=yes';
   return 'https://www.google.com/maps/search/?api=1&query=' + q;
+}
+// What to hand to Maps/Waze for a stop. A placeholder ("Stop #17 (not read - check Flex app)") is not a searchable address, so it
+// navigates by the position estimated from the stops before and after it; every other stop keeps navigating by its address.
+function navQ(s) {
+  if (s && s._noGeocode && s.coords && s.coords.lat != null) return s.coords.lat.toFixed(6) + ',' + s.coords.lon.toFixed(6);
+  return s ? s.address : '';
+}
+// Shift Mode walks only the stops that have a position. Anything left out must be said, on the card and on the finish screen,
+// so a driver can never finish a shift believing nothing is left.
+function unplacedNoteHtml() {
+  var u = (S.optimized || []).filter(function(x) { return x.geoFailed; });
+  if (!u.length) return '';
+  var list = u.slice(0, 3).map(function(x) { return escH(String(x.address).split(',')[0]); }).join('; ') + (u.length > 3 ? '; +' + (u.length - 3) + ' more' : '');
+  return '<div style="margin:8px 14px;padding:8px 12px;border:1px solid #FFB300;border-radius:10px;background:rgba(255,179,0,.10);color:#FFB300;font-size:13px;line-height:1.35">&#9888; '
+    + u.length + (u.length > 1 ? ' stops are' : ' stop is') + ' not in this list (address not found): ' + list + '. Find them at the end of your route list.</div>';
 }
 
 function vCompanion() {
@@ -4664,13 +4682,14 @@ function vCompanion() {
       '<div style="font-size:56px;margin-bottom:16px">🎉</div>' +
       '<div style="font-family:var(--sans);font-size:40px;font-weight:900;color:var(--ok);margin-bottom:10px">' + t('shift_complete') + '</div>' +
       '<div style="font-size:17px;color:var(--t2);margin-bottom:28px">' + t('stops_delivered').replace('{n}', done) + (elapsed ? ' ' + t('in_word') + ' ' + elapsed : '') + '</div>' +
+      unplacedNoteHtml() +
       reviewCardHtml() +
       _homeBtn +
       '<button id="compFinishBtn" class="btn bp" style="font-size:18px;padding:16px 32px">' + t('done_back') + '</button>' +
       '</div></div>';
   }
-  var wazeURL = buildNavURL('waze', stop.address);
-  var mapsURL = buildNavURL('maps', stop.address);
+  var wazeURL = buildNavURL('waze', navQ(stop));
+  var mapsURL = buildNavURL('maps', navQ(stop));
   return '<div class="comp-wrap">' +
     '<div class="comp-hdr">' +
       '<button id="compBkBtn" style="background:transparent;border:none;color:var(--t3);font-size:22px;cursor:pointer;padding:4px 10px">&#8592;</button>' +
@@ -4690,6 +4709,7 @@ function vCompanion() {
        return '<div class="comp-prog" role="progressbar" aria-label="Delivery progress" aria-valuemin="0" aria-valuemax="' + total + '" aria-valuenow="' + done + '" aria-valuetext="' + done + ' of ' + total + '">' +
          '<div class="comp-prog-fill' + (pct >= 100 ? ' full' : '') + '" style="width:' + pct + '%;--from:' + _from + '%;--to:' + pct + '%"></div></div>';
      })() +
+    unplacedNoteHtml() +
     '<div class="comp-body">' +
       '<div class="comp-stopnum">' + t('stop_of').replace('{i}', idx+1).replace('{n}', total) + (isLast ? ' ' + t('last_stop') : '') + '</div>' +
       '<div class="comp-addr">' + escH(stop.address) + '</div>' +
@@ -4854,7 +4874,7 @@ function markDelivered() {
   if (!wasLast && S.cNavApp && S.cAutoNav) {
     var nextStop = stops[S.cIdx];
     if (nextStop && nextStop.address) {
-      var url = buildNavURL(S.cNavApp, nextStop.address);
+      var url = buildNavURL(S.cNavApp, navQ(nextStop));
       // Same TWA rationale as the manual Waze/Maps buttons above:
       // window.open(_,'_blank') is silently swallowed in Chrome Custom Tabs.
       trackEvent('maps_opened', { map_type: 'companion_autonav_' + S.cNavApp });
@@ -5172,8 +5192,8 @@ function initRouteMap() {
 function showMapNavPopup(s, num, latlng) {
   hideMapNavPopup();
 
-  var wazeURL = 'https://waze.com/ul?q=' + encodeURIComponent(s.address) + '&navigate=yes';
-  var mapsURL = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(s.address);
+  var wazeURL = buildNavURL('waze', navQ(s));
+  var mapsURL = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(navQ(s));
 
   var el = document.createElement('div');
   el.className = 'map-nav-popup';
@@ -5455,7 +5475,8 @@ async function reoptimizeRemaining() {
   // Stage: remaining stops become the input; start = last delivered location.
   S.stops = remaining.map(function(st){
     return { id: st.id || mkId(), address: st.address, flexNum: st.flexNum != null ? st.flexNum : null,
-             coords: st.coords || null, pkgCount: st.pkgCount || 1, packageNums: st.packageNums || [], scanned: !!st.scanned };
+             coords: st.coords || null, pkgCount: st.pkgCount || 1, packageNums: st.packageNums || [], scanned: !!st.scanned,
+             _noGeocode: st._noGeocode || undefined, _estPos: st._estPos || undefined, _rescued: st._rescued || undefined, loose: st.loose || undefined };
   });
   var last = delivered.length ? delivered[delivered.length - 1] : null;
   if (last && last.coords) {
@@ -6642,10 +6663,22 @@ async function optimize() {
     if (cc === 'gb') return lat > 49 && lat < 62 && lon > -9 && lon < 3;
     return true;
   }
+  S._homeBias = 'none';
   if (S.home) {
-    const homePreview = await _tmo(geocode(S.home), 12000, null);
+    // A home address written without a comma before the city ("3 fermoy rd Scarborough") can match more than one place, and with
+    // nothing to search around the geocoder's first guess won out - one real run put home 14 km west of the actual street (the
+    // pin also became the search bias for every stop). The depot is in the driver's own metro area, so search around it first.
+    var _depPt = null;
+    if (S.startAddr) {
+      var _depPrev = await _tmo(geocode(S.startAddr), 12000, null);
+      if (_depPrev && _inCountry(_depPrev.lat, _depPrev.lon, S.userState)) _depPt = { lat: _depPrev.lat, lon: _depPrev.lon };
+    } else if (S.gpsCoords && S.gpsCoords.lat != null) {
+      _depPt = { lat: S.gpsCoords.lat, lon: S.gpsCoords.lon };
+    }
+    const homePreview = await _tmo(_depPt ? geocode(S.home, _depPt.lat, _depPt.lon) : geocode(S.home), 12000, null);
     if (homePreview && _inCountry(homePreview.lat, homePreview.lon, S.userState)) {
       biasLat = homePreview.lat; biasLon = homePreview.lon;
+      S._homeBias = _depPt ? 'depot' : 'none';
     }
   }
   // Sequential geocoding — one at a time to avoid rate-limiting Photon/Nominatim
@@ -10426,6 +10459,7 @@ function buildRouteReport() {
   L.push('build ' + FR_BUILD + (S._sample ? '  (SAMPLE ROUTE)' : ''));
   L.push('stops ' + list.length + '  | start ' + (S._startPt ? S._startPt.lat.toFixed(5) + ',' + S._startPt.lon.toFixed(5) : 'none') +
          '  | home ' + (S.homeCoords ? S.homeCoords.lat.toFixed(5) + ',' + S.homeCoords.lon.toFixed(5) : 'none'));
+  L.push('Home search  : ' + (S._homeBias === 'depot' ? 'searched around the depot' : 'no depot to search around (first match used)'));
   L.push('Amazon order : ' + f1(d.amazonM) + ', ' + fm(d.amazonS) + '   (as routed on the roads)');
   L.push('Router draft : ' + f1(d.draftM) + ', ' + fm(d.draftS));
   L.push('Shown to you : ' + f1(d.finalM) + ', ' + fm(d.finalS) + (d.remeasure && d.remeasure !== 'not needed' ? '   (re-measure: ' + d.remeasure + ')' : ''));
@@ -11105,7 +11139,7 @@ function _gMapsChunkBounds() {
 }
 
 function gMapsURL(chunkIndex) {
-  const allStops = S.optimized.map(s => s.address);
+  const allStops = S.optimized.map(s => navQ(s));
   const bounds = _gMapsChunkBounds();
   const idx = chunkIndex || 0;
   if (idx >= bounds.length) return '#';
