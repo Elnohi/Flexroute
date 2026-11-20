@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.10-v81';
+  var FR_BUILD = 'v2026.11.10-v84';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -7200,6 +7200,7 @@ async function optimize() {
   // Same street + nearby house numbers must be near each other; fix a stop that geocoded across the city.
   try { await _reconcileSameStreetNeighbors(); } catch (e) { console.warn('[FlexRoute] neighbour check skipped:', e); }
   try { await _reconcileLooseWithFlexNeighbours(); } catch (e) { console.warn('[FlexRoute] loose-address check skipped:', e); }
+  try { await _reconcileFlexOutliers(); } catch (e) { console.warn('[FlexRoute] outlier check skipped:', e); }
 
   const geocodedStops = S.stops.filter(s => s.coords !== null);
   const failedStops   = S.stops.filter(s => s.coords === null);
@@ -7414,6 +7415,14 @@ async function optimize() {
   })();
   // New route = new shift — reset companion progress so it starts fresh
   S.cIdx = 0; S.cDone = []; S.cShiftStart = null; S.cView = null;
+
+  // A position that had to be estimated makes the distance and time approximate. Say so, rather than presenting a
+  // saving to one decimal place that partly rests on a guess.
+  (function() {
+    var est = S.optimized.filter(function(o) { return o._estPos && !o.geoFailed; }).length;
+    if (est) (S._routeNotes = S._routeNotes || []).push(est + (est > 1 ? ' stop positions are estimated' : ' stop position is estimated') +
+      ', so the distance and time shown are approximate.');
+  })();
 
   if (origDist != null && tripDist != null) {
     const savedKm  = Math.max(0, round1((origDist - tripDist) / 1000));
@@ -10153,6 +10162,81 @@ async function _reconcileLooseWithFlexNeighbours() {
     }
   }
 }
+// Amazon numbers its stops in delivery order, so a stop is close to the stops numbered either side of it. When a stop
+// lands far from BOTH of those and they agree with each other, it is the stop's own map position that is wrong, not
+// Amazon's order. Search again aimed between them; if nothing better comes back, order the stop where Amazon has it.
+// The address itself is never changed, so Maps and Waze still navigate by the address and can resolve it better than
+// we can -- only the position used for ORDERING moves. Anything touched here is flagged for the driver to check.
+async function _reconcileFlexOutliers() {
+  var all = S.stops.filter(function(s) { return s.coords && !s.geoFailed && !s._noGeocode && s.flexNum != null; });
+  if (all.length < 5) return;
+  // How tightly packed this route is. A country block has long gaps between stops for real; a city block does not,
+  // so what counts as "far" is measured against this route rather than against a fixed number of kilometres.
+  var nnOf = function(s) {
+    var best = Infinity;
+    all.forEach(function(o) { if (o !== s) { var d = _distKm(s.coords, o.coords); if (d < best) best = d; } });
+    return best;
+  };
+  var nn = all.map(nnOf).sort(function(x, y) { return x - y; });
+  var medNN = nn[Math.floor(nn.length / 2)];
+  var R = Math.max(1.5, medNN * 3);
+  // A stop with another stop beside it is corroborated: two addresses that landed together are very unlikely to
+  // have BOTH landed wrong in the same spot. Only corroborated stops are trusted as anchors, which matters when
+  // two stops next to each other in Amazon's numbering are both misplaced and would otherwise vouch for each other.
+  var anchored = {};
+  all.forEach(function(s) { anchored[s.id] = nnOf(s) <= R; });
+  // How far this driver normally travels from one stop to the next, measured on Amazon's own numbering, which is
+  // delivery order. A city block steps a couple of hundred metres between stops; a country block steps kilometres
+  // for real and must not be second-guessed on a city yardstick. Measured over the corroborated stops only, so the
+  // misplaced pins being hunted for cannot stretch the very yardstick used to judge them -- on a route with several
+  // bad positions, counting them hid every one of them behind the gaps they had themselves created.
+  var byNum = all.filter(function(o) { return anchored[o.id]; }).sort(function(x, y) { return x.flexNum - y.flexNum; });
+  var steps = [];
+  for (var q = 1; q < byNum.length; q++) steps.push(_distKm(byNum[q - 1].coords, byNum[q].coords));
+  steps.sort(function(x, y) { return x - y; });
+  var FAR = Math.max(3, (steps.length ? steps[Math.floor(steps.length * 0.75)] : 0) * 3);
+  var budget = Date.now() + 12000, calls = 0, fixed = 0;
+  for (var i = 0; i < all.length; i++) {
+    if (calls >= 4 || fixed >= 4 || Date.now() > budget) break;
+    var s = all[i];
+    if (anchored[s.id]) continue;                                 // it has company: leave it alone
+    // Two stops delivered together at a genuinely remote spot are a real thing, and Amazon numbers them one after the
+    // other. If a stop numbered within 3 of this one is sitting right beside it, this is that, not a misplaced pin.
+    var _paired = all.some(function(o) {
+      return o !== s && Math.abs(o.flexNum - s.flexNum) <= 3 && _distKm(s.coords, o.coords) <= R;
+    });
+    if (_paired) continue;
+    var lo = null, hi = null;                                     // nearest ANCHORED stop numbered below and above
+    all.forEach(function(o) {
+      if (o === s || !anchored[o.id]) return;
+      var g = o.flexNum - s.flexNum;
+      if (g < 0 && g >= -3 && (!lo || o.flexNum > lo.flexNum)) lo = o;
+      if (g > 0 && g <=  3 && (!hi || o.flexNum < hi.flexNum)) hi = o;
+    });
+    if (!lo || !hi) continue;                                     // nothing solid on one side: do not guess
+    if (_distKm(lo.coords, hi.coords) > 3) continue;              // the two sides disagree, so neither can be trusted
+    var d = Math.min(_distKm(s.coords, lo.coords), _distKm(s.coords, hi.coords));
+    if (d < FAR) continue;                                        // not an outlier at this route's scale
+    var mid = { lat: (lo.coords.lat + hi.coords.lat) / 2, lon: (lo.coords.lon + hi.coords.lon) / 2 };
+    var r = null; calls++;
+    try { r = await geocode(s.address, mid.lat, mid.lon); } catch (e) { r = null; }
+    if (r && haversineKm(r.lat, r.lon, mid.lat, mid.lon) < Math.min(d - 1, 2.5)) {
+      s.coords = { lat: r.lat, lon: r.lon, state: s.coords.state, country: s.coords.country };
+      fixed++;
+      (S._routeNotes = S._routeNotes || []).push('Corrected the map position of "' + s.address + '" (it had landed ' +
+        (Math.round(d * 10) / 10) + ' km from the stops numbered either side of it).');
+      if (typeof trackEvent === 'function') trackEvent('flex_outlier_fixed', { strategy: 'bias', km: Math.round(d * 10) / 10, region: S.userState || 'unknown' });
+      continue;
+    }
+    // Nothing better came back. Put it between its neighbours so the driving order is right, flag it, and leave the
+    // address alone so tapping Navigate still searches for the address itself.
+    s.coords = { lat: mid.lat, lon: mid.lon, state: s.coords.state, country: s.coords.country, _approximate: true, _est: true };
+    s._estPos = true; fixed++;
+    (S._routeNotes = S._routeNotes || []).push('Could not place "' + s.address + '" with confidence (it searched to a point ' +
+      (Math.round(d * 10) / 10) + ' km from the stops either side of it), so it is ordered where Amazon has it. Tap check on that stop.');
+    if (typeof trackEvent === 'function') trackEvent('flex_outlier_fixed', { strategy: 'between_neighbours', km: Math.round(d * 10) / 10, region: S.userState || 'unknown' });
+  }
+}
 async function _reconcileSameStreetNeighbors() {
   // This is the only step that makes extra geocoding calls inside a loop, and those calls are rate
   // limited, so on a long route it could keep the optimise screen spinning. Hard caps: at most 6
@@ -10162,16 +10246,47 @@ async function _reconcileSameStreetNeighbors() {
     .map(function(s) { return { s: s, p: _streetParts(s.address) }; }).filter(function(x) { return x.p; });
   // Nearest OTHER stop on the same street (house numbers within 300): the odd one out is the one that sits far
   // from the rest of its own street, even when it happens to land near unrelated stops elsewhere.
-  var streetMin = function(x, partner) {
-    var best = Infinity;
-    items.forEach(function(o) {
-      if (o === x || o === partner || o.p.street !== x.p.street || o.p.fam !== x.p.fam || Math.abs(o.p.num - x.p.num) > 300) return;
-      var d = _distKm(x.s.coords, o.s.coords); if (d < best) best = d;
+  // Held as the two nearest per stop, so leaving one partner out is still instant. Working it out inside the pair
+  // loop instead cost a cube of the stop count, which a long route with many stops on one street really felt.
+  // Rebuilt after every correction, so it always reflects where the stops are now, exactly as before.
+  items.forEach(function(x, k) { x.k = k; });
+  var _near2 = [], _rebuild = function() {
+    _near2 = items.map(function(x) {
+      var b1 = { d: Infinity, o: null }, b2 = { d: Infinity, o: null };
+      items.forEach(function(o) {
+        if (o === x || o.p.street !== x.p.street || o.p.fam !== x.p.fam || Math.abs(o.p.num - x.p.num) > 300) return;
+        var d = _distKm(x.s.coords, o.s.coords);
+        if (d < b1.d) { b2 = b1; b1 = { d: d, o: o }; } else if (d < b2.d) { b2 = { d: d, o: o }; }
+      });
+      return [b1, b2];
     });
-    return best;
+  };
+  // The nearest other stop anywhere on the route, held the same way for the same reason.
+  var _wc = S.stops.filter(function(o) { return o.coords; }), _nn2 = {};
+  var _rebuildNN = function() {
+    _nn2 = {};
+    _wc.forEach(function(x) {
+      var b1 = { d: Infinity, o: null }, b2 = { d: Infinity, o: null };
+      _wc.forEach(function(o) {
+        if (o === x) return;
+        var d = _distKm(x.coords, o.coords);
+        if (d < b1.d) { b2 = b1; b1 = { d: d, o: o }; } else if (d < b2.d) { b2 = { d: d, o: o }; }
+      });
+      _nn2[x.id] = [b1, b2];
+    });
+  };
+  var nearestOther = function(stop, exclude) {
+    var n2 = _nn2[stop.id];
+    if (!n2) return _nearestOtherKm(stop, exclude);
+    return (n2[0].o && n2[0].o !== exclude) ? n2[0].d : (n2[1].o ? n2[1].d : Infinity);
+  };
+  _rebuild(); _rebuildNN();
+  var streetMin = function(x, partner) {
+    var n2 = _near2[x.k];
+    return (n2[0].o && n2[0].o !== partner) ? n2[0].d : (n2[1].o ? n2[1].d : Infinity);
   };
   var report = function(strategy, dKm, stop) {
-    _fixes++;
+    _fixes++; _rebuild(); _rebuildNN();                           // this stop moved: refresh the nearest-stop tables
     (S._routeNotes = S._routeNotes || []).push('Corrected the map position of "' + stop.address + '" (it had landed ' +
       (Math.round(dKm * 10) / 10) + ' km away from its neighbour on the same street).');
     if (typeof trackEvent === 'function') trackEvent('neighbor_geocode_fixed', { strategy: strategy, km: Math.round(dKm * 10) / 10, region: S.userState || 'unknown' });
@@ -10181,9 +10296,14 @@ async function _reconcileSameStreetNeighbors() {
     for (var b = a + 1; b < items.length; b++) {
       if (_fixes >= 6 || Date.now() > _budget) break;
       var A = items[a], B = items[b];
-      if (A.p.street !== B.p.street || A.p.fam !== B.p.fam || Math.abs(A.p.num - B.p.num) > 8) continue;
+      var _nd = Math.abs(A.p.num - B.p.num);
+      // House numbers this close on one street are a few blocks apart at most (about 100 numbers to a city block),
+      // so how far apart they are allowed to sit grows with the gap between the numbers. The window used to be 8,
+      // which meant "8 Park Road" and "50 Park Road" were never even compared, and one of them stayed 3 km out.
+      if (A.p.street !== B.p.street || A.p.fam !== B.p.fam || _nd > 400) continue;
       var dKm = _distKm(A.s.coords, B.s.coords);
-      if (dKm <= 0.4) continue;                                   // consistent: same building / neighbours
+      var _allow = 0.4 + _nd * 0.005;                             // 0.4 km for the same building, growing with the number gap
+      if (dKm <= _allow) continue;                                // consistent: same building / same stretch of street
       // 1) which one is the odd one out? other stops on the same street first, then plain isolation
       var bad = null, good = null, sA = streetMin(A, B), sB = streetMin(B, A);
       if (isFinite(sA) || isFinite(sB)) {
@@ -10191,14 +10311,14 @@ async function _reconcileSameStreetNeighbors() {
         else if ((isFinite(sB) ? sB : 1e9) > (isFinite(sA) ? sA : 1e9) + 0.5) { bad = B; good = A; }
       }
       if (!bad) {
-        var nnA = _nearestOtherKm(A.s, B.s), nnB = _nearestOtherKm(B.s, A.s);
+        var nnA = nearestOther(A.s, B.s), nnB = nearestOther(B.s, A.s);
         if (nnA > nnB + 0.5) { bad = A; good = B; } else if (nnB > nnA + 0.5) { bad = B; good = A; }
       }
       if (bad) {
         var r = null;
         try { r = await geocode(bad.s.address, good.s.coords.lat, good.s.coords.lon); } catch (e) { r = null; }
         if (r && _distKm(r, good.s.coords) <= 0.4) { bad.s.coords = r; report('bias', dKm, bad.s); }
-        else if (_nearestOtherKm(good.s, bad.s) <= 2) {            // the partner is well supported: put the pair together
+        else if (nearestOther(good.s, bad.s) <= 2) {               // the partner is well supported: put the pair together
           bad.s.coords = { lat: good.s.coords.lat, lon: good.s.coords.lon, state: good.s.coords.state, country: good.s.coords.country, snapped: true };
           report('snap', dKm, bad.s);
         }
@@ -10450,6 +10570,17 @@ function _streetVisits(list) {
   var multi = Object.keys(visits).filter(function(k) { return visits[k] > 1; }).sort(function(a, b) { return visits[b] - visits[a]; });
   return { total: total, streets: Object.keys(visits).length, multi: multi.map(function(k) { return k + ' x' + visits[k]; }) };
 }
+// The route report is copied out of the app and sent to others, so it must not carry what customers type into an address line: a
+// person's name ("16 Fallingbrook Drive Nadira Somwaru") or a business ("41 Beech Ave Hands Up Canada"). Keep the number, the
+// street, its type and direction, and a unit word with its number ("Building D", "Basement"); drop whatever follows. Report only:
+// the app itself keeps the full text.
+function _rptAddr(a) {
+  var str = String(a == null ? '' : a), parts = str.split(','), head = parts[0];
+  var m = head.match(/^(.*\b(?:street|st|avenue|ave|av|road|rd|boulevard|blvd|drive|dr|crescent|cres|court|ct|lane|ln|place|pl|way|circle|cir|terrace|terr|parkway|pkwy|highway|hwy|trail|trl|gate|grove|gardens|square|sq|close|row|walk|path)\b\.?(?:\s+(?:east|west|north|south|ne|nw|se|sw|e|w|n|s)\b\.?)?)(\s+\S.*)?$/i);
+  if (!m || !m[2]) return str;
+  var keep = m[2].trim().match(/^((?:unit|apt|apartment|suite|ste|basement|bsmt|rear|upper|lower|main|floor|fl|building|bldg|lobby|garage|side|back|front)\b\.?(?:\s*#?[A-Za-z0-9-]{1,4}\b)?)/i);
+  return m[1] + (keep ? ' ' + keep[1] : '') + (parts.length > 1 ? ',' + parts.slice(1).join(',') : '');
+}
 function buildRouteReport() {
   var L = [], list = (S.optimized || []).filter(function(s) { return !s.geoFailed; });
   var f1 = function(m) { return m == null ? '?' : (m / 1000).toFixed(1) + ' km'; };
@@ -10495,9 +10626,9 @@ function buildRouteReport() {
       leg = String((dm / 1000).toFixed(1)).padStart(6) + String(Math.round(ds / 60)).padStart(8) + '  ';
     }
     prevId = cur;
-    L.push(String(i + 1).padEnd(4) + (s.flexNum != null ? ('#' + s.flexNum) : '-').padEnd(6) + leg + (s.coords ? s.coords.lat.toFixed(5) + ',' + s.coords.lon.toFixed(5) : 'no coords').padEnd(24) + s.address +
+    L.push(String(i + 1).padEnd(4) + (s.flexNum != null ? ('#' + s.flexNum) : '-').padEnd(6) + leg + (s.coords ? s.coords.lat.toFixed(5) + ',' + s.coords.lon.toFixed(5) : 'no coords').padEnd(24) + _rptAddr(s.address) +
            ((s.pkgCount || 1) > 1 ? '  [' + s.pkgCount + ' pkgs]' : '') +
-           (s.geoFixed ? '   <-- MOVED ' + s.geoFixed + ' m onto its own street' : '') + (s.addrWas ? ' (address corrected from "' + s.addrWas.split(',')[0] + '")' : '') + (s.geoSuspect ? '   <-- SUSPECT: ' + (s.geoNote || '') : ''));
+           (s.geoFixed ? '   <-- MOVED ' + s.geoFixed + ' m onto its own street' : '') + (s.addrWas ? ' (address corrected from "' + _rptAddr(s.addrWas.split(',')[0]) + '")' : '') + (s.geoSuspect ? '   <-- SUSPECT: ' + (s.geoNote || '') : ''));
   });
   if (T && prevId != null && idx['__home__'] != null && idx[prevId] != null) {
     L.push('home'.padEnd(10) + String((T.dist[idx[prevId]][idx['__home__']] / 1000).toFixed(1)).padStart(6) + String(Math.round(T.dur[idx[prevId]][idx['__home__']] / 60)).padStart(8));
@@ -10511,7 +10642,7 @@ function buildRouteReport() {
     tr.forEach(function(f) {
       L.push('file ' + (f.file || '?') + (f.realigned ? '  [numbers realigned to the list structure: ' + f.realigned + ']' : ''));
       f.rows.slice(0, 80).forEach(function(w) {
-        L.push(String(w.k + 1).padStart(3) + '  ' + String(w.read == null ? '-' : w.read).padStart(4) + '  ' + String(w.was == null ? '-' : w.was).padStart(4) + '  ' + String(w.num == null ? '-' : w.num).padStart(4) + '  ' + String(w.kind || '').padEnd(5) + ' ' + String(w.pk == null ? '' : w.pk).padStart(2) + '  ' + w.a);
+        L.push(String(w.k + 1).padStart(3) + '  ' + String(w.read == null ? '-' : w.read).padStart(4) + '  ' + String(w.was == null ? '-' : w.was).padStart(4) + '  ' + String(w.num == null ? '-' : w.num).padStart(4) + '  ' + String(w.kind || '').padEnd(5) + ' ' + String(w.pk == null ? '' : w.pk).padStart(2) + '  ' + _rptAddr(w.a));
       });
     });
   }

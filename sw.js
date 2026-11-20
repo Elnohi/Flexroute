@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v81';   // v81: header shows the running build; a fine-tuned route that is 3+ minutes slower than the router's own is not shipped
+const CACHE = 'flexroute-v84';   // v84: stops that geocode to the wrong place are found and corrected from their Flex-numbered neighbours
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
