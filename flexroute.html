@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.10-v84';
+  var FR_BUILD = 'v2026.11.10-v86';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -6626,7 +6626,7 @@ async function optimize() {
   if (!S.stops.length) { S.errMsg = 'Add at least one stop first.'; render(); return; }
   S.errMsg = ''; S.savings = null; S.geoFailed = []; S.tweakMode = false;
   S.ldStep = 0; S.ldProg = 0; S.phase = 'optimizing'; render();
-  S._routeNotes = [];   // plain-language list of every adjustment made to the router's order, shown on the result screen
+  S._routeNotes = []; S._routeDiag = [];   // plain-language list of every adjustment made to the router's order, shown on the result screen
   trackEvent('route_optimization_started', {
     stop_count: S.stops.length,
     has_home: !!S.home,
@@ -7260,9 +7260,9 @@ async function optimize() {
   S._startPt = startPt;
   // Is every stop on the street its address names? Moves the ones that are not, flags the ones it cannot fix.
   const _street = await _verifyStopStreets(orderedForTrip, startPt);
-  if (_street.moved > 0) S._routeNotes.push('Moved ' + _street.moved + ' stop' + (_street.moved > 1 ? 's' : '') + ' onto the street named in ' + (_street.moved > 1 ? 'their addresses' : 'its address') +
+  if (_street.moved > 0) (S._routeDiag = S._routeDiag || []).push('Moved ' + _street.moved + ' stop' + (_street.moved > 1 ? 's' : '') + ' onto the street named in ' + (_street.moved > 1 ? 'their addresses' : 'its address') +
     ': ' + orderedForTrip.filter(function(s) { return s.geoFixed; }).slice(0, 3).map(function(s) { return s.address.split(',')[0]; }).join('; ') + '.');
-  if (_street.suspect > 0) S._routeNotes.push(_street.suspect + ' stop' + (_street.suspect > 1 ? 's' : '') + ' may be on the wrong street and could not be corrected: ' +
+  if (_street.suspect > 0) (S._routeDiag = S._routeDiag || []).push(_street.suspect + ' stop' + (_street.suspect > 1 ? 's' : '') + ' may be on the wrong street and could not be corrected: ' +
     orderedForTrip.filter(function(s) { return s.geoSuspect; }).slice(0, 3).map(function(s) { return s.address.split(',')[0]; }).join('; ') + '. Tap \u26a0 check on the stop to see where the app put it.');
   const tripCoords = [
     ...(startPt ? [startPt] : []),
@@ -7336,7 +7336,7 @@ async function optimize() {
             optimizedOrder = _osrmOrder; tripDist = _osrmDist; tripDur = _osrmDur;
             _orderChanged = false; _groupedTogether = false;
             _remeasure = 'reverted';
-            S._routeNotes.push("Kept the router's own order (the fine-tuning would have made the drive longer).");
+            (S._routeDiag = S._routeDiag || []).push("Kept the router's own order (the fine-tuning would have made the drive longer).");
             trackEvent('route_changes_reverted', { extra_m: Math.round(_nr.distance - _osrmDist), extra_s: Math.round(_nr.duration - _osrmDur), region: S.userState || 'unknown' });
           } else if (_nr) { tripDist = _nr.distance; tripDur = _nr.duration; _remeasure = 'ok'; }
           else if (_refTot && _refTot.m != null) {
@@ -7360,7 +7360,7 @@ async function optimize() {
           if (_n2 && _n2.distance < _osrmDist - 50 && _n2.duration <= _osrmDur + 60) {
             optimizedOrder = _cand; tripDist = _n2.distance; tripDur = _n2.duration; _orderChanged = true; _groupedTogether = false;
             _remeasure = 'ok (a smaller change to the draft; the full search order was turned down)'; _altInfo.used = true; _altInfo.routeM = Math.round(_n2.distance); _altInfo.routeS = Math.round(_n2.duration);
-            S._routeNotes = S._routeNotes.filter(n => !/^Kept the router's own order/.test(n));
+            S._routeDiag = (S._routeDiag || []).filter(n => !/^Kept the router's own order/.test(n));
             trackEvent('route_alt_order_used', { stop_count: _cand.length, saved_m: Math.round(_osrmDist - _n2.distance), region: S.userState || 'unknown' });
             break;
           }
@@ -7372,7 +7372,7 @@ async function optimize() {
       if (!lastStop && origDist != null && origDur != null && tripDist != null && tripDur != null &&
           tripDist > origDist + 100 && tripDur > origDur) {
         optimizedOrder = orderedForTrip.slice(); tripDist = origDist; tripDur = origDur; _orderChanged = false;
-        S._routeNotes.push("Kept Amazon's order: our best alternative was not shorter on the road.");
+        (S._routeDiag = S._routeDiag || []).push("Kept Amazon's order: our best alternative was not shorter on the road.");
         trackEvent('route_kept_amazon_order', { stop_count: optimizedOrder.length, region: S.userState || 'unknown' });
       }
       S._diag = S._diag || {};
@@ -7420,11 +7420,14 @@ async function optimize() {
   // saving to one decimal place that partly rests on a guess.
   (function() {
     var est = S.optimized.filter(function(o) { return o._estPos && !o.geoFailed; }).length;
-    if (est) (S._routeNotes = S._routeNotes || []).push(est + (est > 1 ? ' stop positions are estimated' : ' stop position is estimated') +
+    if (est) (S._routeDiag = S._routeDiag || []).push(est + (est > 1 ? ' stop positions are estimated' : ' stop position is estimated') +
       ', so the distance and time shown are approximate.');
   })();
 
-  if (origDist != null && tripDist != null) {
+  // A saving worked out from positions that are guesses is not a saving: show none rather than an absurd one.
+  const _unsureSav = S.optimized.some(function(o) { return !o.geoFailed && o._estPos; });
+  if (_unsureSav) { S.savings = null; (S._routeDiag = S._routeDiag || []).push('Savings figure hidden: at least one stop position is estimated.'); }
+  if (!_unsureSav && origDist != null && tripDist != null) {
     const savedKm  = Math.max(0, round1((origDist - tripDist) / 1000));
     const savedMin = Math.max(0, Math.round((origDur - tripDur) / 60));
     S.savings = {
@@ -10220,19 +10223,49 @@ async function _reconcileFlexOutliers() {
     var mid = { lat: (lo.coords.lat + hi.coords.lat) / 2, lon: (lo.coords.lon + hi.coords.lon) / 2 };
     var r = null; calls++;
     try { r = await geocode(s.address, mid.lat, mid.lon); } catch (e) { r = null; }
+    if (!(r && haversineKm(r.lat, r.lon, mid.lat, mid.lon) < Math.min(d - 1, 2.5))) {
+      // The biased search did not come back near the neighbours. Search ONLY inside a box around them, and take only the
+      // very same street name (with the house number when there is one), so a look-alike street elsewhere cannot win.
+      try {
+        var _box = (mid.lon - 0.05).toFixed(5) + ',' + (mid.lat - 0.04).toFixed(5) + ',' + (mid.lon + 0.05).toFixed(5) + ',' + (mid.lat + 0.04).toFixed(5);
+        var _q = String(s.address).split(',').slice(0, 2).join(',').replace(/\b(unit|suite|ste|apt|front porch|buzz)\b.*$/i, '').trim();
+        var _pr = await _tmo(fetch('https://photon.komoot.io/api/?q=' + encodeURIComponent(_q) + '&limit=10&lang=en&bbox=' + _box), 8000, null);
+        var _pd = _pr && _pr.ok ? await _tmo(_pr.json(), 4000, null) : null;
+        var _core = _streetCoreOf(s.address), _num = _houseNumOf(s.address), _best = null;
+        ((_pd && _pd.features) || []).forEach(function(f) {
+          var pr = f.properties || {}, st = _streetCoreOf((pr.housenumber ? pr.housenumber + ' ' : '') + (pr.street || pr.name || ''));
+          if (!_coreMatches(st, _core)) return;
+          var ex = st.split(' ').filter(function(w) { return !_core.split(' ').some(function(x) { return _tokenClose(w, x); }); });
+          if (ex.length && !ex.every(function(w) { return /^(lower|upper|north|south|east|west|old|new|n|s|e|w)$/.test(w); })) return;
+          var hn = pr.housenumber ? parseInt(pr.housenumber, 10) : null;
+          if (_num != null && hn != null && hn !== _num) return;
+          var pt = { lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0] };
+          var dd = haversineKm(pt.lat, pt.lon, mid.lat, mid.lon) - (hn != null && hn === _num ? 1 : 0);   // an exact house number is preferred
+          if (!_best || dd < _best.dd) _best = { lat: pt.lat, lon: pt.lon, dd: dd };
+        });
+        if (_best) r = { lat: _best.lat, lon: _best.lon };
+      } catch (e) {}
+    }
+    // A search aimed at its neighbours that still comes back to where the stop already is has CONFIRMED the position: a real
+    // remote stop, not a misplaced one. Leave it exactly as it was.
+    if (r && haversineKm(r.lat, r.lon, s.coords.lat, s.coords.lon) < 0.5) continue;
+    // No answer at all (offline, or the service is down) proves nothing about this stop: leave it exactly as it was.
+    if (!r) continue;
     if (r && haversineKm(r.lat, r.lon, mid.lat, mid.lon) < Math.min(d - 1, 2.5)) {
       s.coords = { lat: r.lat, lon: r.lon, state: s.coords.state, country: s.coords.country };
       fixed++;
-      (S._routeNotes = S._routeNotes || []).push('Corrected the map position of "' + s.address + '" (it had landed ' +
+      (S._routeDiag = S._routeDiag || []).push('Corrected the map position of "' + s.address + '" (it had landed ' +
         (Math.round(d * 10) / 10) + ' km from the stops numbered either side of it).');
       if (typeof trackEvent === 'function') trackEvent('flex_outlier_fixed', { strategy: 'bias', km: Math.round(d * 10) / 10, region: S.userState || 'unknown' });
       continue;
     }
+    // Estimating a position is only safe on a tightly packed (city) route; on a spread-out one a stop far from the rest is usually real.
+    if (medNN > 0.6) continue;
     // Nothing better came back. Put it between its neighbours so the driving order is right, flag it, and leave the
     // address alone so tapping Navigate still searches for the address itself.
     s.coords = { lat: mid.lat, lon: mid.lon, state: s.coords.state, country: s.coords.country, _approximate: true, _est: true };
     s._estPos = true; fixed++;
-    (S._routeNotes = S._routeNotes || []).push('Could not place "' + s.address + '" with confidence (it searched to a point ' +
+    (S._routeDiag = S._routeDiag || []).push('Could not place "' + s.address + '" with confidence (it searched to a point ' +
       (Math.round(d * 10) / 10) + ' km from the stops either side of it), so it is ordered where Amazon has it. Tap check on that stop.');
     if (typeof trackEvent === 'function') trackEvent('flex_outlier_fixed', { strategy: 'between_neighbours', km: Math.round(d * 10) / 10, region: S.userState || 'unknown' });
   }
@@ -10287,7 +10320,7 @@ async function _reconcileSameStreetNeighbors() {
   };
   var report = function(strategy, dKm, stop) {
     _fixes++; _rebuild(); _rebuildNN();                           // this stop moved: refresh the nearest-stop tables
-    (S._routeNotes = S._routeNotes || []).push('Corrected the map position of "' + stop.address + '" (it had landed ' +
+    (S._routeDiag = S._routeDiag || []).push('Corrected the map position of "' + stop.address + '" (it had landed ' +
       (Math.round(dKm * 10) / 10) + ' km away from its neighbour on the same street).');
     if (typeof trackEvent === 'function') trackEvent('neighbor_geocode_fixed', { strategy: strategy, km: Math.round(dKm * 10) / 10, region: S.userState || 'unknown' });
   };
@@ -10609,6 +10642,7 @@ function buildRouteReport() {
                                                         : 'tried ' + d.alt.tried + ' smaller change' + (d.alt.tried === 1 ? '' : 's') + ' to the draft; none was shorter than the draft on the route lookup'));
   }
   if (st && st.detail && st.detail.length) st.detail.forEach(function(x) { L.push('   flagged     : ' + x.addr + '  (snapped to ' + x.snappedTo + ')  ->  ' + x.outcome); });
+  (S._routeDiag || []).concat(S._routeNotes || []).forEach(function(n) { L.push('Note         : ' + n); });
   var sv = _streetVisits(list);
   L.push('Streets      : ' + sv.total + ' separate street visits on ' + sv.streets + ' streets' + (sv.multi.length ? ' | returns to: ' + sv.multi.join(', ') : ' | no street is visited twice'));
   var amz = (S.stops || []).filter(function(s) { return !s.geoFailed; }).slice().sort(function(a, b) { return (a.flexNum == null ? 1e9 : a.flexNum) - (b.flexNum == null ? 1e9 : b.flexNum); });
@@ -10809,6 +10843,7 @@ async function _verifyStopStreets(stops, startPt) {
     res.ran = true;
     var flagged = [], okSet = new Set();      // okSet: stops whose own street was verified; only these may vouch for another stop
     stops.forEach(function(s, k) {
+      if (s._estPos) return;                                                     // an estimated position is not on any street by design
       var core = _streetCoreOf(s.address); if (!_checkableCore(core)) return;
       res.checked++;
       var name = D.names[k + off], snap = D.snaps ? D.snaps[k + off] : null;
@@ -10828,6 +10863,15 @@ async function _verifyStopStreets(stops, startPt) {
       var both = await Promise.all([_geoCandidatesFor(f.s.address, med.lat, med.lon)]), cands = both[0], num = _houseNumOf(f.s.address), fixed = null;
       cands = cands.filter(function(c) {
         var lbl = _streetCoreOf(c.label); if (!_coreMatches(lbl, f.core)) return false;
+        // The candidate may not carry extra name words of its own ("Park Road" is not "Heydon Park Road"), except a plain
+        // direction or "old/new" prefix. Only a street that is the very same name is a correction.
+        var _extra = lbl.split(' ').filter(function(w) { return !f.core.split(' ').some(function(x) { return _tokenClose(w, x); }); });
+        if (_extra.length && !_extra.every(function(w) { return /^(lower|upper|north|south|east|west|old|new|n|s|e|w)$/.test(w); })) return false;
+        // And it must sit near the stops Amazon delivers just before and after this one (their numbers are consecutive).
+        if (f.s.flexNum != null) {
+          var _nb = stops.filter(function(o) { return o !== f.s && o.coords && o.flexNum != null && Math.abs(o.flexNum - f.s.flexNum) <= 2 && !flagged.some(function(g) { return g.s === o; }); });
+          if (_nb.length && Math.min.apply(null, _nb.map(function(o) { return haversineKm(c.lat, c.lon, o.coords.lat, o.coords.lon); })) > 4) return false;
+        }
         var cn = _houseNumOf(c.label); if (num != null && cn !== num) return false;       // the very house number, on the right street
         if (haversineKm(c.lat, c.lon, med.lat, med.lon) > 8) return false;
         return haversineKm(c.lat, c.lon, f.s.coords.lat, f.s.coords.lon) > 0.04;           // not the same wrong place again
@@ -11046,7 +11090,7 @@ function startSample() {
   S.startAddr = t('sample_depot') + ' \u2014 Brighton Blvd, Denver';
   S.home = t('sample_home') + ' \u2014 1000 Clarkson St, Denver';
   S._startPt = D.depot; S.homeCoords = D.home;
-  S.geoFailed = []; S._routeNotes = []; S.tweakMode = false; S.lastId = null; S._scanSummary = null; S.errMsg = ''; S._trialStopCapped = false;
+  S.geoFailed = []; S._routeNotes = []; S._routeDiag = []; S.tweakMode = false; S.lastId = null; S._scanSummary = null; S.errMsg = ''; S._trialStopCapped = false;
   S.savingsOpen = true;     // show the full card, which carries the ESTIMATED tag, instead of the bare numbers
   S.companion = false; S.cIdx = 0; S.cDone = []; S.cShiftStart = null; S.cView = null;
   S.phase = 'result';

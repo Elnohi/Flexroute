@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v84';   // v84: stops that geocode to the wrong place are found and corrected from their Flex-numbered neighbours
+const CACHE = 'flexroute-v86';   // v85: no technical notes on the result screen; honest savings; stricter street fixes
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
