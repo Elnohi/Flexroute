@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v86';   // v85: no technical notes on the result screen; honest savings; stricter street fixes
+const CACHE = 'flexroute-v87';   // v87 = v81 + a silent check for a stop placed far from the stops Amazon numbers either side of it
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 
