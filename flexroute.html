@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.10-v87';
+  var FR_BUILD = 'v2026.11.10-v89';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -4512,7 +4512,7 @@ function vResult() {
   <div style="font-size:11px;color:var(--t3);margin:-4px 0 12px 2px">
     ${(function(){ var _sh = _pkgShown(S.optimized.reduce(function(sum,s){return sum+(s.pkgCount||1);},0), S.stops.length); return _sh.n + (_sh.flex ? ' (Amazon\'s total; per-stop counts unconfirmed)' : '') + ' packages scanned'; })()} &mdash; check this against your Flex app before you drive off
   </div>
-  ${(S._routeNotes && S._routeNotes.length) ? '<div id="routeNotes" style="font-size:11px;color:var(--t2);margin:-6px 0 12px 2px;line-height:1.5">' + S._routeNotes.map(function(n){ return '&bull; ' + escH(n); }).join('<br>') + '</div>' : ''}
+  ${false ? '<div id="routeNotes" style="font-size:11px;color:var(--t2);margin:-6px 0 12px 2px;line-height:1.5">' + S._routeNotes.map(function(n){ return '&bull; ' + escH(n); }).join('<br>') + '</div>' : ''}
 
   ${S._trialStopCapped ? `
   <div style="background:var(--acc-d);border:1.5px solid var(--acc);border-radius:16px;padding:14px 16px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:10px">
@@ -5588,7 +5588,7 @@ function rRow(s, i) {
   <div style="flex:1;min-width:0">
   <div style="display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:4px 8px">
     <div class="ri-addr" style="flex:1 1 170px;min-width:0">${escH(s.address)}</div>
-    ${s.coords ? `<a href="https://www.google.com/maps/search/?api=1&query=${s.coords.lat},${s.coords.lon}" target="_blank"
+    ${(s.coords && (s.geoSuspect || s._estPos)) ? `<a href="https://www.google.com/maps/search/?api=1&query=${s.coords.lat},${s.coords.lon}" target="_blank"
       style="flex-shrink:0;font-size:11px;color:${(s.geoSuspect || s._estPos) ? '#FFB300' : 'var(--t3)'};text-decoration:none;padding:3px 7px;border:1px solid ${(s.geoSuspect || s._estPos) ? '#FFB300' : 'var(--brd)'};border-radius:6px;white-space:nowrap;margin-top:2px;${(s.geoSuspect || s._estPos) ? 'font-weight:700' : ''}"
       title="${s.geoSuspect ? escH('This stop may be on the wrong street (' + (s.geoNote || '') + '). Tap to see where the app put it.') : (s._estPos ? 'Position estimated from the stops before and after it. Tap to check it in Maps.' : 'Verify this location on Google Maps')}">${(s.geoSuspect || s._estPos) ? t('verify_warn') : '&#128205; verify'}</a>` : ''}
   </div>
@@ -10639,6 +10639,7 @@ function buildRouteReport() {
                                                         : 'tried ' + d.alt.tried + ' smaller change' + (d.alt.tried === 1 ? '' : 's') + ' to the draft; none was shorter than the draft on the route lookup'));
   }
   if (st && st.detail && st.detail.length) st.detail.forEach(function(x) { L.push('   flagged     : ' + x.addr + '  (snapped to ' + x.snappedTo + ')  ->  ' + x.outcome); });
+  (S._routeNotes || []).forEach(function(n) { L.push('Note         : ' + n); });
   var sv = _streetVisits(list);
   L.push('Streets      : ' + sv.total + ' separate street visits on ' + sv.streets + ' streets' + (sv.multi.length ? ' | returns to: ' + sv.multi.join(', ') : ' | no street is visited twice'));
   var amz = (S.stops || []).filter(function(s) { return !s.geoFailed; }).slice().sort(function(a, b) { return (a.flexNum == null ? 1e9 : a.flexNum) - (b.flexNum == null ? 1e9 : b.flexNum); });
