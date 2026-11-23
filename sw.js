@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v89';   // v89 = v88 + the per-stop verify link only appears on a stop flagged as possibly misplaced
+const CACHE = 'flexroute-v90';   // v90 = v89 + no placeholder stops for a gap wider than two numbers in the Flex numbering
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

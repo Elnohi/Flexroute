@@ -402,7 +402,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.10-v89';
+  var FR_BUILD = 'v2026.11.10-v90';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -6048,6 +6048,9 @@ function _fillFlexNumberGaps() {
   var list = Object.keys(have).map(Number).sort(function(a, b) { return a - b; });
   var made = 0;
   for (var i = 1; i < list.length && made < 20; i++) {
+    // A hole of one or two numbers is a stop that was skipped. A wider hole is almost always one misread number or a screenshot
+    // that was never added, and filling it would invent a whole page of stops nobody has: leave it alone.
+    if (list[i] - list[i - 1] - 1 > 2) continue;
     for (var n = list[i - 1] + 1; n < list[i] && made < 20; n++) {
       if (have[n]) continue;
       var addr = 'Stop #' + n + ' (not read - check Flex app)';
