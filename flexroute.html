@@ -123,6 +123,8 @@ input::placeholder{color:var(--t3);font-size:14px}
 .btn{font-family:var(--sans);font-weight:800;letter-spacing:.5px;cursor:pointer;border:none;border-radius:10px;transition:background .15s,transform .1s}
 .btn:active{transform:scale(.98)}
 .bp{background:var(--acc);color:#000;padding:16px 20px;font-size:18px;width:100%;display:flex;align-items:center;justify-content:center;gap:8px}
+.bhome{width:100%;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:10px;background:#4DB8FF;color:#031B2E;font-size:18px;font-weight:800;text-decoration:none;box-shadow:0 6px 18px rgba(77,184,255,.28)}
+.bhome:active{background:#2FA3F0}
 .bp:disabled{background:var(--surf2);color:var(--t3);cursor:not-allowed;transform:none;opacity:.5}
 .bg{background:transparent;border:1px solid var(--brd);color:var(--t3);padding:11px 16px;font-size:14px;width:100%;letter-spacing:.5px;border-radius:var(--rs)}
 .badd{background:var(--acc);color:#000;padding:0 16px;font-size:22px;font-weight:800;height:44px;flex-shrink:0;border-radius:var(--rs);border:none;cursor:pointer}
@@ -402,7 +404,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.10-v90';
+  var FR_BUILD = 'v2026.11.10-v92';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -2030,7 +2032,7 @@ var LANGS = {
     map_start: 'START',
     map_home: 'HOME',
     hero_kicker: 'Amazon Flex Drivers',
-    hero_title: 'Shorter route.<br>Home sooner.',
+    hero_title: 'Shorter route.<br>Less driving.',
     hero_sub: 'Screenshot your stop list. Get the shortest route in seconds.',
     trial_ended_title: 'Free premium has ended',
     trial_ended_sub: 'Subscribe to continue optimizing your routes.',
@@ -2090,6 +2092,8 @@ var LANGS = {
     back_to_current: 'Back to stop {n}',
     stops_delivered: '{n} stops',
     done_back: '✓ Done — Back to route',
+    done_close: '✓ Done — Close the app',
+    closed_msg: 'All done. Your shift is saved. You can close the app now.',
     you_save: 'You save {km} {unit} & ~{min} min',
     dist_saved: 'Distance saved',
     time_saved: 'Time saved',
@@ -2303,7 +2307,7 @@ var LANGS = {
     map_start: 'DÉPART',
     map_home: 'DOMICILE',
     hero_kicker: 'Chauffeurs Amazon Flex',
-    hero_title: 'Trajet plus court.<br>Retour plus tôt.',
+    hero_title: 'Trajet plus court.<br>Moins de route.',
     hero_sub: 'Faites une capture de votre liste d’arrêts. Obtenez l’itinéraire le plus court en quelques secondes.',
     trial_ended_title: 'L’accès premium gratuit est terminé',
     trial_ended_sub: 'Abonnez-vous pour continuer à optimiser vos itinéraires.',
@@ -2363,6 +2367,8 @@ var LANGS = {
     back_to_current: 'Retour à l’arrêt {n}',
     stops_delivered: '{n} arrêts',
     done_back: '✓ Terminé — Retour à l\'itinéraire',
+    done_close: '✓ Terminé — Fermer l\'application',
+    closed_msg: 'Terminé. Votre quart est enregistré. Vous pouvez fermer l\'application.',
     you_save: 'Vous économisez {km} {unit} & ~{min} min',
     dist_saved: 'Distance économisée',
     time_saved: 'Temps économisé',
@@ -2576,7 +2582,7 @@ var LANGS = {
     map_start: 'START',
     map_home: 'ZUHAUSE',
     hero_kicker: 'Amazon-Flex-Fahrer',
-    hero_title: 'Kürzere Route.<br>Früher zu Hause.',
+    hero_title: 'Kürzere Route.<br>Weniger Fahrstrecke.',
     hero_sub: 'Screenshot der Stopp-Liste machen. In Sekunden die kürzeste Route erhalten.',
     trial_ended_title: 'Das kostenlose Premium ist beendet',
     trial_ended_sub: 'Abonnieren Sie, um weiter Routen zu optimieren.',
@@ -2636,6 +2642,8 @@ var LANGS = {
     back_to_current: 'Zur\u00fcck zu Stopp {n}',
     stops_delivered: '{n} Stopps',
     done_back: '✓ Fertig — Zurück zur Route',
+    done_close: '✓ Fertig — App schließen',
+    closed_msg: 'Fertig. Deine Schicht ist gespeichert. Du kannst die App jetzt schließen.',
     you_save: 'Sie sparen {km} {unit} & ~{min} Min',
     dist_saved: 'Distanz gespart',
     time_saved: 'Zeit gespart',
@@ -2849,7 +2857,7 @@ var LANGS = {
     map_start: 'INICIO',
     map_home: 'CASA',
     hero_kicker: 'Conductores de Amazon Flex',
-    hero_title: 'Ruta más corta.<br>Llegas antes a casa.',
+    hero_title: 'Ruta más corta.<br>Menos manejo.',
     hero_sub: 'Haz una captura de tu lista de paradas. Obtén la ruta más corta en segundos.',
     trial_ended_title: 'El premium gratuito ha terminado',
     trial_ended_sub: 'Suscríbete para seguir optimizando tus rutas.',
@@ -2909,6 +2917,8 @@ var LANGS = {
     back_to_current: 'Volver a la parada {n}',
     stops_delivered: '{n} paradas',
     done_back: '✓ Listo — Volver a la ruta',
+    done_close: '✓ Listo — Cerrar la app',
+    closed_msg: 'Listo. Tu turno está guardado. Ya puedes cerrar la app.',
     you_save: 'Ahorras {km} {unit} & ~{min} min',
     dist_saved: 'Distancia ahorrada',
     time_saved: 'Tiempo ahorrado',
@@ -3122,7 +3132,7 @@ var LANGS = {
     map_start: 'INÍCIO',
     map_home: 'CASA',
     hero_kicker: 'Motoristas Amazon Flex',
-    hero_title: 'Rota mais curta.<br>Mais cedo em casa.',
+    hero_title: 'Rota mais curta.<br>Menos estrada.',
     hero_sub: 'Tire uma captura de tela da sua lista de paradas. Receba a rota mais curta em segundos.',
     trial_ended_title: 'O premium gratuito terminou',
     trial_ended_sub: 'Assine para continuar otimizando suas rotas.',
@@ -3182,6 +3192,8 @@ var LANGS = {
     back_to_current: 'Voltar à parada {n}',
     stops_delivered: '{n} paradas',
     done_back: '✓ Concluído — Voltar à rota',
+    done_close: '✓ Concluído — Fechar o app',
+    closed_msg: 'Tudo certo. Seu turno está salvo. Você já pode fechar o app.',
     you_save: 'Você economiza {km} {unit} e ~{min} min',
     dist_saved: 'Distância economizada',
     time_saved: 'Tempo economizado',
@@ -4675,7 +4687,7 @@ function vCompanion() {
     if (S.home && S.home.trim()) {
       var _hq = encodeURIComponent(S.home.trim());
       _homeBtn = '<a href="https://www.google.com/maps/dir/?api=1&destination=' + _hq + '" target="_blank" ' +
-        'class="btn" style="font-size:18px;padding:16px 32px;margin-bottom:12px;text-decoration:none;display:block;text-align:center">' +
+        'class="btn bhome" style="padding:16px 32px;margin-bottom:12px">' +
         '🏠 ' + t('nav_home') + '</a>';
     }
     return '<div class="comp-wrap"><div class="comp-body" style="height:100vh">' +
@@ -4685,7 +4697,7 @@ function vCompanion() {
       unplacedNoteHtml() +
       reviewCardHtml() +
       _homeBtn +
-      '<button id="compFinishBtn" class="btn bp" style="font-size:18px;padding:16px 32px">' + t('done_back') + '</button>' +
+      '<button id="compFinishBtn" class="btn bp" style="font-size:18px;padding:16px 32px">' + t('done_close') + '</button>' +
       '</div></div>';
   }
   var wazeURL = buildNavURL('waze', navQ(stop));
@@ -4808,6 +4820,28 @@ function toggleCompList() {
 
 // how: 'back' (the arrow) or 'finish' (the Done button on the completion screen). The event records how far the
 // driver got, so "started but never finished" can be told apart from "finished and tapped Done".
+// End of shift: save, then close the app. A browser tab or an installed Android app usually refuses to close itself from a
+// script, so when it is still open a moment later a quiet "all done" screen covers it (with a way back to the route).
+function closeAppAfterShift() {
+  try { trackEvent('companion_exit', { how: 'finish_close', done: S.cDone.length, total: S.optimized.filter(function(x) { return !x.geoFailed; }).length,
+    completed: 1, elapsed_mins: S.cShiftStart ? Math.round((Date.now() - S.cShiftStart) / 60000) : 0 }); } catch (e) {}
+  S.companion = false; S.cView = null; S.phase = 'result';
+  try { saveSession(); } catch (e) {}
+  try { window.open('', '_self'); window.close(); } catch (e) {}
+  setTimeout(function() {
+    if (document.visibilityState === 'hidden') return;
+    var ov = document.createElement('div');
+    ov.id = 'closedOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;text-align:center';
+    ov.innerHTML = '<div style="font-size:56px;margin-bottom:16px">🎉</div>' +
+      '<div style="font-family:var(--sans);font-size:26px;font-weight:800;color:var(--ok);margin-bottom:12px">' + t('shift_complete') + '</div>' +
+      '<div style="font-size:17px;color:var(--t2);max-width:320px;margin-bottom:36px">' + t('closed_msg') + '</div>' +
+      '<button id="closedBack" class="btn bg" style="max-width:280px">' + t('back_to_route').replace(/^[^\u2014]*\u2014\s*/, '') + '</button>';
+    document.body.appendChild(ov);
+    document.getElementById('closedBack').addEventListener('click', function() { ov.remove(); render(); });
+  }, 450);
+}
+
 function exitCompanion(how) {
   if (S.companion) {
     var _tot = S.optimized.filter(function(x) { return !x.geoFailed; }).length;
@@ -5263,7 +5297,7 @@ function bindCompanion() {
   if (bkC) bkC.addEventListener('click', function() { exitCompanion('back'); });
   // Completion Done button
   var doneC = document.getElementById('compFinishBtn');
-  if (doneC) doneC.addEventListener('click', function() { exitCompanion('finish'); });
+  if (doneC) doneC.addEventListener('click', function() { closeAppAfterShift(); });
   var autoNavBtn = document.getElementById('compAutoNavBtn');
   if (autoNavBtn) autoNavBtn.addEventListener('click', function(){
     S.cAutoNav = !S.cAutoNav;
