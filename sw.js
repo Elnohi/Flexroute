@@ -3,7 +3,7 @@
 //     users on their next cold launch. The network-first design only helped
 //     partially before, because Chrome's HTTP cache underneath was still
 //     returning stale flexroute.html in Custom Tab / TWA sessions.
-const CACHE = 'flexroute-v92';   // v92 = v91 + hero line no longer promises getting home sooner
+const CACHE = 'flexroute-v93';   // v93 = v92 + Done tries every way to close the app at shift end
 
 const SHELL = ['/flexroute.html', '/index.html', '/'];
 

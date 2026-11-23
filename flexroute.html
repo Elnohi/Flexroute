@@ -404,7 +404,7 @@ hr.dv{border:none;border-top:1px solid var(--brd);margin:11px 0}
   // 'standalone' = launched from the home screen (iOS "Add to Home Screen", or an installed PWA/Android app).
   var FR_DISPLAY = (window.navigator.standalone === true ||
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)) ? 'standalone' : 'browser';
-  var FR_BUILD = 'v2026.11.10-v92';
+  var FR_BUILD = 'v2026.11.10-v93';
   var FR_PLATFORM = /iphone|ipad|ipod/i.test(navigator.userAgent) ? 'ios'
     : (/android/i.test(navigator.userAgent) ? 'android' : 'other');
 
@@ -4827,7 +4827,14 @@ function closeAppAfterShift() {
     completed: 1, elapsed_mins: S.cShiftStart ? Math.round((Date.now() - S.cShiftStart) / 60000) : 0 }); } catch (e) {}
   S.companion = false; S.cView = null; S.phase = 'result';
   try { saveSession(); } catch (e) {}
+  // Closing from a script is refused almost everywhere, so try every way there is, all inside this tap:
+  // a wrapper app's own close hook, a plain window close, and (Android) the system "go to the home screen" action,
+  // which takes the app off the screen the same way pressing Home does.
+  try { if (window.Android && typeof window.Android.close === 'function') window.Android.close(); } catch (e) {}
+  try { if (window.Android && typeof window.Android.finish === 'function') window.Android.finish(); } catch (e) {}
+  try { if (navigator.app && typeof navigator.app.exitApp === 'function') navigator.app.exitApp(); } catch (e) {}
   try { window.open('', '_self'); window.close(); } catch (e) {}
+  try { if (/android/i.test(navigator.userAgent)) window.location.href = 'intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end'; } catch (e) {}
   setTimeout(function() {
     if (document.visibilityState === 'hidden') return;
     var ov = document.createElement('div');
@@ -4839,7 +4846,7 @@ function closeAppAfterShift() {
       '<button id="closedBack" class="btn bg" style="max-width:280px">' + t('back_to_route').replace(/^[^\u2014]*\u2014\s*/, '') + '</button>';
     document.body.appendChild(ov);
     document.getElementById('closedBack').addEventListener('click', function() { ov.remove(); render(); });
-  }, 450);
+  }, 1500);
 }
 
 function exitCompanion(how) {
